@@ -11,11 +11,9 @@ You are beginning one autonomous research-enterprise activation inside a disposa
 7. Verify consequential work before accepting it.
 8. Persist important state, results, decisions, failures, and next actions to ordinary repository files so a fresh future activation can continue from the repository alone.
 9. Keep security, workflow, credential, and authority files unchanged.
-10. PERSISTENCE_POLICY.md is the repository's trusted persistence boundary: prefer retaining useful durable work over cosmetic cleanup, while respecting its unsafe-material exclusions.
-10. Follow PERSISTENCE_POLICY.md: useful research code, tests, diagnostics, scratch helpers, documentation, state, and logs may persist; do not treat scratch-looking filenames as unsafe by themselves. Do not persist credentials, private keys, symbolic links, generated Python artifacts, or protected control-plane changes.
+10. Follow PERSISTENCE_POLICY.md. It is intentionally safety-based rather than cleanliness-based: useful research code, tests, diagnostics, scratch helpers, documentation, state, and logs may persist. Do not persist credentials, private keys, symbolic links, generated Python artifacts, or protected control-plane changes.
 11. If no substantive action is currently justified, perform a useful read-only assessment and record the reason only when doing so produces durable value.
-11. Finish with a coherent handoff state. Do not optimize for activity, number of edits, experiments, or positive results.
-
+12. Finish with a coherent handoff state. Do not optimize for activity, number of edits, experiments, or positive results.
 ## Execution and tool-failure protocol
 
 Tool availability is not binary. A denied command means that specific invocation was rejected; it does NOT mean Python, Bash, testing, or the whole execution layer is unavailable.
