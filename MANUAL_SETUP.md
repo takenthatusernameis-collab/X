@@ -15,6 +15,8 @@ If `KILO_API_KEY` is configured as a GitHub Actions repository secret, the workf
 
 The key is never printed or committed. The research agent does not receive the key.
 
+The diagnostic checks the authenticated Kilo profile endpoint directly: HTTP 200 is reported as VALID and HTTP 401 as INVALID. Other responses are reported as UNVERIFIED.
+
 ## Free model
 
 The workflow queries Kilo's live `/api/gateway/models` catalogue and selects a currently available `:free` model suitable for tool use. It then registers that model as a local Kilo custom model pointed at the OpenAI-compatible Gateway.
@@ -26,6 +28,8 @@ The selected research model is free; no Kilo credits are required for the free-m
 ## Anonymous versus authenticated free inference
 
 The research agent uses anonymous free inference. Kilo currently documents a 200 requests/hour/IP limit for anonymous free-model access.
+
+The Kilo OS sandbox is disabled in the GitHub-hosted runner because the runner's Linux user-namespace policy causes Kilo's Bubblewrap backend to fail with "setting up uid map: Permission denied". The workflow instead relies on the disposable GitHub runner boundary, Kilo's explicit permission denials, no Kilo-side GitHub token, and the trusted persistence step.
 
 The API key is therefore an optional diagnostic credential rather than a dependency of the research loop.
 
