@@ -1,4 +1,4 @@
-Read the trusted project instructions in AGENTS.md and ENTERPRISE.md before acting.
+Read the trusted project instructions in AGENTS.md, ENTERPRISE.md, and PERSISTENCE_POLICY.md before acting.
 
 You are beginning one autonomous research-enterprise activation inside a disposable GitHub Actions runner.
 
