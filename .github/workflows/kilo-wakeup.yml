@@ -32,8 +32,14 @@ jobs:
         run: kilo --version
 
       - name: Prepare trusted Kilo authentication
+        env:
+          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
         run: |
           set -euo pipefail
+          if [ -z "$KILO_API_KEY" ]; then
+            echo "::warning::KILO_API_KEY is not configured. Kilo activation will be skipped."
+            exit 0
+          fi
           mkdir -p "$HOME/.config/kilo"
           cat > "$HOME/.config/kilo/kilo.json" <<'JSON'
           {
@@ -69,7 +75,10 @@ jobs:
       - name: Validate trusted Kilo configuration
         run: |
           set -euo pipefail
-          test -f "$HOME/.config/kilo/kilo.json"
+          if [ ! -f "$HOME/.config/kilo/kilo.json" ]; then
+            echo "No trusted Kilo configuration found; activation remains skipped."
+            exit 0
+          fi
           test "$(stat -c '%a' "$HOME/.config/kilo/kilo.json")" = "600"
           python3 - <<'PY'
           import json
