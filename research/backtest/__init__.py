@@ -40,6 +40,25 @@ from .perturbation import (
     random_signals,
     sweep_summary,
 )
+from .regime_stability import (
+    EdgeFree,
+    EdgePresent,
+    OUTLIER_TOL,
+    RegimeScenario,
+    RegimeScenarioResult,
+    RegimeStressResult,
+    active_when_anything,
+    active_when_turbulent,
+    canonical_regime_scenarios,
+    conditional_signal,
+    deterministic_edge_signal,
+    generate_under,
+    regime_stress,
+    run_scenario,
+    stress_regime_scenarios,
+    direction_signal,
+    always_long_signal,
+)
 
 __all__ = [
     "__version__",
@@ -63,6 +82,12 @@ __all__ = [
     "LeakySignalError",
     "check_signal_integrity",
     "check_equity_matches_fills",
+    "ParameterSet",
+    "SweepResult",
+    "SweepSummary",
+    "OUTLIER_TOL",
+    "EdgeFree",
+    "EdgePresent",
     "ParameterSet",
     "SweepResult",
     "SweepSummary",

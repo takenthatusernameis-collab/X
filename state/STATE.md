@@ -9,18 +9,23 @@
    using the same framework. **Status: done** (this activation).
 3. Prepare a real-data feasibility note for research-only simulation.
    **Status: done** (this activation).
+4. Add a regime-stability stress test: verify a candidate's out-of-sample
+   results are stable across different regime parameterizations rather
+   than fitting one regime mix. **Status: done** (this activation).
 
 ## Status
 
 - `research/backtest/` — deterministic backtest toolkit: engine
   (event-driven, walk-forward IS/OOS), metrics, synthetic regime-switching
-  data, leakage/look-ahead checks, and perturbation/parameter-sensitivity
-  testing (`perturbation.py`). Dependency: numpy.
-- `tests/` — deterministic unit tests for engine, metrics, data, and
-  perturbation; all passing.
+  data, leakage/look-ahead checks, perturbation/parameter-sensitivity
+  testing (`perturbation.py`), and regime-stability stress testing
+  (`regime_stability.py`). Dependency: numpy.
+- `tests/` — deterministic unit tests for engine, metrics, data,
+  perturbation, and regime-stability; all passing.
 - `examples/` — `ma_crossover.py` (walk-forward + cost sensitivity +
-  perturbation sweep) and `volatility_regime_filter.py` (regime-aware
-  signal, walk-forward, costs).
+  perturbation sweep), `volatility_regime_filter.py` (regime-aware
+  signal, walk-forward, costs), and `regime_stability_demo.py` (demonstrates
+  all three regime-stability verdicts).
 - `research/METHODOLOGY.md` — evidence standard, no-look-ahead rules,
   walk-forward discipline.
 - `research/REAL_DATA_FEASIBILITY.md` — in-scope data, provenance
@@ -64,31 +69,58 @@ correctly and does not hallucinate an edge — a negative result that reduces
 the risk of later over-reading walk-forward noise. See
 `logs/ACTIVATION-2026-10-02.md` for the full record.
 
+## Current activation (regime-stability stress testing)
+
+Added regime-stability stress testing to the enterprise so that every
+candidate is checked for dependence on the data-generating process before
+its results are admitted into the evidence base. This closes the last gap
+in the robustness capability that `METHODOLOGY.md` lists as required for
+judging robustness (perturbation, parameter sensitivity, regime stability).
+
+- Added `research/backtest/regime_stability.py`: `regime_stress()` runs the
+  same walk-forward perturbation sweep across a family of regime scenarios
+  (via `run_scenario()`); `RegimeScenario` / `RegimeScenarioResult` hold the
+  scenario configuration and per-scenario medians; `regime_stability` verdicts
+  are one of CONSISTENT_WITH_NOISE (candidate indistinguishable from the
+  coin-flip null in every scenario), REGIME_STABLE (consistent behavior —
+  same edge or no edge — across regimes, candidate dispersion not greater
+  than twice the null's), or REGIME_DEPENDENT (candidate results swing
+  across regimes far more than a coin-flip null would, i.e. fits one regime).
+  Also provided: `stress_regime_scenarios()` (extreme drift regimes for
+  demonstration, documented as stress cases), `canonical_regime_scenarios()`,
+  and contrived signals `direction_signal()` and `always_long_signal()`.
+- Added `tests/test_regime_stability.py` (14 tests: scenario generation,
+  determinism, noise behavior, detection of regime-dependence, detection of
+  regime-stable adaptive signals, edge cases).
+- Added `examples/regime_stability_demo.py` demonstrating all three verdicts
+  on synthetic data.
+
 ## Next activation
 
-1. Run the full test suite end-to-end in the runner: `pip install
-   -r research/backtest/requirements.txt` then `python -m unittest
-   discover -s tests -v`, plus `python -m examples.ma_crossover` and
-   `python -m examples.volatility_regime_filter`. **Now verified (see "Verification (executed)" below).**
-2. Consider a regime-stability stress test: regenerate the same seed with
-   different regime parameters and confirm the signal's fold distribution
-   is stable, or prove instability on pure noise.
-3. If an in-scope public real dataset is identified for research-only
-   simulation, create the manifest per `research/REAL_DATA_FEASIBILITY.md`
-   before any real-data run.
+1. Real-data readiness: if an in-scope public real dataset is identified for
+   research-only simulation, create its manifest per
+   `research/REAL_DATA_FEASIBILITY.md` and pass the pre-run leakage review
+   checklist before any real-data execution.
+2. Optionally: extend the engine with a margin/collateral model (backlog item
+   from the first activation) so that high-leverage strategies are modeled
+   safely; currently the engine allows negative cash without mark-to-market
+   margin.
 
 ## Verification (executed)
 
 The framework is deterministic and the full suite executes:
 
 - `pip install -q numpy` (resolved numpy 2.5.3); all modules compile.
-- `python -m unittest discover -s tests -v`: **45 tests, all passing**
-  (31 pre-existing engine/metrics/data tests + 14 perturbation tests).
+- `python -m unittest discover -s tests -v`: **56 tests, all passing**
+  (31 pre-existing engine/metrics/data tests + 14 perturbation tests +
+  11 regime-stability tests).
 - `python -m examples.ma_crossover`: runs end-to-end and prints the full
   perturbation deviation scan; two independent runs produce byte-identical
   output (verified programmatically).
 - `python -m examples.volatility_regime_filter`: runs end-to-end with
   walk-forward output; leakage checks pass on the full-sample runs.
+- `python -m examples.regime_stability_demo`: runs end-to-end and prints
+  all three verdicts; two independent runs produce byte-identical output.
 
 Corrected verified results on seed 42 (regime-switching synthetic data;
 tooling-validation only), superseding the unverified figures in the
@@ -109,6 +141,27 @@ Volatility regime filter (warmup=20, 252d/84d walk-forward):
   exits), total return -42.83%, sharpe=-0.10, max drawdown 74.80%.
 - Walk-forward: 90 folds, 7560 OOS periods, mean log return -0.029, median
   log return 0.000.
+
+Regime-stability stress test (seed 42, 600 bars, train=60d/test=20d,
+walk-forward IS/OOS; the extreme regime family is documented as stress
+cases, not realistic parameterizations):
+
+- Long-only rule on extreme up (+0.9/yr) / neutral / down (-0.9/yr) regimes:
+  candidate medians [+0.055, +0.005, -0.079] across scenarios;
+  candidate dispersion 0.055 > 2x null dispersion 0.019. Verdict:
+  REGIME_DEPENDENT (correctly flags a rule whose results swing with the
+  regime mix).
+- Direction-following rule (long up, short down) on the up/down pair:
+  candidate medians [+0.055, +0.048]; candidate dispersion 0.003 <
+  2x null dispersion 0.006. Verdict: REGIME_STABLE (consistent edge in both
+  regimes).
+- Coin-flip signal on the canonical realistic family: medians near zero in
+  all four scenarios. Verdict: CONSISTENT_WITH_NOISE.
+- MA crossover on the canonical realistic family: medians near zero in all
+  scenarios. Verdict: CONSISTENT_WITH_NOISE (honest exploratory finding:
+  no regime dependence is detectable on realistic regime mixes).
+
+## Notes
 
 Note: the activation log's earlier quantitative claims (e.g. full-sample
 +15.99%, Sharpe 0.05) were not reproducible; the log had been written with

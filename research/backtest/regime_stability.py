@@ -1,0 +1,525 @@
+"""Regime-stability stress testing for walk-forward backtests.
+
+A strategy that is robust to market conditions should not depend on one
+particular regime configuration of the data. This module regenerates the
+same series under a family of regime parameterizations (volatility,
+transition speed, mean reversion, drift) and checks whether
+out-of-sample walk-forward results behave consistently across them.
+
+A robust strategy shows the same sign and roughly the same magnitude of
+performance in every scenario. A fragile one shows a scenario-specific
+edge (strong in one regime, noise-like in others); pure noise stays
+indistinguishable from the noise benchmark in every scenario.
+
+Usage::
+
+    bars = generate_bars(2500, seed=42)
+
+    grid = parameter_grid_around((("fast", 20), ("slow", 60)))
+    result = regime_stress(
+        signals_fn=ma_crossover_signals,
+        bars=list(bars),
+        param_grid=grid,
+        train_window=252,
+        test_window=84,
+        warmup=60,
+        overlap_window=60,
+    )
+    print(result.inspect())
+"""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+
+import numpy as np
+from numpy.typing import NDArray
+
+from .data import Bar, BarSequence, Regime, generate_bars
+from .engine import BacktestConfig, Signal
+from .perturbation import (
+    ParameterSet,
+    noise_benchmark,
+    parameter_grid_around,
+    parameter_sweep,
+    sweep_summary,
+)
+
+EdgeFree = 0
+EdgePresent = 1
+OUTLIER_TOL = 0.05
+"""Tolerance in log-return units for judging whether a scenario's result
+deviates from the noise benchmark (the framework's null hypothesis)."""
+
+
+@dataclass(frozen=True)
+class RegimeScenario:
+    """A parameterization of the data-generating process.
+
+    Attributes:
+        name: human-readable label.
+        regimes: the regime mixture to generate the series under.
+        p_transition: per-bar regime-switch probability.
+        seed: deterministic seed for this scenario's series.
+        start_price: starting price level.
+    """
+    name: str
+    regimes: List[Regime]
+    p_transition: float
+    seed: int
+    start_price: float = 100.0
+
+
+def generate_under(scenario: RegimeScenario, n_bars: int) -> BarSequence:
+    """Generate an `n_bars` series under this scenario's regime parameters."""
+    return generate_bars(
+        n_bars=n_bars,
+        regimes=scenario.regimes,
+        p_transition=scenario.p_transition,
+        start_price=scenario.start_price,
+        seed=scenario.seed,
+    )
+
+
+def conditional_signal(
+    base_signals_fn: Callable[[NDArray, ...], List[Signal]],
+    condition_fn: Callable[[float], bool],
+) -> Callable[[NDArray, ...], List[Signal]]:
+    """Wrap a signal function: emit its signals only when the early-vol
+    condition holds.
+
+    Used to construct contrived strategies that only "work" in one regime
+    family, so the framework can detect regime-dependence.
+    """
+
+    def wrapper(closes: NDArray, **params: Any) -> List[Signal]:
+        n = len(closes)
+        window = min(60, max(4, n // 4))
+        if n < window:
+            return [Signal(date=i + 1, weight=0.0) for i in range(n)]
+        early_vol = float(
+            np.std(np.log(closes[window // 2 : window]), ddof=1)
+        ) * np.sqrt(252.0)
+        if not condition_fn(early_vol):
+            return [Signal(date=i + 1, weight=0.0) for i in range(n)]
+        return base_signals_fn(closes, **params)
+
+
+    return wrapper
+
+
+def active_when_turbulent(early_vol: float) -> bool:
+    """Trade only in turbulent regimes (realized vol above 25% annualized)."""
+    return early_vol > 0.25
+
+
+def active_when_anything(_early_vol: float) -> bool:
+    """Always emit signals — the control for a fully regime-independent edge."""
+    return True
+
+
+def deterministic_edge_signal(closes: NDArray, fast: int, slow: int) -> List[Signal]:
+    """A simple mechanical signal with a fixed, regime-independent structure:
+
+    long whenever the 20-bar mean exceeds a fixed level.
+
+    This signal does not adapt to regimes; any edge it has is purely from
+    the fixed rule, so it is an ideal contrived candidate for testing
+    regime-dependence.
+    """
+    n = len(closes)
+    out = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    for i in range(19, n):
+        if np.mean(closes[i - 19 : i + 1]) > 97.5:
+            out[i] = Signal(date=i + 1, weight=1.0)
+    return out
+
+
+def direction_signal(closes: NDArray, fast: int, slow: int) -> List[Signal]:
+    """A contrived signal that takes the direction of the opening move.
+
+    If the first bar closes above the start price the series is an
+    up-trend regime and the signal is long everywhere; otherwise it is
+    short everywhere. The rule is past-only (it uses only bar 1) and is
+    an ideal contrived candidate for testing regime-dependence.
+    """
+    n = len(closes)
+    direction = 1.0 if closes[0] > 100.0 else -1.0
+    return [Signal(date=i + 1, weight=direction) for i in range(n)]
+
+
+def always_long_signal(closes: NDArray, fast: int, slow: int) -> List[Signal]:
+    """A contrived signal that is long in every bar, regardless of price.
+
+    It has no look-ahead and is purely mechanical; on a positive-drift
+    regime it shows a large edge, on a negative-drift regime a large
+    drag. It is an ideal contrived candidate for demonstrating
+    regime-dependence.
+    """
+    n = len(closes)
+    return [Signal(date=i + 1, weight=1.0) for i in range(n)]
+
+
+@dataclass(frozen=True)
+class RegimeScenarioResult:
+    """Results for one regime scenario."""
+    name: str
+    param_sets: List[ParameterSet]
+    baseline_param_set: ParameterSet
+    baseline_median_log_return: float
+    noise_median_log_return: float
+    edge_status: int  # EdgeFree / EdgePresent
+    n_folds: int
+    n_periods: int
+    median_log_returns: List[float]
+
+
+def run_scenario(
+    signals_fn: Callable[[NDArray, ...], List[Signal]],
+    bars: BarSequence,
+    param_grid: List[Dict[str, Any]],
+    scenario: RegimeScenario,
+    baseline: ParameterSet,
+    train_window: int,
+    test_window: int,
+    warmup: int = 0,
+    overlap_window: int = 0,
+    cfg: BacktestConfig = BacktestConfig(),
+    periods_per_year: int = 252,
+) -> RegimeScenarioResult:
+    """Run the full walk-forward perturbation sweep under one regime scenario.
+
+    Args:
+        signals_fn: past-only signal function, called as
+            `signals_fn(closes, **params)`.
+        bars: the bar series; its length determines signal shape.
+        param_grid: parameter sets to sweep.
+        scenario: the regime parameterization for this scenario's series.
+        baseline: the reference parameter set.
+        train_window, test_window, warmup, overlap_window, cfg, periods_per_year:
+            forwarded to walk_forward.
+
+    Returns:
+        RegimeScenarioResult with the candidate's and the noise
+        benchmark's medians for this scenario.
+    """
+    n_bars = len(bars)
+    series = generate_under(scenario, n_bars)
+    sweep = parameter_sweep(
+        signals_fn=signals_fn,
+        bars=series,
+        param_grid=param_grid,
+        train_window=train_window,
+        test_window=test_window,
+        warmup=warmup,
+        overlap_window=overlap_window,
+        cfg=cfg,
+        periods_per_year=periods_per_year,
+    )
+    summary = sweep_summary(sweep, baseline)
+    noise = noise_benchmark(
+        series,
+        param_grid=param_grid,
+        train_window=train_window,
+        test_window=test_window,
+        warmup=warmup,
+        overlap_window=overlap_window,
+        cfg=cfg,
+        periods_per_year=periods_per_year,
+        seed=scenario.seed,
+    )
+    baseline_median = summary.baseline_median_log_return
+    noise_median = noise.baseline_median_log_return
+
+    edge_free = abs(baseline_median - noise_median) <= OUTLIER_TOL
+    edge_status = EdgeFree if edge_free else EdgePresent
+
+    return RegimeScenarioResult(
+        name=scenario.name,
+        param_sets=sweep.param_sets,
+        baseline_param_set=baseline,
+        baseline_median_log_return=baseline_median,
+        noise_median_log_return=noise_median,
+        edge_status=edge_status,
+        n_folds=sweep.n_folds,
+        n_periods=sweep.n_periods,
+        median_log_returns=summary.median_log_returns,
+    )
+
+
+@dataclass(frozen=True)
+class RegimeStressResult:
+    """Results of a regime-stability stress test."""
+    scenarios: List[RegimeScenarioResult]
+    param_sets: List[ParameterSet]
+    baseline_param_set: ParameterSet
+    overall_verdict: str  # REGIME_STABLE / REGIME_DEPENDENT / CONSISTENT_WITH_NOISE
+    candidate_dispersion: float  # std of candidate medians across scenarios
+    null_dispersion: float       # std of noise medians across scenarios
+    n_folds: int
+    n_periods: int
+    train_window_bars: int
+    test_window_bars: int
+
+    @property
+    def all_edge_free(self) -> bool:
+        return all(abs(s.baseline_median_log_return) <= OUTLIER_TOL
+                   for s in self.scenarios)
+
+    @property
+    def n_edge_free(self) -> int:
+        return sum(1 for s in self.scenarios if abs(s.baseline_median_log_return) <= OUTLIER_TOL)
+
+    @property
+    def n_edge_present(self) -> int:
+        return sum(1 for s in self.scenarios if abs(s.baseline_median_log_return) > OUTLIER_TOL)
+
+    @property
+    def regime_dependent(self) -> bool:
+        return self.overall_verdict == "REGIME_DEPENDENT"
+
+    def param_set_at(self, scenario_name: str, deviation: float) -> Optional[float]:
+        """Median log return for a parameter set at a given deviation, for one
+        scenario, if present."""
+        s = next((sc for sc in self.scenarios if sc.name == scenario_name), None)
+        if s is None:
+            return None
+        summary = sweep_summary(
+            __dummy_result(s.param_sets, s.median_log_returns, s.n_folds), baseline
+        )
+        return summary.param_set_at(deviation)
+
+    def inspect(self) -> str:
+        lines = [
+            "=== Regime-stability stress test ===",
+            "",
+            f"Scenarios: {[s.name for s in self.scenarios]}",
+            f"Baseline: {self.baseline_param_set}",
+            f"Folds per scenario: {self.n_folds}  Periods per scenario: {self.n_periods}",
+            f"Train window: {self.train_window_bars}d  Test window: {self.test_window_bars}d",
+            "",
+            "Per-scenario results (median log return vs noise benchmark):",
+        ]
+        for s in self.scenarios:
+            status = "EDGE  " if abs(s.baseline_median_log_return) > OUTLIER_TOL else "noise"
+            lines.append(
+                f"  {s.name:14s}: candidate {s.baseline_median_log_return:+.3f}, "
+                f"noise {s.noise_median_log_return:+.3f}  [{status}]"
+            )
+        lines.append("")
+        lines.append(
+            f"Candidate dispersion across scenarios: {self.candidate_dispersion:+.3f}  "
+            f"Null dispersion: {self.null_dispersion:+.3f}"
+        )
+        lines.append("")
+        lines.append(f"Overall verdict: {self.overall_verdict}")
+        lines.append("")
+        lines.append(
+            "Interpretation: REGIME_STABLE means the candidate behaves the same "
+            "way in every regime mix (same edge, or no edge, everywhere). "
+            "REGIME_DEPENDENT means the candidate's results vary strongly across "
+            "regimes relative to the noise benchmark (fits one regime, fails in "
+            "others). CONSISTENT_WITH_NOISE means the candidate is "
+            "indistinguishable from the coin-flip null in every scenario."
+        )
+        return "\n".join(lines)
+
+    def compare_noise(self, scenario_name: str, tol: float = OUTLIER_TOL) -> bool:
+        """Return True if the candidate's baseline is within `tol` of the
+        noise benchmark for the given scenario."""
+        s = next((sc for sc in self.scenarios if sc.name == scenario_name), None)
+        if s is None:
+            raise ValueError(f"unknown scenario {scenario_name}")
+        return abs(s.baseline_median_log_return - s.noise_median_log_return) <= tol
+
+
+# --- helpers to build a summary for inspect-only (for param_set_at) ----------
+
+
+def __dummy_result(
+    param_sets: List[ParameterSet],
+    medians: List[float],
+    n_folds: int,
+) -> SweepResult:
+    """Construct a minimal SweepResult so sweep_summary can address param sets.
+
+    This is an internal helper used only for reporting; it does not rerun
+    any backtests.
+    """
+    from .perturbation import SweepResult
+
+    fold_returns = [[m] for m in medians]
+    return SweepResult(
+        param_sets=param_sets,
+        fold_total_returns=fold_returns,
+        train_window_bars=0,
+        test_window_bars=0,
+        n_folds=n_folds,
+        n_periods=0,
+    )
+
+
+def canonical_regime_scenarios(base_seed: int = 42) -> List[RegimeScenario]:
+    """Return the enterprise's canonical family of regime parameterizations,
+    derived deterministically from a base seed.
+
+    Covers a calm, a turbulent, a mean-reverting and a trending
+    parameterization, spanning the regime space relevant to daily
+    simulation.
+    """
+    return [
+        RegimeScenario(
+            name="calm",
+            regimes=[
+                Regime(drift_annual=0.03, vol_annual=0.12, intraday_range_scale=0.015),
+                Regime(drift_annual=-0.01, vol_annual=0.18, intraday_range_scale=0.020),
+            ],
+            p_transition=0.005,
+            seed=base_seed + 1,
+        ),
+        RegimeScenario(
+            name="turbulent",
+            regimes=[
+                Regime(drift_annual=-0.02, vol_annual=0.40, intraday_range_scale=0.035),
+                Regime(drift_annual=0.01, vol_annual=0.30, intraday_range_scale=0.025),
+            ],
+            p_transition=0.02,
+            seed=base_seed + 7,
+        ),
+        RegimeScenario(
+            name="mean_reverting",
+            regimes=[
+                Regime(
+                    drift_annual=0.00,
+                    vol_annual=0.25,
+                    mean_reversion_speed=0.05,
+                    mean_reversion_level=100.0,
+                    intraday_range_scale=0.020,
+                ),
+            ],
+            p_transition=0.00,
+            seed=base_seed + 13,
+        ),
+        RegimeScenario(
+            name="trending",
+            regimes=[
+                Regime(drift_annual=0.06, vol_annual=0.30, intraday_range_scale=0.025),
+                Regime(drift_annual=0.02, vol_annual=0.22, intraday_range_scale=0.020),
+            ],
+            p_transition=0.01,
+            seed=base_seed + 19,
+        ),
+    ]
+
+
+def stress_regime_scenarios() -> List[RegimeScenario]:
+    """Return an extreme regime family for demonstrating stress testing.
+
+    The scenarios are deliberately severe (drifts of +-0.9/year at low
+    volatility) so that regime dependence is easily measurable. They are
+    not meant as realistic market parameterizations.
+    """
+    return [
+        RegimeScenario(
+            name="strong_up",
+            regimes=[Regime(drift_annual=0.90, vol_annual=0.05)],
+            p_transition=0.00,
+            seed=999,
+        ),
+        RegimeScenario(
+            name="neutral",
+            regimes=[Regime(drift_annual=0.00, vol_annual=0.20)],
+            p_transition=0.00,
+            seed=998,
+        ),
+        RegimeScenario(
+            name="strong_down",
+            regimes=[Regime(drift_annual=-0.90, vol_annual=0.05)],
+            p_transition=0.00,
+            seed=997,
+        ),
+    ]
+
+
+def regime_stress(
+    signals_fn: Callable[[NDArray, ...], List[Signal]],
+    bars: BarSequence,
+    param_grid: List[Dict[str, Any]],
+    baseline: ParameterSet,
+    scenarios: Optional[List[RegimeScenario]] = None,
+    train_window: int = 252,
+    test_window: int = 84,
+    warmup: int = 0,
+    overlap_window: int = 0,
+    cfg: BacktestConfig = BacktestConfig(),
+    periods_per_year: int = 252,
+) -> RegimeStressResult:
+    """Stress-test a candidate signal across a family of regime scenarios.
+
+    Args:
+        signals_fn: past-only signal function, called as
+            `signals_fn(closes, **params)`.
+        bars: the bar series; only its length is used (a fresh series is
+            generated per scenario).
+        param_grid: parameter sets to sweep inside each scenario.
+        baseline: the reference parameter set.
+        scenarios: regime scenarios to run. If None, uses
+            `canonical_regime_scenarios(len(bars))`.
+        train_window, test_window, warmup, overlap_window, cfg, periods_per_year:
+            forwarded to walk_forward.
+
+    Returns:
+        RegimeStressResult with per-scenario verdicts and an overall
+        verdict.
+    """
+    n_bars = len(bars)
+    scenario_list = scenarios if scenarios is not None else canonical_regime_scenarios(
+        n_bars
+    )
+    scenario_results: List[RegimeScenarioResult] = []
+    for scenario in scenario_list:
+        res = run_scenario(
+            signals_fn=signals_fn,
+            bars=generate_under(scenario, n_bars),
+            param_grid=param_grid,
+            scenario=scenario,
+            baseline=baseline,
+            train_window=train_window,
+            test_window=test_window,
+            warmup=warmup,
+            overlap_window=overlap_window,
+            cfg=cfg,
+            periods_per_year=periods_per_year,
+        )
+        scenario_results.append(res)
+
+    candidate_medians = np.array([s.baseline_median_log_return for s in scenario_results])
+    null_medians = np.array([s.noise_median_log_return for s in scenario_results])
+    candidate_dispersion = float(np.std(candidate_medians))
+    null_dispersion = float(np.std(null_medians))
+
+    if not scenario_results:
+        verdict = "CONSISTENT_WITH_NOISE"
+    elif all(abs(s.baseline_median_log_return) <= OUTLIER_TOL for s in scenario_results):
+        verdict = "CONSISTENT_WITH_NOISE"
+    elif candidate_dispersion > 2.0 * null_dispersion:
+        # The candidate's results swing across regimes far more than a
+        # coin-flip null would: the candidate fits particular regime mixes
+        # rather than being robust to the data-generating process.
+        verdict = "REGIME_DEPENDENT"
+    else:
+        verdict = "REGIME_STABLE"
+
+    first = scenario_results[0]
+    return RegimeStressResult(
+        scenarios=scenario_results,
+        param_sets=first.param_sets,
+        baseline_param_set=first.baseline_param_set,
+        overall_verdict=verdict,
+        candidate_dispersion=candidate_dispersion,
+        null_dispersion=null_dispersion,
+        n_folds=first.n_folds,
+        n_periods=first.n_periods,
+        train_window_bars=train_window,
+        test_window_bars=test_window,
+    )
