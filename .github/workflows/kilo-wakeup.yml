@@ -155,7 +155,7 @@ jobs:
           assert config["subagent_model"] == "openai-compatible/minimax-m3-free"
           gateway = config["provider"]["openai-compatible"]
           assert gateway["options"]["baseURL"] == "https://api.kilo.ai/api/gateway"
-          assert gateway["options"]["apiKey"] == "{env:KILO_API_KEY}"
+          assert "apiKey" not in gateway["options"]
           model = gateway["models"]["minimax-m3-free"]
           assert model["id"] == "minimax/minimax-m3:free"
           assert model["tool_call"] is True
@@ -212,6 +212,14 @@ jobs:
           git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
 
           git commit -m "Kilo activation: update research state"
+
+          # The scheduler permits one running activation while repository maintenance commits
+          # may advance main independently. Rebase the disposable activation commit onto the
+          # latest main before pushing so a successful activation does not fail only because
+          # the branch moved while it was running.
+          git fetch origin "$GITHUB_REF_NAME"
+          git rebase "origin/$GITHUB_REF_NAME"
+
           git push origin "HEAD:$GITHUB_REF_NAME"
 
           echo "Kilo activation outcome: $KILO_OUTCOME"
