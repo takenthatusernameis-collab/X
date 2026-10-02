@@ -31,18 +31,56 @@ jobs:
       - name: Verify Kilo installation
         run: kilo --version
 
+      - name: Prepare trusted Kilo authentication
+        env:
+          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KILO_API_KEY" ]; then
+            echo "::warning::KILO_API_KEY is not configured. Kilo activation will be skipped."
+            exit 0
+          fi
+
+          mkdir -p "$HOME/.config/kilo"
+          cat > "$HOME/.config/kilo/kilo.json" <<EOF
+          {
+            "$schema": "https://app.kilo.ai/config.json",
+            "provider": {
+              "kilocode": {
+                "options": {
+                  "apiKey": "$KILO_API_KEY"
+                }
+              }
+            },
+            "model": "kilo-auto/free",
+            "small_model": "kilo-auto/small",
+            "subagent_model": "kilo-auto/free",
+            "sandbox": {
+              "enabled": true,
+              "network": "deny",
+              "allowed_hosts": [
+                "github.com:443",
+                "api.github.com:443",
+                "raw.githubusercontent.com:443",
+                "pypi.org:443",
+                "files.pythonhosted.org:443",
+                "registry.npmjs.org:443"
+              ]
+            }
+          }
+          EOF
+          chmod 600 "$HOME/.config/kilo/kilo.json"
+          unset KILO_API_KEY
+
       - name: Run Kilo
         id: kilo
         continue-on-error: true
         timeout-minutes: 340
         env:
-          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
-          KILO_CONFIG_CONTENT: >-
-            {"$schema":"https://app.kilo.ai/config.json","provider":{"kilocode":{"options":{"apiKey":"{env:KILO_API_KEY}"}}},"model":"kilo-auto/free","small_model":"kilo-auto/small","subagent_model":"kilo-auto/free","sandbox":{"enabled":true,"network":"deny","allowed_hosts":["github.com:443","api.github.com:443","raw.githubusercontent.com:443","pypi.org:443","files.pythonhosted.org:443","registry.npmjs.org:443"]}}
           KILO_DISABLE_EXTERNAL_SKILLS: "true"
         run: |
-          if [ -z "$KILO_API_KEY" ]; then
-            echo "::warning::KILO_API_KEY is not configured. Kilo activation skipped."
+          if [ ! -f "$HOME/.config/kilo/kilo.json" ]; then
+            echo "No trusted Kilo configuration found; skipping activation."
             exit 0
           fi
           kilo run --model kilo-auto/free --auto "$(cat .kilo/wakeup-prompt.md)"
