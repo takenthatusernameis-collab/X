@@ -117,6 +117,41 @@ Do not create an infinite optimization loop.
 
 Do not repeat an equivalent experiment without a new hypothesis, diagnostic reason, or information objective.
 
+## Failure-resistant execution and verification
+
+Tool failures must be interpreted narrowly and truthfully.
+
+- A denied tool call means that invocation was denied. It does not prove that the entire tool, Python, Bash, testing layer, or runner is unavailable.
+- When a command is denied, change the invocation before retrying. Prefer simple, single-purpose commands over compound shell syntax. Avoid unnecessary `&&`, `||`, pipes, redirects, heredocs, command substitution, and other constructs that can fail permission-pattern matching.
+- Use repository read/glob/grep/edit capabilities for inspection and changes where practical. Use directly permitted Python/test forms for execution. Do not declare execution unavailable after one denied command.
+- Never repeat an identical failing tool call without a new reason.
+- Treat the command result and exit status as the evidence. A model-generated statement such as “tests passed” is not evidence.
+- Never claim verification, reproduction, correctness, or success unless the relevant operation actually ran successfully after the final relevant change.
+- After changing code, rerun affected tests, then the broader regression suite, then the relevant end-to-end example or backtest when practical.
+- A successful test run before later edits does not validate later edits.
+- If an end-to-end example fails after the unit suite passes, treat that failure as real until fixed or explicitly handed off.
+- Never weaken tests, tolerances, audits, leakage checks, cost assumptions, or acceptance criteria just to obtain a green result.
+- Do not modify tests merely to fit the implementation. Change a test only when the test's contract is demonstrably wrong.
+- Do not silence a validation failure, remove a diagnostic, or add an exception without identifying and recording the root cause.
+- Do not use a failed command as justification for inventing the expected output.
+- If execution cannot be completed, label the relevant result UNVERIFIED and persist the exact blocker and the next executable verification step.
+
+## Research anti-gaming rules
+
+The agent must optimize for information quality, not pleasing-looking results.
+
+- Do not tune after seeing evaluation results unless that tuning is explicitly part of a predeclared exploratory stage.
+- Protect OOS data, frozen evaluation settings, and stopping rules from post-hoc changes.
+- Do not move date boundaries, alter warmups, reduce costs, change benchmarks, change signal timing, or remove hard cases because they hurt results.
+- Do not treat a single fold, asset, regime, toy dataset, synthetic dataset, or example as evidence of general profitability.
+- Do not treat an implementation pass as a research result.
+- When evidence conflicts with prior durable state, investigate the discrepancy before replacing the prior conclusion.
+- Preserve provenance, seeds, configs, and exact experiment definitions.
+- If an audit indicates leakage or accounting inconsistency, repair the underlying logic instead of relaxing the audit.
+- Record negative and inconclusive results when they materially reduce uncertainty.
+- Avoid duplicate infrastructure. Search first, then extend the existing authoritative path.
+- Keep unrelated refactors, dependency additions, cosmetic churn, generated build artifacts, and broad rewrites out of focused activations.
+
 ## Security and authority
 
 Stay inside the repository workspace.
@@ -172,6 +207,12 @@ Persist important code, results, decisions, experiment definitions, failures, un
 Keep a concise human-readable activation record when substantive work occurs.
 
 Leave the repository understandable to a fresh activation with no hidden conversational memory.
+
+When reporting an activation, distinguish:
+- CHANGED: actual files/code changed;
+- VERIFIED: exact post-change commands/tests that succeeded;
+- UNVERIFIED: execution or evidence that could not be checked;
+- NEXT: smallest useful continuation.
 
 ## Process improvement
 
