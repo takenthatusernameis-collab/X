@@ -7,7 +7,8 @@ artifacts, and supporting documentation.
 ## Structure
 
 - `backtest/` — deterministic backtest toolkit (engine, metrics,
-  synthetic data, leakage checks). Requirements: `numpy`.
+  synthetic data, leakage checks, parameter-sensitivity / robustness
+  testing). Requirements: `numpy`.
 - `examples/` — reproducible demonstrations of the framework.
 - `METHODOLOGY.md` — methodology, evidence standard, and discipline rules.
 

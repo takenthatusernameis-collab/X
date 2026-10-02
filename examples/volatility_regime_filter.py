@@ -1,11 +1,14 @@
-"""Moving-average crossover on synthetic data (walk-forward IS/OOS).
+"""Volatility-regime filter on synthetic data (walk-forward IS/OOS).
 
-This example demonstrates:
-- past-only signal generation (signals use only closes available at each bar);
-- warmup padding for the slow moving average;
+A past-only realized-volatility regime filter: estimate recent
+annualized volatility (standard deviation of log returns over a
+lookback window) and hold the long position only in low-vol regimes.
+
+Demonstrates:
+- past-only indicator construction;
+- warmup padding for the volatility window;
 - a walk-forward split with out-of-sample testing;
 - cost sensitivity (0 vs realistic costs);
-- a parameter-sensitivity (perturbation) sweep across a grid of window sizes;
 - the leakage discipline checks.
 
 Research/simulation only. The data is synthetic and must not be
@@ -22,18 +25,22 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import research.backtest as bt
 
 
-def ma_crossover_signals(closes: np.ndarray, fast: int, slow: int):
-    """Past-only MA-crossover signals.
+def volatility_regime_signals(closes: np.ndarray, vol_window: int = 20, threshold: float = 0.20):
+    """Past-only volatility-regime signals.
 
-    Returns a Signal for each bar. Bars before the slow window are
-    neutral (no lookahead; the engine's warmup discipline applies).
+    Annualized realized volatility is the standard deviation of log
+    returns over `vol_window` bars, scaled to an annual basis. Weight is
+    +1 (long) in low-vol regimes (realized vol below `threshold`) and 0
+    (cash) otherwise. `threshold` is a fixed level, not fitted to the
+    data.
     """
     n = len(closes)
     signals = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
-    for i in range(slow - 1, n):
-        fast_ma = np.mean(closes[i - fast + 1 : i + 1])
-        slow_ma = np.mean(closes[i - slow + 1 : i + 1])
-        signals[i] = bt.Signal(date=i + 1, weight=1.0 if fast_ma > slow_ma else -1.0)
+    sqrt252 = np.sqrt(252.0)
+    for i in range(vol_window - 1, n):
+        log_returns = np.log(closes[i - vol_window + 1 : i + 1])
+        realized_annual = float(np.std(log_returns, ddof=1)) * sqrt252
+        signals[i] = bt.Signal(date=i + 1, weight=1.0 if realized_annual < threshold else 0.0)
     return signals
 
 
@@ -49,14 +56,11 @@ def main():
         start_price=100.0,
     )
 
-    fast, slow = 20, 60
-    signals = ma_crossover_signals(bars.closes_array(), fast, slow)
-
-    # Leakage discipline: signals must respect the no-look-ahead boundary.
-    # Here the signal author guarantees padding for the slow window.
+    vol_window, threshold = 20, 0.20
+    signals = volatility_regime_signals(bars.closes_array(), vol_window, threshold)
     bt.check_signal_integrity(signals, [b.date for b in bars], warmup=0)
 
-    warmup = slow  # engine warmup matches the signal's padding window
+    warmup = vol_window
     cfg0 = bt.BacktestConfig(initial_capital=1e6, warmup_periods=warmup)
     cfg1 = bt.BacktestConfig(
         initial_capital=1e6,
@@ -67,14 +71,18 @@ def main():
         slippage_proportional=0.0005,
     )
 
-    print("=== Full-sample MA crossover (regime-switching synthetic data) ===")
+    print("=== Full-sample volatility-regime filter (regime-switching synthetic data) ===")
     for label, cfg in (("zero cost", cfg0), ("realistic costs", cfg1)):
         res = bt.run_bars(list(bars), signals, cfg)
+        fill_prices = (
+            np.array([f.price for f in res.trades], dtype=np.float64)
+            if res.trades
+            else np.array([], dtype=np.float64)
+        )
         m = bt.compute_metrics(
             res.equity_curve,
             fills=res.trades,
-            fill_prices=np.array([f.price for f in res.trades], dtype=np.float64)
-            if res.trades else np.array([], dtype=np.float64),
+            fill_prices=fill_prices,
             periods_per_year=252,
         )
         bt.check_equity_matches_fills(res.equity_curve, res.trades, bars.closes_array(), 1e6)
@@ -83,7 +91,7 @@ def main():
               f"turnover={m.turnover_ratio:.1f}x")
 
     print()
-    print("=== Walk-forward validation (train=12mo, test=4mo, warmup=60d) ===")
+    print("=== Walk-forward validation (train=12mo, test=4mo, warmup=20d) ===")
     result = bt.walk_forward(
         list(bars),
         signals,
@@ -107,42 +115,6 @@ def main():
     fold_pos = sum(1 for f in result.folds if f.metrics["total_return"] > 0)
     print()
     print(f"positive OOS folds: {fold_pos}/{len(result.folds)}")
-
-    print()
-    print("=== Perturbation / parameter-sensitivity sweep ===")
-    print("(If the crossover has no real edge, results should be flat and")
-    print("noisy across the window grid, with no persistent sign or structure.)")
-    grid = bt.parameter_grid_around((("fast", fast), ("slow", slow)),
-                                    multipliers=(0.5, 1.0, 2.0))
-    sweep = bt.parameter_sweep(
-        signals_fn=lambda closes, **p: ma_crossover_signals(closes, p["fast"], p["slow"]),
-        bars=list(bars),
-        param_grid=grid,
-        train_window=252,
-        test_window=84,
-        warmup=warmup,
-        overlap_window=60,
-        cfg=cfg0,
-    )
-    summary = bt.sweep_summary(sweep, baseline=(("fast", fast), ("slow", slow)))
-    summary.inspect()
-
-    noise_summary = bt.noise_benchmark(
-        list(bars),
-        param_grid=grid,
-        train_window=252,
-        test_window=84,
-        warmup=warmup,
-        overlap_window=60,
-        cfg=cfg0,
-        seed=99,
-    )
-    print()
-    print("Null (coin-flip) benchmark: median log return",
-          f"{noise_summary.baseline_median_log_return:+.3f}")
-    print("Baseline indistinguishable from noise:",
-          summary.compare_noise(noise_summary.baseline_median_log_return))
-
     print()
     print("NOTE: data is synthetic and intended only for tooling validation.")
 

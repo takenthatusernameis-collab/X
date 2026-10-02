@@ -4,10 +4,11 @@ Research / simulation only. No live trading.
 Stdlib + numpy only.
 
 Structure:
-- data.py     : synthetic daily bar generator (tooling validation only)
-- engine.py   : event-driven backtest with walk-forward IS/OOS support
-- metrics.py  : deterministic performance/risk metrics
-- leakage.py  : look-ahead and equity-fill integrity checks
+- data.py           : synthetic daily bar generator (tooling validation only)
+- engine.py          : event-driven backtest with walk-forward IS/OOS support
+- metrics.py         : deterministic performance/risk metrics
+- leakage.py         : look-ahead and equity-fill integrity checks
+- perturbation.py    : parameter-sensitivity / robustness testing
 """
 from __future__ import annotations
 
@@ -29,6 +30,16 @@ from .engine import (
 )
 from .leakage import LeakySignalError, check_equity_matches_fills, check_signal_integrity
 from .metrics import Metrics, compute_metrics, TradeSummary
+from .perturbation import (
+    ParameterSet,
+    SweepResult,
+    SweepSummary,
+    noise_benchmark,
+    parameter_grid_around,
+    parameter_sweep,
+    random_signals,
+    sweep_summary,
+)
 
 __all__ = [
     "__version__",
@@ -52,4 +63,12 @@ __all__ = [
     "LeakySignalError",
     "check_signal_integrity",
     "check_equity_matches_fills",
+    "ParameterSet",
+    "SweepResult",
+    "SweepSummary",
+    "parameter_sweep",
+    "parameter_grid_around",
+    "random_signals",
+    "noise_benchmark",
+    "sweep_summary",
 ]

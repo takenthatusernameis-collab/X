@@ -16,7 +16,8 @@ Continuously improve the enterprise's ability to make increasingly effective dec
 - Git history: durable audit trail.
 - Deterministic research/backtest infrastructure: `research/backtest/`
   (event-driven backtest, walk-forward IS/OOS, synthetic-data
-  validation, leakage checks) plus `tests/`. Preferred execution layer.
+  validation, leakage checks, parameter-sensitivity / robustness testing)
+  plus `tests/`. Preferred execution layer.
 
 ### Safety boundary
 
