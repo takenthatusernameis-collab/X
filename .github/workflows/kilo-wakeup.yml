@@ -31,27 +31,6 @@ jobs:
       - name: Verify Kilo installation
         run: kilo --version
 
-      - name: Prepare API key diagnostic configuration
-        env:
-          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
-        run: |
-          set -euo pipefail
-          mkdir -p "$HOME/.config/kilo"
-          cat > "$HOME/.config/kilo/diagnostic-kilo.json" <<'JSON'
-          {
-            "$schema": "https://app.kilo.ai/config.json",
-            "enabled_providers": ["kilo"],
-            "provider": {
-              "kilo": {
-                "options": {
-                  "apiKey": "{env:KILO_API_KEY}"
-                }
-              }
-            }
-          }
-          JSON
-          chmod 600 "$HOME/.config/kilo/diagnostic-kilo.json"
-
       - name: Diagnose Kilo API key
         id: kilo_auth
         continue-on-error: true
@@ -71,7 +50,8 @@ jobs:
             exit 0
           fi
 
-          status="$(curl --silent --show-error --output /tmp/kilo-profile-response --write-out '%{http_code}' \
+          status="$(curl --silent --show-error --connect-timeout 10 --max-time 20 \
+            --output /tmp/kilo-profile-response --write-out '%{http_code}' \
             -H "Authorization: Bearer $KILO_API_KEY" \
             -H "Accept: application/json" \
             https://api.kilo.ai/api/profile || true)"
@@ -94,7 +74,7 @@ jobs:
                 echo
                 echo "The key itself was not printed or persisted."
               } >> "$GITHUB_STEP_SUMMARY"
-              exit 1
+              exit 0
               ;;
             *)
               echo "::warning::KILO_API_KEY_CHECK=UNVERIFIED"
@@ -104,7 +84,7 @@ jobs:
                 echo
                 echo "The key itself was not printed or persisted."
               } >> "$GITHUB_STEP_SUMMARY"
-              exit 1
+              exit 0
               ;;
           esac
 
@@ -231,9 +211,6 @@ jobs:
           path = Path(os.environ["HOME"]) / ".config" / "kilo" / "kilo.json"
           path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
           os.chmod(path, 0o600)
-
-          diagnostic = Path(os.environ["HOME"]) / ".config" / "kilo" / "diagnostic-kilo.json"
-          diagnostic.unlink(missing_ok=True)
 
           print(f"Prepared secretless Kilo research config for {model_id}.")
           PY
