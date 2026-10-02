@@ -4,15 +4,25 @@ The repository-side infrastructure is configured on `main`.
 
 ## Required GitHub Actions secret
 
-In repository **Settings -> Secrets and variables -> Actions -> Repository secrets**, create exactly:
+No secret is required for the free-model workflow.
 
-```
-KILO_API_KEY
-```
+The workflow uses Kilo's built-in Gateway provider with a currently documented free model and anonymous free-model access. You may leave `KILO_API_KEY` unset.
 
-Paste the single Kilo Gateway API key as its value.
+Do not commit any API key to the repository.
 
-Do not commit the key to the repository.
+## Optional Kilo API key
+
+A `KILO_API_KEY` can be configured as a GitHub Actions repository secret if you later want authenticated Kilo Gateway access or change the enterprise to use paid models. It is not required for the current free-only workflow.
+
+Adding an API key does not make the selected free model paid; free models remain $0 on Kilo's side. However, Kilo's current documentation does not promise a higher free-model request allowance for authenticated users, so do not add the key expecting unlimited or materially higher free throughput.
+
+## Free model
+
+The workflow currently pins `minimax/minimax-m3:free` instead of the Auto Free virtual model. This is deliberate: the latest activation reached Kilo successfully but the CLI returned `Model not found: kilo-auto/free`, so a concrete currently documented free model avoids that catalog-resolution failure.
+
+Kilo's free models are available to authenticated and anonymous users. Anonymous free-model access is currently rate-limited to 200 requests per hour per IP, and free-model availability can change over time. citeturn389505search1turn389505search2turn145399search1
+
+Auto Free (`kilo-auto/free`) remains a supported Kilo model tier in the documentation, but its underlying routing changes server-side. The repository therefore prefers the explicit model for CI reliability until the CLI/catalog behavior is confirmed stable. citeturn389505search0turn389505search5
 
 ## No other credential is required
 
@@ -20,11 +30,7 @@ The workflow uses GitHub's automatically provided repository-scoped workflow tok
 
 Kilo is not given a GitHub write token, a personal access token, or a credential for any other repository.
 
-## Free model
-
-The workflow uses Kilo's documented `kilo-auto/free` model tier through the built-in Kilo Gateway provider. Auto Free routes to currently available free models and requires no Kilo credits; free-model availability and rate limits can change. The workflow uses the trusted `KILO_API_KEY` environment variable for Gateway authentication and keeps the key out of repository files. Auto Free may route requests to providers that log prompts/outputs, so this public repository must contain no confidential data or secrets.
-
-## What the workflow will do after the secret is added
+## What the workflow will do
 
 - wake every 5 minutes;
 - allow only one active enterprise run;
@@ -37,6 +43,6 @@ The workflow uses Kilo's documented `kilo-auto/free` model tier through the buil
 
 ## Verification
 
-After adding `KILO_API_KEY`, manually trigger **Actions -> Kilo Research Enterprise Wake -> Run workflow** once.
+After the workflow changes are committed, let the scheduled workflow create a fresh run or manually trigger **Actions -> Kilo Research Enterprise Wake -> Run workflow**.
 
-Then inspect the run logs and repository changes before relying on the 5-minute schedule.
+Inspect the fresh run logs and repository changes before relying on the 5-minute schedule.
