@@ -476,3 +476,90 @@ walk-forward IS/OOS, and deterministic, byte-reproducible output. The full
 suite (56 tests) and both walk-forward examples plus the regime-stability
 demo execute successfully and are byte-deterministic.
 
+
+---
+
+# Engine accounting and margin/collateral modeling activation — 2026-10-02
+
+## Objective
+
+Advance the engine's accounting integrity and add margin/collateral modeling
+(the documented backlog item from the first activation), so trade statistics
+are complete and leveraged strategies can be modeled safely.
+
+## Changes
+
+### `research/backtest/engine.py`
+
+1. **Complete fill records** — when a signal goes to neutral the engine now
+   records an exit fill instead of silently holding the position at
+   mark-to-market. Consequences:
+   - `n_trades` and turnover are now complete (round trips are counted);
+     before, signals with neutral periods undercounted trades.
+   - The equity-fill audit (`check_equity_matches_fills`) now fully
+     validates the fill sequence (it previously could not detect missing
+     exit fills because the audit recomputes from whatever fills were given).
+   - Verified: the vol-filter example now reports trades=10 with the
+     equity-fill audit passing. Its full-sample result moved from
+     -42.83% (held-at-MTM artifact) to -1.72% (positions correctly closed at
+     the neutralizing bar's close).
+
+2. **Margin/collateral modeling** — `BacktestConfig` gained
+   `margin_rate` (maintenance margin as a fraction of gross notional) and
+   `margin_call_liquidate`; on a margin call the position is liquidated to
+   neutral and recorded in `MarginCall`; `FillResult` gained
+   `margin_calls`, and `walk_forward` aggregates `total_margin_calls`.
+   Defaults (`margin_rate=0`) preserve prior behavior.
+
+3. `research/backtest/__init__.py` — exported `MarginCall`.
+
+### `tests/test_engine.py`
+
+Added `TestEngineMargin` (6 tests): default-margins-no-op, immediate
+margin call, short adverse-move margin call, margin determinism, exit fill
+emission, and walk-forward margin-call aggregation. All 62 tests pass.
+
+## Verification
+
+- `python -m unittest discover -s tests -v`: **62 tests, all passing**.
+- Determinism: two independent runs of each example are byte-identical
+  (ma_crossover `baeee6a3...`,
+  volatility_regime_filter `74447c57...`,
+  regime_stability_demo `2d3bc5c4...`).
+- Full-sample equity-fill audit passes on both MA and vol-filter examples.
+
+## Verified results (seed 42, synthetic data; tooling-validation only)
+
+MA crossover — unchanged from the prior record:
+full sample -106.93% / sharpe -0.04 / max dd 128.21%; walk-forward 88 folds,
+7392 OOS, mean log ret -0.123, median -0.081, 37/88 positive.
+
+Volatility regime filter — corrected by exit fills:
+full sample trades=10, total -1.72%, sharpe -0.05, max dd 9.60%;
+walk-forward 90 folds, 7560 OOS, mean log ret -0.001, median 0.000, 8/90 positive.
+
+Regime-stability demo — verdicts unchanged (null dispersion moved slightly
+0.019 -> 0.003 due to realized exit proceeds): long-only REGIME_DEPENDENT
+(medians [+0.055, +0.005, -0.079], candidate dispersion 0.055 > 2x null
+0.003); direction REGIME_STABLE
+([+0.055, +0.048], dispersion 0.003 < 2x null 0.003); coin-flip and MA
+CONSISTENT_WITH_NOISE.
+
+## Notes / open items
+
+- `research/backtest/_determinism_check.py` (sha256 file-diff utility left
+  from prior sandbox work) and this activation's harness are retained for
+  deterministic verification; deletion of scratch files is not permitted in
+  this sandbox.
+- No real-data work: out of scope by the enterprise charter (research only;
+  no credentials). Next substantive item on the backlog is a margin model —
+  completed here; remaining optional follow-on: a small margin-parameter
+  sensitivity scan in a future activation once a real dataset exists.
+
+## Handoff
+
+The toolkit's accounting is now honest and complete: every position change
+(records an exit fill), every margin call is recorded and enforced, and all
+62 tests plus all examples are deterministic and byte-reproducible. A fresh
+activation can re-run `python -m unittest discover -s tests -v` and the three
+examples to reproduce this state.

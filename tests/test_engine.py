@@ -244,5 +244,133 @@ class TestLeakageChecks(unittest.TestCase):
             bt.check_equity_matches_fills(perturbed, res.trades, bars.closes_array(), 1e6)
 
 
+class TestEngineMargin(unittest.TestCase):
+    """Margin/collateral modeling: positions must respect margin requirements."""
+
+    def test_margin_default_off(self):
+        """Default margin_rate=0: no margin calls; prior behavior unchanged."""
+        np.random.seed(42)
+        bars = bt.generate_bars(300, seed=42)
+        signals = [bt.Signal(date=i + 1, weight=1.0 if i % 2 == 0 else 0.0)
+                   for i in range(len(bars))]
+        cfg_default = bt.BacktestConfig(initial_capital=1e6, warmup_periods=10)
+        cfg_explicit = bt.BacktestConfig(
+            initial_capital=1e6, warmup_periods=10,
+            margin_rate=0.0, margin_call_liquidate=False,
+        )
+        res_default = bt.run_bars(list(bars), signals, cfg_default)
+        res_explicit = bt.run_bars(list(bars), signals, cfg_explicit)
+        self.assertEqual(res_default.margin_calls, [])
+        self.assertEqual(res_explicit.margin_calls, [])
+        self.assertTrue((res_default.equity_curve == res_explicit.equity_curve).all())
+        self.assertEqual(res_default.trades, res_explicit.trades)
+
+    def test_immediate_margin_call(self):
+        """target_exposure=12 with margin_rate=0.1: required margin exceeds
+        equity on the first fill, so a margin call fires and the position is
+        liquidated to neutral in the same bar. The signal trades only once,
+        so exactly one call occurs."""
+        bars = bt.generate_bars(30, seed=11)
+        signals = [bt.Signal(date=1, weight=1.0)] + [
+            bt.Signal(date=i + 1, weight=0.0) for i in range(1, len(bars))
+        ]
+        cfg = bt.BacktestConfig(
+            initial_capital=1e6, target_exposure=12,
+            margin_rate=0.1, margin_call_liquidate=True, warmup_periods=0,
+        )
+        res = bt.run_bars(list(bars), signals, cfg)
+        self.assertEqual(len(res.margin_calls), 1)
+        mc = res.margin_calls[0]
+        self.assertGreater(mc.gross_notional, 10e6)
+        self.assertGreater(mc.required_margin, 1.0e6)
+        self.assertAlmostEqual(mc.equity, 1e6, places=2)
+        self.assertEqual(res.positions[-1], 0.0)
+        # liquidated_shares is the position that existed before liquidation,
+        # i.e. the entry fill size from the same bar.
+        self.assertAlmostEqual(mc.liquidated_shares, res.trades[0].shares)
+
+    def test_short_adverse_margin_call(self):
+        """A short position that loses value triggers a margin call. The
+        short is held at a fixed 10,000 shares (weights tuned to keep target
+        constant); a 100 -> 280 move pushes equity below the margin
+        requirement and forces liquidation. The signal then goes neutral so
+        the engine does not re-enter a position that cannot be margined."""
+        bars = bt.generate_bars(20, seed=13)
+        bars.closes[:] = 280.0
+        bars.closes[0] = 100.0
+        bars.opens[:] = 280.0
+        bars.lows[:] = 279.0
+        bars.highs[:] = 281.0
+        bars.opens[0] = 100.0
+        bars.lows[0] = 99.0
+        bars.highs[0] = 101.0
+        capital = 2e6
+        target_shares = -10000.0
+        weights = [target_shares * c / (2.0 * capital) for c in (100.0, 280.0)]
+        weights += [0.0] * (len(bars) - 2)
+        signals = [bt.Signal(date=i + 1, weight=w) for i, w in enumerate(weights)]
+        cfg = bt.BacktestConfig(
+            initial_capital=capital, target_exposure=2.0,
+            margin_rate=0.5, margin_call_liquidate=True, warmup_periods=0,
+        )
+        res = bt.run_bars(list(bars), signals, cfg)
+        self.assertEqual(len(res.margin_calls), 1)
+        mc = res.margin_calls[0]
+        self.assertEqual(mc.date, 2)
+        self.assertAlmostEqual(mc.gross_notional, 2.8e6, places=2)
+        self.assertAlmostEqual(mc.required_margin, 1.4e6, places=2)
+        self.assertLess(mc.equity, mc.required_margin)
+        self.assertAlmostEqual(res.positions[-1], 0.0)
+        self.assertTrue(any(f.shares > 0 and f.price > 279 for f in res.trades))
+
+    def test_margin_deterministic(self):
+        cfg = bt.BacktestConfig(initial_capital=1e6, target_exposure=12,
+                                margin_rate=0.1, warmup_periods=0)
+        bars = list(bt.generate_bars(50, seed=99))
+        signals = [bt.Signal(date=i + 1, weight=1.0) for i in range(50)]
+        res1 = bt.run_bars(bars, signals, cfg)
+        res2 = bt.run_bars(bars, signals, cfg)
+        self.assertEqual(res1.margin_calls, res2.margin_calls)
+        self.assertTrue((res1.equity_curve == res2.equity_curve).all())
+        self.assertEqual(res1.trades, res2.trades)
+
+    def test_exit_fill_emitted(self):
+        """A signal that goes long then neutral must emit an exit fill, and
+        trade stats must then count the completed round trip."""
+        bars = bt.generate_bars(60, seed=17)
+        signals = [bt.Signal(date=i + 1, weight=1.0 if 20 <= i < 40 else 0.0)
+                   for i in range(len(bars))]
+        cfg = bt.BacktestConfig(initial_capital=1e6, warmup_periods=0)
+        res = bt.run_bars(list(bars), signals, cfg)
+        sells = [f for f in res.trades if f.shares < 0]
+        buys = [f for f in res.trades if f.shares > 0]
+        self.assertGreater(len(buys), 0)
+        self.assertGreater(len(sells), 0)
+        m = bt.compute_metrics(
+            res.equity_curve, fills=res.trades,
+            fill_prices=np.array([f.price for f in res.trades], dtype=np.float64),
+            periods_per_year=252,
+        )
+        self.assertEqual(m.n_trades, 1)  # one completed round trip
+
+    def test_walk_forward_margin_calls_aggregate(self):
+        """Walk-forward must carry the margin config per fold and report
+        the total number of margin calls in the aggregates."""
+        bars = bt.generate_bars(500, seed=7)
+        signals = [bt.Signal(date=i + 1, weight=1.0) for i in range(len(bars))]
+        result = bt.walk_forward(
+            list(bars), signals,
+            train_window=100, test_window=50, warmup=20, overlap_window=0,
+            cfg=bt.BacktestConfig(
+                initial_capital=1e6, target_exposure=12,
+                margin_rate=0.1, warmup_periods=20,
+            ),
+        )
+        self.assertGreater(result.aggregate_metrics["total_margin_calls"], 0)
+        for fold in result.folds:
+            self.assertEqual(fold.train_window_bars, 100)
+            self.assertEqual(fold.test_window_bars, 50)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

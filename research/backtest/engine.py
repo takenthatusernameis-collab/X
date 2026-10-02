@@ -43,14 +43,23 @@ class Fill(NamedTuple):
 
 
 @dataclasses.dataclass
+class MarginCall:
+    """Record of a maintenance-margin call and forced liquidation."""
+    date: int
+    gross_notional: float
+    required_margin: float
+    equity: float
+    liquidated_shares: float
+
+
+@dataclasses.dataclass
 class BacktestConfig:
     """Costs, cash and warmup policy for one backtest.
 
     Position sizing is constant-dollar: `target_exposure` is applied to
     initial_capital, so a weight of 1.0 holds a position worth
     initial_capital * target_exposure in each signal bar. This keeps
-    sizing independent of accumulated (unrealized) gains and avoids
-    automatic leverage in a zero-cost, no-margin engine.
+    sizing independent of accumulated (unrealized) gains.
     """
     initial_capital: float = 1e6
     target_exposure: float = 1.0     # gross exposure (long or short) as fraction of cash
@@ -61,6 +70,8 @@ class BacktestConfig:
     warmup_periods: int = 0          # leading bars to skip for indicator warmup
     risk_free: float = 0.0
     periods_per_year: int = 252
+    margin_rate: float = 0.0         # maintenance margin, fraction of gross notional
+    margin_call_liquidate: bool = True  # on margin call, liquidate position to neutral
 
 
 @dataclasses.dataclass
@@ -70,6 +81,7 @@ class FillResult:
     trades: List[Fill]
     orders: List[Order]
     positions: List[float]  # shares held after each bar (signed)
+    margin_calls: List[MarginCall] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass
@@ -112,6 +124,7 @@ def _run_bars(
     shares = 0.0
     orders: List[Order] = []
     fills: List[Fill] = []
+    margin_calls: List[MarginCall] = []
     n = len(bars)
     positions = [0.0] * n
     equity_curve = np.zeros(n, dtype=np.float64)
@@ -123,51 +136,88 @@ def _run_bars(
             continue
 
         signal = signals[i]
-        if abs(signal.weight) < 1e-12:
-            # neutral: keep position, but mark equity
-            equity_curve[i] = cash + shares * bar.close
-            positions[i] = shares
-            continue
-
         target_shares = (
             signal.weight
             * cfg.target_exposure
             * cfg.initial_capital
             / bar.close
         )
-
         delta = target_shares - shares
 
         if abs(delta) < 1e-12:
+            # No position change this bar: keep position, just mark equity.
             equity_curve[i] = cash + shares * bar.close
             positions[i] = shares
-            continue
-
-        # Fill at close + fixed slippage + proportional slippage.
-        # close-only pricing enforces no open/high/low lookahead.
-        fill_price = (
-            bar.close
-            + cfg.slippage_cents / 100.0
-            + bar.close * cfg.slippage_proportional
-        )
-        commission = (
-            cfg.commission_per_trade
-            + abs(delta) * cfg.commission_per_share
-        )
-
-        if delta > 0:
-            cash -= delta * fill_price + commission
         else:
-            cash += -delta * fill_price - commission
+            # Fill at close + fixed slippage + proportional slippage.
+            # close-only pricing enforces no open/high/low lookahead.
+            fill_price = (
+                bar.close
+                + cfg.slippage_cents / 100.0
+                + bar.close * cfg.slippage_proportional
+            )
+            commission = (
+                cfg.commission_per_trade
+                + abs(delta) * cfg.commission_per_share
+            )
 
-        side = _side_label(delta, shares)
-        shares = target_shares
-        orders.append(Order(bar.date, target_shares, side))
-        fills.append(Fill(bar.date, delta, fill_price, commission))
-        equity_curve[i] = cash + shares * bar.close
-        positions[i] = shares
+            if delta > 0:
+                cash -= delta * fill_price + commission
+            else:
+                cash += -delta * fill_price - commission
 
-    return FillResult(equity_curve, trades=fills, orders=orders, positions=positions)
+            side = _side_label(delta, shares)
+            shares = target_shares
+            orders.append(Order(bar.date, target_shares, side))
+            fills.append(Fill(bar.date, delta, fill_price, commission))
+            equity_curve[i] = cash + shares * bar.close
+            positions[i] = shares
+
+        # Maintenance-margin check after equity marking. If the position
+        # (whether newly opened or carried) does not support its margin
+        # requirement, force liquidation to neutral so losses stay bounded
+        # and the margin model is faithfully represented.
+        if cfg.margin_rate > 0.0:
+            gross_notional = abs(shares) * bar.close
+            required_margin = cfg.margin_rate * gross_notional
+            equity = cash + shares * bar.close
+            if equity < required_margin:
+                # Margin call: liquidate to neutral at the current close.
+                old_shares = shares
+                delta = -old_shares
+                fill_price = (
+                    bar.close
+                    + cfg.slippage_cents / 100.0
+                    + bar.close * cfg.slippage_proportional
+                )
+                commission = (
+                    cfg.commission_per_trade
+                    + abs(delta) * cfg.commission_per_share
+                )
+                if delta > 0:
+                    cash -= delta * fill_price + commission
+                else:
+                    cash += -delta * fill_price - commission
+                side = _side_label(delta, old_shares)
+                shares = 0.0
+                orders.append(Order(bar.date, 0.0, side))
+                fills.append(Fill(bar.date, delta, fill_price, commission))
+                margin_calls.append(
+                    MarginCall(
+                        date=bar.date,
+                        gross_notional=gross_notional,
+                        required_margin=required_margin,
+                        equity=equity,
+                        liquidated_shares=old_shares,
+                    )
+                )
+                equity_curve[i] = cash + shares * bar.close
+                positions[i] = shares
+
+    return FillResult(
+        equity_curve, trades=fills, orders=orders, positions=positions,
+        margin_calls=margin_calls,
+    )
 
 
 class Backtest:
@@ -242,6 +292,7 @@ def walk_forward(
     step = test_window - overlap_window
     fold_start = 0
     cumulative_test = 0
+    margin_calls_total = 0
 
     while True:
         fold_end = fold_start + warmup + train_window + test_window
@@ -260,6 +311,8 @@ def walk_forward(
             warmup_periods=warmup,
             risk_free=cfg.risk_free,
             periods_per_year=cfg.periods_per_year,
+            margin_rate=cfg.margin_rate,
+            margin_call_liquidate=cfg.margin_call_liquidate,
         )
         result = Backtest(fold_cfg).run(fold_bars, fold_signals)
 
@@ -301,6 +354,7 @@ def walk_forward(
             equity_curve=result.equity_curve,
         ))
         cumulative_test += len(test_eq)
+        margin_calls_total += len(result.margin_calls)
         fold_start += step
 
     aggregate: dict
@@ -317,6 +371,7 @@ def walk_forward(
             "fold_count_positive": int(int(np.sum(m > 0))),
             "fold_count_negative": int(int(np.sum(m < 0))),
             "fold_count_zero": int(int(np.sum(m == 0))),
+            "total_margin_calls": margin_calls_total,
         }
     else:
         aggregate = {"n_folds": 0, "total_oos_periods": 0}

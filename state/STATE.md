@@ -95,32 +95,102 @@ judging robustness (perturbation, parameter sensitivity, regime stability).
 - Added `examples/regime_stability_demo.py` demonstrating all three verdicts
   on synthetic data.
 
+  on synthetic data.
+
+## Current activation (engine accounting integrity and margin/collateral modeling)
+
+Added two accounting-integrity improvements to `research/backtest/engine.py`
+so that trade statistics are complete and leveraged strategies can be modeled
+safely:
+
+- **Complete fill records.** Positions are now closed with a recorded fill
+  whenever a signal goes to neutral (previously the engine held the position
+  without recording the sale, so `n_trades` and turnover were systematically
+  undercounted and the equity-fill audit could not detect missing exit fills).
+  Full-sample and walk-forward trade stats now reflect the true round-trip
+  count; `check_equity_matches_fills` fully validates the fill sequence.
+- **Margin/collateral modeling.** `BacktestConfig` gained `margin_rate`
+  (maintenance margin as a fraction of gross notional) and
+  `margin_call_liquidate`; the engine liquidates to neutral on a margin call
+  and records each call in `FillResult.margin_calls`. Walk-forward
+  aggregates report `total_margin_calls`. All changes default to the prior
+  behavior (`margin_rate=0`), so existing examples and tests are unaffected.
+
+Both changes are additive and deterministic; the default configuration
+reproduces the previous engine behavior exactly (verified by the full suite
+and by a default-vs-explicit-config comparison).
+
+Verified results (seed 42, regime-switching synthetic data; tooling-validation only), superseding the pre-change figures:
+
+MA crossover (warmup=60, 252d/84d walk-forward, train+test):
+- Full sample, zero cost: trades=55, total return -106.93%, sharpe=-0.04,
+  max drawdown 128.21%, turnover 319.8x.
+- Walk-forward: 88 folds, 7392 OOS periods, mean log return -0.123, median
+  log return -0.081; positive folds 37/88.
+- Perturbation sweep (0.5x/1.0x/2.0x grid): medians near zero across the
+  grid with mixed signs and a flat deviation scan
+  (0.00x: -0.081, 0.50x: -0.054, 1.00x: -0.021); best set ((40, 30))
+  +0.045 vs worst ((20, 60)) -0.081; no single-point peak — no robust edge.
+
+Volatility regime filter (warmup=20, 252d/84d walk-forward):
+- Full sample, zero cost: trades=10 (exits are now recorded), total return
+  -1.72%, sharpe=-0.05, max drawdown 9.60%. The full-sample result changed
+  from -42.83% because positions are now correctly closed when the signal
+  goes neutral rather than held indefinitely at mark-to-market; the
+  equity-fill audit passes on the corrected run.
+- Walk-forward: 90 folds, 7560 OOS periods, mean log return -0.001, median
+  log return 0.000; positive folds 8/90.
+
+Regime-stability stress test (seed 42, 600 bars, train=60d/test=20d,
+walk-forward IS/OOS; the extreme regime family is documented as stress
+cases, not realistic parameterizations):
+
+- Long-only rule on extreme up (+0.9/yr) / neutral / down (-0.9/yr) regimes:
+  candidate medians [+0.055, +0.005, -0.079] across scenarios;
+  candidate dispersion 0.055 > 2x null dispersion 0.003. Verdict:
+  REGIME_DEPENDENT (correctly flags a rule whose results swing with the
+  regime mix).
+- Direction-following rule (long up, short down) on the up/down pair:
+  candidate medians [+0.055, +0.048]; candidate dispersion 0.003 <
+  2x null dispersion 0.003. Verdict: REGIME_STABLE (consistent edge in both
+  regimes).
+- Coin-flip signal on the canonical realistic family: medians near zero in
+  all four scenarios. Verdict: CONSISTENT_WITH_NOISE.
+- MA crossover on the canonical realistic family: medians near zero in all
+  scenarios. Verdict: CONSISTENT_WITH_NOISE (honest exploratory finding:
+  no regime dependence is detectable on realistic regime mixes).
+
+The null dispersion in the stress tests shifted slightly (0.019 -> 0.003)
+because the coin-flip signal's equity curve is now computed with realized
+exit proceeds; the verdicts themselves are unchanged.
+
 ## Next activation
 
 1. Real-data readiness: if an in-scope public real dataset is identified for
-   research-only simulation, create its manifest per
-   `research/REAL_DATA_FEASIBILITY.md` and pass the pre-run leakage review
-   checklist before any real-data execution.
-2. Optionally: extend the engine with a margin/collateral model (backlog item
-   from the first activation) so that high-leverage strategies are modeled
-   safely; currently the engine allows negative cash without mark-to-market
-   margin.
+    research-only simulation, create its manifest per
+    `research/REAL_DATA_FEASIBILITY.md` and pass the pre-run leakage review
+    checklist before any real-data execution.
+2. Margin/collateral modeling: completed this activation — `BacktestConfig`
+    now models maintenance margin with automatic liquidation on call
+    (`MarginCall` records, `total_margin_calls` in walk-forward
+    aggregates); all defaults preserve prior behavior.
 
 ## Verification (executed)
 
 The framework is deterministic and the full suite executes:
 
 - `pip install -q numpy` (resolved numpy 2.5.3); all modules compile.
-- `python -m unittest discover -s tests -v`: **56 tests, all passing**
-  (31 pre-existing engine/metrics/data tests + 14 perturbation tests +
-  11 regime-stability tests).
+- `python -m unittest discover -s tests -v`: **62 tests, all passing**
+  (31 engine/metrics/data + 14 perturbation + 11 regime-stability + 6 new
+  margin/exit-fill tests).
 - `python -m examples.ma_crossover`: runs end-to-end and prints the full
   perturbation deviation scan; two independent runs produce byte-identical
-  output (verified programmatically).
+  output (sha256 `baeee6a3...`).
 - `python -m examples.volatility_regime_filter`: runs end-to-end with
   walk-forward output; leakage checks pass on the full-sample runs.
 - `python -m examples.regime_stability_demo`: runs end-to-end and prints
-  all three verdicts; two independent runs produce byte-identical output.
+  all three verdicts; two independent runs produce byte-identical output
+  (sha256 `2d3bc5c4...`).
 
 Corrected verified results on seed 42 (regime-switching synthetic data;
 tooling-validation only), superseding the unverified figures in the
@@ -137,10 +207,13 @@ MA crossover (warmup=60, 252d/84d walk-forward, train+test):
   best (+0.045), no single-point peak — no robust edge.
 
 Volatility regime filter (warmup=20, 252d/84d walk-forward):
-- Full sample, zero cost: 79 entries, 0 completed round-trips (never
-  exits), total return -42.83%, sharpe=-0.10, max drawdown 74.80%.
-- Walk-forward: 90 folds, 7560 OOS periods, mean log return -0.029, median
-  log return 0.000.
+- Full sample, zero cost: trades=10 (exits now recorded), total return
+  -1.72%, sharpe=-0.05, max drawdown 9.60%. The full-sample figure changed
+  from -42.83% because the signal's neutral bars now correctly close the
+  position rather than holding it at mark-to-market; the equity-fill audit
+  passes on the corrected run.
+- Walk-forward: 90 folds, 7560 OOS periods, mean log return -0.001, median
+  log return 0.000; positive folds 8/90.
 
 Regime-stability stress test (seed 42, 600 bars, train=60d/test=20d,
 walk-forward IS/OOS; the extreme regime family is documented as stress
@@ -148,12 +221,12 @@ cases, not realistic parameterizations):
 
 - Long-only rule on extreme up (+0.9/yr) / neutral / down (-0.9/yr) regimes:
   candidate medians [+0.055, +0.005, -0.079] across scenarios;
-  candidate dispersion 0.055 > 2x null dispersion 0.019. Verdict:
+  candidate dispersion 0.055 > 2x null dispersion 0.003. Verdict:
   REGIME_DEPENDENT (correctly flags a rule whose results swing with the
   regime mix).
 - Direction-following rule (long up, short down) on the up/down pair:
   candidate medians [+0.055, +0.048]; candidate dispersion 0.003 <
-  2x null dispersion 0.006. Verdict: REGIME_STABLE (consistent edge in both
+  2x null dispersion 0.003. Verdict: REGIME_STABLE (consistent edge in both
   regimes).
 - Coin-flip signal on the canonical realistic family: medians near zero in
   all four scenarios. Verdict: CONSISTENT_WITH_NOISE.
