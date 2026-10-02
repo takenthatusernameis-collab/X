@@ -37,7 +37,7 @@ def volatility_regime_signals(closes: np.ndarray, vol_window: int = 20, threshol
     n = len(closes)
     signals = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
     sqrt252 = np.sqrt(252.0)
-    for i in range(vol_window - 1, n):
+    for i in range(int(vol_window) - 1, n):
         log_returns = np.log(closes[i - vol_window + 1 : i + 1])
         realized_annual = float(np.std(log_returns, ddof=1)) * sqrt252
         signals[i] = bt.Signal(date=i + 1, weight=1.0 if realized_annual < threshold else 0.0)
@@ -54,6 +54,7 @@ def main():
         ],
         p_transition=0.008,
         start_price=100.0,
+        seed=42,
     )
 
     vol_window, threshold = 20, 0.20

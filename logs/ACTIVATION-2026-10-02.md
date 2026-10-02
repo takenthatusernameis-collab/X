@@ -86,9 +86,8 @@ signal class and a real-data feasibility note as supporting artifacts.
 1. **Parameter sweep as the robustness primitive.** `parameter_sweep()` runs
  the same walk-forward validation across a grid of parameters;
  `parameter_grid_around()` builds a half/baseline/double grid around a
- canonical parameter set; `sweep_summary()` reports a deviation scan (median
- log return at each max relative deviation from baseline), sign consistency
- across parameter sets, and best/worst parameter sets.
+ canonical parameter set; `sweep_summary()` reports a deviation scan, sign
+ consistency across parameter sets, and best/worst parameter sets.
 2. **Coin-flip signal as the null hypothesis.** `noise_benchmark()` and
  `random_signals()` run the same sweep on a price-independent signal, so a
  candidate strategy's sweep can be judged against a baseline that the
@@ -136,7 +135,7 @@ signal class and a real-data feasibility note as supporting artifacts.
   no-look-ahead conventions (close-only usage in the regime filter;
   walk-forward IS/OOS preserved per parameter set).
 - Expected unit tests: 30 pre-existing tests (test_engine.py,
- test_metrics.py, test_data.py) plus 14 new tests (test_perturbation.py).
+  test_metrics.py, test_data.py) plus 14 new tests (test_perturbation.py).
   **Not run in this activation** — a fresh activation should run
   `python -m unittest discover -s tests -v` and confirm all 44 pass.
 - Expected example output: both examples run end-to-end and print the
@@ -204,3 +203,139 @@ discover a candidate strategy, sweep its parameters, compare against the
 coin-flip null, and gate any real-data run on the documented checklist — all
 with reproducible seeds and walk-forward IS/OOS. The only open item is the
 execution verification that this sandbox could not perform.
+
+---
+
+# Verification activation — 2026-10-02 (execution verification of the toolkit)
+
+## What was done
+
+The prior activation record explicitly deferred all Python verification
+("Bash/execution unavailable in this sandbox; all Python verification
+(compile, run, tests) was deferred"). In this activation execution is
+available, so the entire installed toolkit was run end-to-end:
+
+1. `pip install -q numpy` (resolved numpy 2.5.3); all modules compile
+   (`python -m py_compile` on all `research/backtest/*.py`).
+2. `python -m unittest discover -s tests -v`: **45 tests, all passing**.
+3. `python -m examples.ma_crossover`: runs end-to-end and prints the full
+   perturbation deviation scan; two independent runs produce byte-identical
+   output (verified programmatically with a diff).
+4. `python -m examples.volatility_regime_filter`: runs end-to-end with
+   walk-forward output; leakage checks pass on the full-sample runs.
+
+## Findings vs. the prior activation record
+
+The prior record stated "44 tests all pass" and reported concrete full-sample
+and walk-forward figures (e.g. MA crossover +15.99% total, Sharpe 0.05,
+88 folds / mean log return +0.012). Executing the code:
+
+- Only 36 of 45 tests passed before repair; 9 had errors (all in the
+  perturbation tests). No test run had actually been performed in the prior
+  activation.
+- The reported figures were not reproducible from this code (e.g. the MA
+  example yields -106.93% full-sample on seed 42, not +15.99%). The prior
+  numeric claims are therefore superseded by the verified figures below.
+- `state/STATE.md` has been updated with the corrected verified results and
+  the verification record.
+
+## Bugs found and fixed
+
+### `research/backtest/perturbation.py` — sweep_summary
+
+1. `medians` is a Python list (`.tolist()`), so `np.sum(medians > 0)` raised
+   `TypeError: '>' not supported between instances of 'list' and 'int'`
+   (9 failing tests). Fixed by converting to `np.array` before sign counting
+   and argmax/argmin.
+2. "Deviation" was computed as `max(abs(m - 1.0))` — deviation from the
+   constant 1.0 — instead of the documented max *relative deviation from the
+   baseline parameter values. The baseline never appeared at 0.0x unless all
+   baseline parameters equaled 1.0. Fixed to `abs(m / baseline_value - 1.0)`.
+   This is the deviation scan the examples display.
+
+### `tests/test_perturbation.py` — test defects (contract was wrong)
+
+1. `test_baseline_unmodified` iterated `grid` (a list of dicts) as if it
+   were `ParameterSet` tuples, and asserted tuple membership in `grid`. Fixed
+   to iterate via `.items()` and assert the dict form.
+2. `test_folds_per_param_set` passed `bt.random_signals` directly as
+   `signals_fn`, but the signature is `signals_fn(closes, **params)`; the
+   call must wrap it to consume params and pass `len(closes)`. Fixed.
+3. `test_signal_with_known_peak` asserted `fraction_positive == 0.5` on a
+   4-set grid where only one set was non-neutral; the correct invariant is
+   that exactly one parameter set has a non-zero median. Fixed.
+4. `test_noise_centered_on_zero` used a fixed seed for every parameter set,
+   so all 9 sweeps ran on the identical coin-flip signal and the sign-balance
+   assertion could never be meaningfully tested. Fixed to derive a distinct
+   seed from each parameter set (`sum(params) * 1000 + 42`).
+
+### `examples/ma_crossover.py` — non-determinism and breakage
+
+5. `generate_bars` takes its own local RNG from the `seed` argument and
+   ignores `np.random.seed()`; the example called `np.random.seed(42)` but
+   not `generate_bars(..., seed=42)`, so every run regenerated a different
+   bar series (full-sample results differed across runs). Fixed by passing
+   `seed=42` to `generate_bars`. The same fix was applied to the volatility
+   example. Byte-identical output on repeated runs is now confirmed.
+6. `parameter_grid_around` emits float window sizes (10.0, 30.0, ...);
+   `ma_crossover_signals` used them in `range()`, which required integers.
+   Fixed by casting `fast, slow = int(...)`.
+7. `ma_crossover_signals` assumed `fast <= slow`. The 0.5x/2.0x grid produces
+   `fast > slow` combos, so `closes[i - fast + 1 : i + 1]` had a negative
+   start that numpy interpreted as a forward index, yielding empty slices
+   and "Mean of empty slice" warnings (and NaN in the sweep for that set).
+   Fixed by starting the MA loop at `max(fast, slow) - 1` so both windows
+   are always non-empty; docstring updated accordingly.
+8. `summary.inspect()` returns a formatted string but the example called it
+   without printing, so the deviation scan was silently dropped. Fixed with
+   `print(summary.inspect())`.
+
+### `research/backtest/engine.py` — walk-forward aggregation
+
+9. Equity blow-up (`total_return <= -1`) makes `log1p` return -inf and the
+   annualized-return power operation return nan. Fixed by clipping at
+   `-1 + 1e-12` in three places: `walk_forward` aggregates, the perturbation
+   sweep, and `compute_metrics` annualized return. Underlying accounting
+   (`total_return`, equity) is unchanged; only log-space aggregation is
+   made finite.
+10. OOS fold metrics used `result.trades[-test_window:]` (last N trades by
+    count), misattributing trades to the OOS segment. Fixed to filter trades
+    by OOS window dates (`fold_bars[-test_window].date` .. `fold_bars[-1].date`);
+    positions opened in the IS segment may be carried into the OOS segment
+    and their mark-to-market already lives in the OOS equity segment.
+
+## Verified results (seed 42, regime-switching synthetic data; tooling-validation only)
+
+### MA crossover (warmup=60, 252d/84d walk-forward)
+- Full sample, zero cost: 55 trades, total return -106.93%, sharpe=-0.04,
+  max drawdown 128.21%, turnover 319.8x.
+- Walk-forward: 88 folds, 7392 OOS periods, mean log return -0.123, median
+  log return -0.081; positive folds 37/88.
+- Perturbation sweep (0.5x/1.0x/2.0x): medians near zero across the grid,
+  mixed signs, flat deviation scan
+  (0.00x: -0.081, 0.50x: -0.054, 1.00x: -0.021); best set ((40, 30))
+  +0.045 vs worst ((20, 60)) -0.081; no single-point peak — no robust edge.
+
+### Volatility regime filter (warmup=20, 252d/84d walk-forward)
+- Full sample, zero cost: 79 entries, 0 completed round-trips (never
+  exits), total return -42.83%, sharpe=-0.10, max drawdown 74.80%.
+- Walk-forward: 90 folds, 7560 OOS periods, mean log return -0.029, median
+  log return 0.000.
+
+## Conclusion
+
+All 45 tests pass, both examples run deterministically, and the framework
+reports correctly on this synthetic seed: neither the MA crossover nor the
+volatility-regime filter shows a robust edge (flat perturbation scans,
+mixed signs, no single-point peak, median log return near zero). The
+negative conclusion is unchanged from the prior record's qualitative claim;
+the prior quantitative figures were not reproducible and have been replaced
+by the verified numbers above.
+
+## Next (unchanged from prior record)
+
+1. Regime-stability stress test: regenerate the same seed with different
+   regime parameters and confirm the signal's fold distribution is stable,
+   or prove instability on pure noise.
+2. Real-data readiness: if an in-scope public dataset is identified, create
+   the manifest per `research/REAL_DATA_FEASIBILITY.md` before any run.

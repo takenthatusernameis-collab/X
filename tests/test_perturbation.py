@@ -79,11 +79,11 @@ class TestParameterGridAround(unittest.TestCase):
     def test_baseline_unmodified(self):
         baseline = (("n", 42.0),)
         grid = bt.parameter_grid_around(baseline)
-        for ps in grid:
-            for name, val in ps:
+        self.assertIn({"n": 42.0}, grid)
+        for params in grid:
+            for name, val in params.items():
                 self.assertIsInstance(name, str)
                 self.assertIsInstance(val, float)
-        self.assertIn((("n", 42.0),), grid)
 
 
 class TestEmptyGridAndEdgeCases(unittest.TestCase):
@@ -115,7 +115,8 @@ class TestNoiseBenchmark(unittest.TestCase):
         grid = bt.parameter_grid_around((("fast", 20), ("slow", 60)),
                                         multipliers=(0.5, 1.0, 2.0))
         result = bt.parameter_sweep(
-            signals_fn=lambda closes, **p: bt.random_signals(len(bars), seed=42),
+            signals_fn=lambda closes, **p: bt.random_signals(
+                len(bars), seed=int(sum(p.values()) * 1000 + 42)),
             bars=list(bars),
             param_grid=grid,
             train_window=120,
@@ -170,7 +171,11 @@ class TestSweepDetectsStructuredSignal(unittest.TestCase):
         self.assertEqual(summary.n_param_sets, len(grid))
         self.assertGreater(summary.best_median_log_return,
                            summary.worst_median_log_return)
-        self.assertEqual(summary.fraction_positive, 0.5)
+        # only the contrived one-point signal produces trades; all other
+        # parameter sets are neutral and must have a zero median
+        non_zero = [m for m in summary.median_log_returns if abs(m) > 1e-9]
+        self.assertEqual(len(non_zero), 1,
+                         "exactly one parameter set has a non-zero median (the peak)")
 
 
 class TestSweepSummaryConsistency(unittest.TestCase):
@@ -247,7 +252,8 @@ class TestNoiseBenchmarkIS_OOS(unittest.TestCase):
         bars = bt.generate_bars(500, seed=47)
         grid = bt.parameter_grid_around((("fast", 20), ("slow", 60)))
         result = bt.parameter_sweep(
-            bt.random_signals, list(bars), grid, 100, 50, warmup=20,
+            lambda closes, **params: bt.random_signals(len(closes), seed=47),
+            list(bars), grid, 100, 50, warmup=20,
             overlap_window=0, cfg=bt.BacktestConfig(warmup_periods=20),
         )
         self.assertEqual(len(result.param_sets), len(grid))

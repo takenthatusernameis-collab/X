@@ -25,12 +25,13 @@ import research.backtest as bt
 def ma_crossover_signals(closes: np.ndarray, fast: int, slow: int):
     """Past-only MA-crossover signals.
 
-    Returns a Signal for each bar. Bars before the slow window are
-    neutral (no lookahead; the engine's warmup discipline applies).
+    Returns a Signal for each bar. Bars before both moving-average windows
+    are neutral (no lookahead; the engine's warmup discipline applies).
     """
     n = len(closes)
     signals = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
-    for i in range(slow - 1, n):
+    fast, slow = int(fast), int(slow)
+    for i in range(max(fast, slow) - 1, n):
         fast_ma = np.mean(closes[i - fast + 1 : i + 1])
         slow_ma = np.mean(closes[i - slow + 1 : i + 1])
         signals[i] = bt.Signal(date=i + 1, weight=1.0 if fast_ma > slow_ma else -1.0)
@@ -47,6 +48,7 @@ def main():
         ],
         p_transition=0.008,
         start_price=100.0,
+        seed=42,
     )
 
     fast, slow = 20, 60
@@ -125,7 +127,7 @@ def main():
         cfg=cfg0,
     )
     summary = bt.sweep_summary(sweep, baseline=(("fast", fast), ("slow", slow)))
-    summary.inspect()
+    print(summary.inspect())
 
     noise_summary = bt.noise_benchmark(
         list(bars),

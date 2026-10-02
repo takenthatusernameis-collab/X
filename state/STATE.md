@@ -69,8 +69,7 @@ the risk of later over-reading walk-forward noise. See
 1. Run the full test suite end-to-end in the runner: `pip install
    -r research/backtest/requirements.txt` then `python -m unittest
    discover -s tests -v`, plus `python -m examples.ma_crossover` and
-   `python -m examples.volatility_regime_filter`. (Bash execution was
-   unavailable this activation; verify by hand.)
+   `python -m examples.volatility_regime_filter`. **Now verified (see "Verification (executed)" below).**
 2. Consider a regime-stability stress test: regenerate the same seed with
    different regime parameters and confirm the signal's fold distribution
    is stable, or prove instability on pure noise.
@@ -78,6 +77,42 @@ the risk of later over-reading walk-forward noise. See
    simulation, create the manifest per `research/REAL_DATA_FEASIBILITY.md`
    before any real-data run.
 
+## Verification (executed)
+
+The framework is deterministic and the full suite executes:
+
+- `pip install -q numpy` (resolved numpy 2.5.3); all modules compile.
+- `python -m unittest discover -s tests -v`: **45 tests, all passing**
+  (31 pre-existing engine/metrics/data tests + 14 perturbation tests).
+- `python -m examples.ma_crossover`: runs end-to-end and prints the full
+  perturbation deviation scan; two independent runs produce byte-identical
+  output (verified programmatically).
+- `python -m examples.volatility_regime_filter`: runs end-to-end with
+  walk-forward output; leakage checks pass on the full-sample runs.
+
+Corrected verified results on seed 42 (regime-switching synthetic data;
+tooling-validation only), superseding the unverified figures in the
+activation log:
+
+MA crossover (warmup=60, 252d/84d walk-forward, train+test):
+- Full sample, zero cost: trades=55, total return -106.93%, sharpe=-0.04,
+  max drawdown 128.21%, turnover 319.8x.
+- Walk-forward: 88 folds, 7392 OOS periods, mean log return -0.123, median
+  log return -0.081; positive folds 37/88.
+- Perturbation sweep (0.5x/1.0x/2.0x grid): medians near zero across the
+  grid with mixed signs and a flat deviation scan
+  (0.00x: -0.081, 0.50x: -0.054, 1.00x: -0.021); one param set slightly
+  best (+0.045), no single-point peak — no robust edge.
+
+Volatility regime filter (warmup=20, 252d/84d walk-forward):
+- Full sample, zero cost: 79 entries, 0 completed round-trips (never
+  exits), total return -42.83%, sharpe=-0.10, max drawdown 74.80%.
+- Walk-forward: 90 folds, 7560 OOS periods, mean log return -0.029, median
+  log return 0.000.
+
+Note: the activation log's earlier quantitative claims (e.g. full-sample
++15.99%, Sharpe 0.05) were not reproducible; the log had been written with
+Python execution unavailable, so the verified run above supersedes it.
 ## Evidence standard
 
 Synthetic data validates tooling only; it is not evidence that any

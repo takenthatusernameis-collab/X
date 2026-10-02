@@ -128,7 +128,7 @@ def compute_metrics(
     starts, ends = eq[0], eq[-1]
     total_return = ends / starts - 1.0
     n_years = n / periods_per_year
-    annualized_return = (1.0 + total_return) ** (1.0 / n_years) - 1.0 if n_years > 0 else 0.0
+    annualized_return = (1.0 + max(total_return, -1.0 + 1e-12)) ** (1.0 / n_years) - 1.0 if n_years > 0 else 0.0
 
     returns = np.diff(eq) / eq[:-1]
     vol_annual = float(np.std(returns, ddof=1)) * np.sqrt(periods_per_year) if n > 1 else 0.0

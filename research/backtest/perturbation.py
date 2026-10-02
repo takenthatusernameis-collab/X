@@ -303,23 +303,28 @@ def sweep_summary(
         parameter sets, and the optional noise comparison.
     """
     fold_rets = np.array(result.fold_total_returns, dtype=np.float64)
-    log_rets = np.log1p(fold_rets)
+    # equity blow-up (total_return <= -1) makes log1p undefined; clip to a
+    # floor so the deviation scan stays finite and comparable across parameter
+    # sets.
+    log_rets = np.log1p(np.clip(fold_rets, -1.0 + 1e-12, None))
     medians = np.median(log_rets, axis=1).tolist()
+    medians_array = np.array(medians, dtype=np.float64)
 
+    baseline_dict = dict(baseline)
     dev_groups: Dict[float, List[float]] = {}
     for ps, med in zip(result.param_sets, medians):
-        dev = round(max(abs(float(m) - 1.0) for _, m in ps), 6)
+        dev = round(max(abs(float(m) / baseline_dict[name] - 1.0) for name, m in ps), 6)
         dev_groups.setdefault(dev, []).append(med)
     sorted_devs = sorted(dev_groups)
     medians_at_deviation = {d: float(np.median(dev_groups[d])) for d in sorted_devs}
 
-    n_positive = int(np.sum(medians > 0))
-    n_negative = int(np.sum(medians < 0))
+    n_positive = int(np.sum(medians_array > 0))
+    n_negative = int(np.sum(medians_array < 0))
     n_zero = int(len(medians) - n_positive - n_negative)
     fraction_positive = n_positive / len(medians)
 
-    best_idx = int(np.argmax(medians))
-    worst_idx = int(np.argmin(medians))
+    best_idx = int(np.argmax(medians_array))
+    worst_idx = int(np.argmin(medians_array))
 
     return SweepSummary(
         param_sets=result.param_sets,

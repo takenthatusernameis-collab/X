@@ -270,7 +270,15 @@ def walk_forward(
 
         # per-fold metrics on the OOS segment only
         from .metrics import compute_metrics
-        oos_trades = result.trades[-test_window:]
+        # only trades executed within the OOS window belong in OOS metrics;
+        # positions opened in the IS (warmup/train) segment may be carried into
+        # the OOS segment, and their mark-to-market is already in test_eq.
+        oos_window_start = fold_bars[-test_window].date
+        oos_window_end = fold_bars[-1].date
+        oos_trades = [
+            f for f in result.trades
+            if oos_window_start <= f.date <= oos_window_end
+        ]
         oos_prices = (
             np.array([f.price for f in oos_trades], dtype=np.float64)
             if oos_trades
@@ -297,7 +305,9 @@ def walk_forward(
 
     aggregate: dict
     if folds:
-        m = np.array([np.log1p(f.metrics["total_return"]) for f in folds])
+        # equity blow-up (total_return <= -1) makes log1p undefined; clip to a
+        # floor so log-space aggregates stay finite and comparable across folds.
+        m = np.log1p(np.clip([f.metrics["total_return"] for f in folds], -1.0 + 1e-12, None))
         aggregate = {
             "n_folds": len(folds),
             "total_oos_periods": cumulative_test,
