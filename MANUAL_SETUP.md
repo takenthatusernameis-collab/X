@@ -22,7 +22,7 @@ Kilo is not given a GitHub write token, a personal access token, or a credential
 
 ## Free model
 
-The workflow uses the currently listed free model `nvidia/nemotron-3-super-120b-a12b:free` as a concrete model ID. This avoids relying on Auto Free's virtual model ID in the CLI's local model catalog; free-model availability and rate limits can change. Kilo currently lists this model as free and supports function calling/tool use. Auto Free remains a documented Kilo tier, but the runner uses the concrete free model for CLI compatibility. The public repository must contain no confidential data or secrets.
+The workflow uses Kilo's documented `kilo-auto/free` model tier through the built-in Kilo Gateway provider. Auto Free routes to currently available free models and requires no Kilo credits; free-model availability and rate limits can change. The workflow uses the trusted `KILO_API_KEY` environment variable for Gateway authentication and keeps the key out of repository files. Auto Free may route requests to providers that log prompts/outputs, so this public repository must contain no confidential data or secrets.
 
 ## What the workflow will do after the secret is added
 
