@@ -1,6 +1,6 @@
 # Manual Setup
 
-The repository-side infrastructure is configured in the setup branch.
+The repository-side infrastructure is configured on `main`.
 
 ## Required GitHub Actions secret
 
