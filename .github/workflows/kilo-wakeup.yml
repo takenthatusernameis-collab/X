@@ -42,33 +42,40 @@ jobs:
           fi
 
           mkdir -p "$HOME/.config/kilo"
-          cat > "$HOME/.config/kilo/kilo.json" <<EOF
-          {
-            "$schema": "https://app.kilo.ai/config.json",
-            "provider": {
-              "kilocode": {
-                "options": {
-                  "apiKey": "$KILO_API_KEY"
-                }
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          config = {
+              "$schema": "https://app.kilo.ai/config.json",
+              "provider": {
+                  "kilocode": {
+                      "options": {
+                          "apiKey": os.environ["KILO_API_KEY"]
+                      }
+                  }
+              },
+              "model": "kilo-auto/free",
+              "small_model": "kilo-auto/free",
+              "subagent_model": "kilo-auto/free",
+              "sandbox": {
+                  "enabled": true,
+                  "network": "deny",
+                  "allowed_hosts": [
+                      "github.com:443",
+                      "api.github.com:443",
+                      "raw.githubusercontent.com:443",
+                      "pypi.org:443",
+                      "files.pythonhosted.org:443",
+                      "registry.npmjs.org:443"
+                  ]
               }
-            },
-            "model": "kilo-auto/free",
-            "small_model": "kilo-auto/free",
-            "subagent_model": "kilo-auto/free",
-            "sandbox": {
-              "enabled": true,
-              "network": "deny",
-              "allowed_hosts": [
-                "github.com:443",
-                "api.github.com:443",
-                "raw.githubusercontent.com:443",
-                "pypi.org:443",
-                "files.pythonhosted.org:443",
-                "registry.npmjs.org:443"
-              ]
-            }
           }
-          EOF
+
+          path = Path(os.environ["HOME"]) / ".config" / "kilo" / "kilo.json"
+          path.write_text(json.dumps(config, indent=2) + "\\n", encoding="utf-8")
+          PY
           chmod 600 "$HOME/.config/kilo/kilo.json"
           unset KILO_API_KEY
 
