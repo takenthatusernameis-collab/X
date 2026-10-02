@@ -44,7 +44,7 @@ The persistence gate must reject high-confidence unsafe material, including:
 - symbolic links;
 - generated Python bytecode/build artifacts such as `__pycache__/**`, `*.pyc`, and `*.py.c`.
 
-The gate should prefer a false negative over blocking legitimate research code when a credential pattern is ambiguous. High-confidence unsafe material must fail the persistence step rather than being silently committed.
+Ambiguous patterns should not by themselves block legitimate research code; the gate targets high-confidence unsafe material. High-confidence unsafe material must fail the persistence step rather than being silently committed.
 
 ## Behavior on violation
 
