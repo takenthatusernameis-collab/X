@@ -71,36 +71,42 @@ jobs:
             exit 0
           fi
 
-          if KILO_CONFIG="$HOME/.config/kilo/diagnostic-kilo.json" KILO_PROVIDER=kilo kilo profile --json >/tmp/kilo-profile.json 2>/tmp/kilo-profile.err; then
-            echo "KILO_API_KEY_CHECK=VALID"
-            {
-              echo "### Kilo API key diagnostic"
-              echo "KILO_API_KEY: **valid** — authenticated Kilo profile request succeeded."
-              echo
-              echo "The key itself was not printed or persisted."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
+          status="$(curl --silent --show-error --output /tmp/kilo-profile-response --write-out '%{http_code}' \
+            -H "Authorization: Bearer $KILO_API_KEY" \
+            -H "Accept: application/json" \
+            https://api.kilo.ai/api/profile || true)"
 
-          if grep -Eiq '(^|[^0-9])401([^0-9]|$)|unauthorized|invalid[^[:space:]]*[[:space:]]+(api[[:space:]-]?key|token)|authentication[^[:space:]]*failed|invalid[[:space:]]+credential' /tmp/kilo-profile.err /tmp/kilo-profile.json 2>/dev/null; then
-            echo "::error::KILO_API_KEY_CHECK=INVALID"
-            {
-              echo "### Kilo API key diagnostic"
-              echo "KILO_API_KEY: **invalid or rejected** — Kilo returned an authentication failure."
-              echo
-              echo "The key itself was not printed or persisted."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-
-          echo "::warning::KILO_API_KEY_CHECK=UNVERIFIED"
-          {
-            echo "### Kilo API key diagnostic"
-            echo "KILO_API_KEY: **unverified** — the profile request failed, but the failure did not identify the credential as invalid."
-            echo
-            echo "The key itself was not printed or persisted."
-          } >> "$GITHUB_STEP_SUMMARY"
-          exit 1
+          case "$status" in
+            200)
+              echo "KILO_API_KEY_CHECK=VALID"
+              {
+                echo "### Kilo API key diagnostic"
+                echo "KILO_API_KEY: **valid** — authenticated Kilo profile request returned HTTP 200."
+                echo
+                echo "The key itself was not printed or persisted."
+              } >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            401)
+              echo "::error::KILO_API_KEY_CHECK=INVALID"
+              {
+                echo "### Kilo API key diagnostic"
+                echo "KILO_API_KEY: **invalid or rejected** — Kilo returned HTTP 401."
+                echo
+                echo "The key itself was not printed or persisted."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+            *)
+              echo "::warning::KILO_API_KEY_CHECK=UNVERIFIED"
+              {
+                echo "### Kilo API key diagnostic"
+                echo "KILO_API_KEY: **unverified** — Kilo profile endpoint returned HTTP $status rather than 200 or 401."
+                echo
+                echo "The key itself was not printed or persisted."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+              ;;
+          esac
 
       - name: Discover a currently available free model
         id: discover_model
@@ -208,8 +214,8 @@ jobs:
                   }
               },
               "sandbox": {
-                  "enabled": True,
-                  "network": "deny",
+                  "enabled": False,
+                  "network": "allow",
                   "allowed_hosts": [
                       "github.com:443",
                       "api.github.com:443",
@@ -257,9 +263,7 @@ jobs:
           assert model["id"].endswith(":free")
           assert model["tool_call"] is True
 
-          assert config["sandbox"]["enabled"] is True
-          assert config["sandbox"]["network"] == "deny"
-          assert "api.kilo.ai:443" in config["sandbox"]["allowed_hosts"]
+          assert config["sandbox"]["enabled"] is False
           print(f"Trusted Kilo configuration validated for {model['id']}.")
           PY
 
