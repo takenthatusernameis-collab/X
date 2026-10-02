@@ -32,60 +32,44 @@ jobs:
         run: kilo --version
 
       - name: Prepare trusted Kilo authentication
-        env:
-          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
         run: |
           set -euo pipefail
-          if [ -z "$KILO_API_KEY" ]; then
-            echo "::warning::KILO_API_KEY is not configured. Kilo activation will be skipped."
-            exit 0
-          fi
-
           mkdir -p "$HOME/.config/kilo"
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-
-          config = {
-              "$schema": "https://app.kilo.ai/config.json",
-              "provider": {
-                  "kilocode": {
-                      "options": {
-                          "apiKey": os.environ["KILO_API_KEY"]
-                      }
-                  }
-              },
-              "model": "nvidia/nemotron-3-super-120b-a12b:free",
-              "small_model": "nvidia/nemotron-3-super-120b-a12b:free",
-              "subagent_model": "nvidia/nemotron-3-super-120b-a12b:free",
-              "sandbox": {
-                  "enabled": True,
-                  "network": "deny",
-                  "allowed_hosts": [
-                      "github.com:443",
-                      "api.github.com:443",
-                      "raw.githubusercontent.com:443",
-                      "pypi.org:443",
-                      "files.pythonhosted.org:443",
-                      "registry.npmjs.org:443"
-                  ]
+          cat > "$HOME/.config/kilo/kilo.json" <<'JSON'
+          {
+            "$schema": "https://app.kilo.ai/config.json",
+            "provider": {
+              "kilo": {
+                "options": {
+                  "apiKey": "{env:KILO_API_KEY}"
+                }
               }
+            },
+            "enabled_providers": [
+              "kilo"
+            ],
+            "model": "kilo-auto/free",
+            "small_model": "kilo-auto/free",
+            "subagent_model": "kilo-auto/free",
+            "sandbox": {
+              "enabled": true,
+              "network": "deny",
+              "allowed_hosts": [
+                "github.com:443",
+                "api.github.com:443",
+                "raw.githubusercontent.com:443",
+                "pypi.org:443",
+                "files.pythonhosted.org:443",
+                "registry.npmjs.org:443"
+              ]
+            }
           }
-
-          path = Path(os.environ["HOME"]) / ".config" / "kilo" / "kilo.json"
-          path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
-          PY
+          JSON
           chmod 600 "$HOME/.config/kilo/kilo.json"
-          unset KILO_API_KEY
-
       - name: Validate trusted Kilo configuration
         run: |
           set -euo pipefail
-          if [ ! -f "$HOME/.config/kilo/kilo.json" ]; then
-            echo "No trusted Kilo configuration found; activation remains skipped."
-            exit 0
-          fi
+          test -f "$HOME/.config/kilo/kilo.json"
           test "$(stat -c '%a' "$HOME/.config/kilo/kilo.json")" = "600"
           python3 - <<'PY'
           import json
@@ -94,11 +78,12 @@ jobs:
 
           path = Path(os.environ["HOME"]) / ".config" / "kilo" / "kilo.json"
           config = json.loads(path.read_text(encoding="utf-8"))
-          assert config["provider"]["kilocode"]["options"]["apiKey"], "Kilo API key is empty"
-          expected_model = "nvidia/nemotron-3-super-120b-a12b:free"
-          assert config["model"] == expected_model
-          assert config["small_model"] == expected_model
-          assert config["subagent_model"] == expected_model
+          provider = config["provider"]["kilo"]
+          assert provider["options"]["apiKey"] == "{env:KILO_API_KEY}"
+          assert config["enabled_providers"] == ["kilo"]
+          assert config["model"] == "kilo-auto/free"
+          assert config["small_model"] == "kilo-auto/free"
+          assert config["subagent_model"] == "kilo-auto/free"
           assert config["sandbox"]["enabled"] is True
           assert config["sandbox"]["network"] == "deny"
           print("Trusted Kilo configuration validated.")
@@ -109,13 +94,12 @@ jobs:
         continue-on-error: true
         timeout-minutes: 340
         env:
+          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
+          KILO_PROVIDER: "kilo"
           KILO_DISABLE_EXTERNAL_SKILLS: "true"
         run: |
-          if [ ! -f "$HOME/.config/kilo/kilo.json" ]; then
-            echo "No trusted Kilo configuration found; skipping activation."
-            exit 0
-          fi
-          kilo run --auto "$(cat .kilo/wakeup-prompt.md)"
+          set -euo pipefail
+          kilo run --model kilo-auto/free --auto "$(cat .kilo/wakeup-prompt.md)"
 
       - name: Persist safe repository changes
         if: always()
