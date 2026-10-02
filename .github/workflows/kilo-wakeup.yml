@@ -60,7 +60,7 @@ jobs:
               "small_model": "kilo-auto/free",
               "subagent_model": "kilo-auto/free",
               "sandbox": {
-                  "enabled": true,
+                  "enabled": True,
                   "network": "deny",
                   "allowed_hosts": [
                       "github.com:443",
@@ -78,6 +78,27 @@ jobs:
           PY
           chmod 600 "$HOME/.config/kilo/kilo.json"
           unset KILO_API_KEY
+
+      - name: Validate trusted Kilo configuration
+        run: |
+          set -euo pipefail
+          test -f "$HOME/.config/kilo/kilo.json"
+          test "$(stat -c '%a' "$HOME/.config/kilo/kilo.json")" = "600"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["HOME"]) / ".config" / "kilo" / "kilo.json"
+          config = json.loads(path.read_text(encoding="utf-8"))
+          assert config["provider"]["kilocode"]["options"]["apiKey"], "Kilo API key is empty"
+          assert config["model"] == "kilo-auto/free"
+          assert config["small_model"] == "kilo-auto/free"
+          assert config["subagent_model"] == "kilo-auto/free"
+          assert config["sandbox"]["enabled"] is True
+          assert config["sandbox"]["network"] == "deny"
+          print("Trusted Kilo configuration validated.")
+          PY
 
       - name: Run Kilo
         id: kilo
