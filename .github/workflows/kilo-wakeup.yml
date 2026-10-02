@@ -266,15 +266,17 @@ jobs:
           git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
           git reset -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
 
+          # Ordinary research files, diagnostics, tests, examples and scratch
+          # helpers are allowed to persist when they provide future value.
           git add -A
 
-          # Never persist generated Python build artifacts from research verification.
+          # Never persist generated Python build artifacts from verification.
           git reset -- \
             ':(glob)**/__pycache__/**' \
             ':(glob)**/*.pyc' \
             ':(glob)**/*.py.c' 2>/dev/null || true
 
-          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)
+          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)$' >/tmp/kilo_protected_paths; then
             echo "Protected paths unexpectedly staged:"
             cat /tmp/kilo_protected_paths
             exit 1
@@ -286,10 +288,24 @@ jobs:
             exit 1
           fi
 
-          # Balanced persistence policy: ordinary research files are allowed.
-          # Reject only high-confidence unsafe material; do not blanket-block
-          # scratch/debug files because useful diagnostics may become durable.
-          if git diff --cached --name-only | grep -E '(^|/)(\.env|\.env\..*|id_rsa|id_dsa|id_ecdsa|id_ed25519|credentials\.(json|ya?ml|toml)|secrets\.(json|ya?ml|toml))$|\.(pem|key)
+          if git diff --cached --name-only | grep -E '(^|/)(\.env(\..*)?|id_rsa|id_dsa|id_ecdsa|id_ed25519|credentials\.(json|ya?ml|toml)|secrets\.(json|ya?ml|toml))$|\.(pem|key)$' >/tmp/kilo_credential_paths; then
+            echo "Credential/secret-like paths are not allowed to persist:"
+            cat /tmp/kilo_credential_paths
+            exit 1
+          fi
+
+          if git diff --cached --binary | grep -E -n 'ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|sk-[A-Za-z0-9_-]{20,}|kilo_[A-Za-z0-9_-]{20,}' >/tmp/kilo_high_confidence_credentials; then
+            echo "High-confidence credential/token material detected in staged changes:"
+            cat /tmp/kilo_high_confidence_credentials
+            exit 1
+          fi
+
+          if git diff --cached --summary | grep -E '^ create mode 120000 ' >/tmp/kilo_symlinks; then
+            echo "Symbolic links are not allowed to persist:"
+            cat /tmp/kilo_symlinks
+            exit 1
+          fi
+
           if git diff --cached --quiet; then
             echo "No safe repository changes to persist."
             exit 0
