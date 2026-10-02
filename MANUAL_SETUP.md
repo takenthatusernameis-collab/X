@@ -20,9 +20,9 @@ Adding an API key does not make the selected free model paid; free models remain
 
 The workflow currently pins `minimax/minimax-m3:free` instead of the Auto Free virtual model. This is deliberate: the latest activation reached Kilo successfully but the CLI returned `Model not found: kilo-auto/free`, so a concrete currently documented free model avoids that catalog-resolution failure.
 
-Kilo's free models are available to authenticated and anonymous users. Anonymous free-model access is currently rate-limited to 200 requests per hour per IP, and free-model availability can change over time. citeturn389505search1turn389505search2turn145399search1
+Kilo's free models are available to authenticated and anonymous users. Anonymous free-model access is currently rate-limited to 200 requests per hour per IP, and free-model availability can change over time.
 
-Auto Free (`kilo-auto/free`) remains a supported Kilo model tier in the documentation, but its underlying routing changes server-side. The repository therefore prefers the explicit model for CI reliability until the CLI/catalog behavior is confirmed stable. citeturn389505search0turn389505search5
+Auto Free (`kilo-auto/free`) remains a supported Kilo model tier, but its underlying routing changes server-side. The repository therefore prefers the explicit model for CI reliability until the CLI/catalog behavior is confirmed stable.
 
 ## No other credential is required
 
