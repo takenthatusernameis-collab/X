@@ -1,0 +1,103 @@
+name: Kilo Research Enterprise Wake
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: kilo-research-enterprise
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  kilo:
+    name: Autonomous Kilo activation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Kilo Code CLI
+        run: npm install -g @kilocode/cli
+
+      - name: Verify Kilo installation
+        run: kilo --version
+
+      - name: Run Kilo
+        id: kilo
+        continue-on-error: true
+        timeout-minutes: 340
+        env:
+          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
+          KILO_CONFIG_CONTENT: >-
+            {"$schema":"https://app.kilo.ai/config.json","provider":{"kilocode":{"options":{"apiKey":"{env:KILO_API_KEY}"}}},"model":"kilo-auto/free","small_model":"kilo-auto/small","subagent_model":"kilo-auto/free","sandbox":{"enabled":true,"network":"deny","allowed_hosts":["github.com:443","api.github.com:443","raw.githubusercontent.com:443","pypi.org:443","files.pythonhosted.org:443","registry.npmjs.org:443"]}}
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
+        run: |
+          if [ -z "$KILO_API_KEY" ]; then
+            echo "::warning::KILO_API_KEY is not configured. Kilo activation skipped."
+            exit 0
+          fi
+          kilo run --model kilo-auto/free --auto "$(cat .kilo/wakeup-prompt.md)"
+
+      - name: Persist safe repository changes
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          KILO_OUTCOME: ${{ steps.kilo.outcome }}
+        run: |
+          set -euo pipefail
+
+          # Autonomous Kilo is not allowed to persist changes to its authority/security boundary.
+          git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md 2>/dev/null || true
+          git reset -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md 2>/dev/null || true
+
+          git add -A
+
+          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md)$' >/tmp/kilo_protected_paths; then
+            echo "Protected paths unexpectedly staged:"
+            cat /tmp/kilo_protected_paths
+            exit 1
+          fi
+
+          # Common high-risk secret signatures must never enter the public repository.
+          if git diff --cached --binary | grep -E -n 'eyJ[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY' >/tmp/kilo_secret_scan; then
+            echo "Potential secret material detected in staged changes:"
+            cat /tmp/kilo_secret_scan
+            exit 1
+          fi
+
+          if git diff --cached --quiet; then
+            echo "No safe repository changes to persist."
+            exit 0
+          fi
+
+          git config user.name "kilo-research-enterprise"
+          git config user.email "kilo-research-enterprise@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+
+          git commit -m "Kilo activation: update research state"
+          git push origin "HEAD:$GITHUB_REF_NAME"
+
+          echo "Kilo activation outcome: $KILO_OUTCOME"
+
+      - name: Report Kilo outcome
+        if: always()
+        env:
+          KILO_OUTCOME: ${{ steps.kilo.outcome }}
+        run: |
+          if [ "$KILO_OUTCOME" = "success" ]; then
+            echo "Kilo activation completed successfully."
+          elif [ "$KILO_OUTCOME" = "skipped" ]; then
+            echo "Kilo activation was skipped."
+          else
+            echo "Kilo activation ended with outcome: $KILO_OUTCOME"
+            exit 1
+          fi
