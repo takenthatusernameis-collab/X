@@ -19,7 +19,7 @@ The key is never printed or committed. The research agent does not receive the k
 
 The workflow queries Kilo's live `/api/gateway/models` catalogue and selects a currently available `:free` model suitable for tool use. It then registers that model as a local Kilo custom model pointed at the OpenAI-compatible Gateway.
 
-This avoids hard-coding a free model ID that can disappear or change. Kilo documents the models endpoint as unauthenticated and the Gateway as OpenAI-compatible. It also documents anonymous access to free models. citeturn900753search2turn900753search6turn900753search1
+This avoids hard-coding a free model ID that can disappear or change. Kilo documents the models endpoint as unauthenticated and the Gateway as OpenAI-compatible. It also documents anonymous access to free models.
 
 The selected research model is free; no Kilo credits are required for the free-model request itself. Free-model availability and rate limits can change.
 
