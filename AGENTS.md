@@ -202,6 +202,17 @@ Do not claim verification that did not occur.
 
 The runner is disposable.
 
+Follow `PERSISTENCE_POLICY.md` for the repository persistence boundary. The
+policy is intentionally safety-based rather than cleanliness-based:
+research code, tests, examples, diagnostics, scratch/debug helpers,
+documentation, state, logs, and useful new infrastructure may persist.
+Do not delete or suppress useful files merely because their names look
+temporary. Do block and hand off when the policy identifies credentials,
+private keys, symbolic links, generated Python artifacts, or trusted
+control-plane changes.
+
+The trusted workflow enforces this boundary again immediately before commit.
+
 Persist important code, results, decisions, experiment definitions, failures, unresolved questions, and next actions into repository files.
 
 Keep a concise human-readable activation record when substantive work occurs.
