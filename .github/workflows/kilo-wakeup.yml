@@ -82,7 +82,11 @@ jobs:
       - name: Validate trusted Kilo configuration
         run: |
           set -euo pipefail
-          test -f "$HOME/.config/kilo/kilo.json"
+          if [ ! -f "$HOME/.config/kilo/kilo.json" ]; then
+            echo "No trusted Kilo configuration found; activation remains skipped."
+            exit 0
+          fi
+          test "$(stat -c '%a' "$HOME/.config/kilo/kilo.json")" = "600"
           test "$(stat -c '%a' "$HOME/.config/kilo/kilo.json")" = "600"
           python3 - <<'PY'
           import json
