@@ -31,32 +31,19 @@ jobs:
       - name: Verify Kilo installation
         run: kilo --version
 
-      - name: Prepare trusted Kilo authentication
-        env:
-          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
+      - name: Prepare trusted Kilo configuration
         run: |
           set -euo pipefail
-          if [ -z "$KILO_API_KEY" ]; then
-            echo "::warning::KILO_API_KEY is not configured. Kilo activation will be skipped."
-            exit 0
-          fi
           mkdir -p "$HOME/.config/kilo"
           cat > "$HOME/.config/kilo/kilo.json" <<'JSON'
           {
             "$schema": "https://app.kilo.ai/config.json",
-            "provider": {
-              "kilo": {
-                "options": {
-                  "apiKey": "{env:KILO_API_KEY}"
-                }
-              }
-            },
             "enabled_providers": [
               "kilo"
             ],
-            "model": "kilo-auto/free",
-            "small_model": "kilo-auto/free",
-            "subagent_model": "kilo-auto/free",
+            "model": "minimax/minimax-m3:free",
+            "small_model": "minimax/minimax-m3:free",
+            "subagent_model": "minimax/minimax-m3:free",
             "sandbox": {
               "enabled": true,
               "network": "deny",
@@ -72,13 +59,10 @@ jobs:
           }
           JSON
           chmod 600 "$HOME/.config/kilo/kilo.json"
+
       - name: Validate trusted Kilo configuration
         run: |
           set -euo pipefail
-          if [ ! -f "$HOME/.config/kilo/kilo.json" ]; then
-            echo "No trusted Kilo configuration found; activation remains skipped."
-            exit 0
-          fi
           test "$(stat -c '%a' "$HOME/.config/kilo/kilo.json")" = "600"
           python3 - <<'PY'
           import json
@@ -87,12 +71,10 @@ jobs:
 
           path = Path(os.environ["HOME"]) / ".config" / "kilo" / "kilo.json"
           config = json.loads(path.read_text(encoding="utf-8"))
-          provider = config["provider"]["kilo"]
-          assert provider["options"]["apiKey"] == "{env:KILO_API_KEY}"
           assert config["enabled_providers"] == ["kilo"]
-          assert config["model"] == "kilo-auto/free"
-          assert config["small_model"] == "kilo-auto/free"
-          assert config["subagent_model"] == "kilo-auto/free"
+          assert config["model"] == "minimax/minimax-m3:free"
+          assert config["small_model"] == "minimax/minimax-m3:free"
+          assert config["subagent_model"] == "minimax/minimax-m3:free"
           assert config["sandbox"]["enabled"] is True
           assert config["sandbox"]["network"] == "deny"
           print("Trusted Kilo configuration validated.")
@@ -103,12 +85,11 @@ jobs:
         continue-on-error: true
         timeout-minutes: 340
         env:
-          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
           KILO_PROVIDER: "kilo"
           KILO_DISABLE_EXTERNAL_SKILLS: "true"
         run: |
           set -euo pipefail
-          kilo run --model kilo-auto/free --auto "$(cat .kilo/wakeup-prompt.md)"
+          kilo run --model minimax/minimax-m3:free --auto "$(cat .kilo/wakeup-prompt.md)"
 
       - name: Persist safe repository changes
         if: always()
