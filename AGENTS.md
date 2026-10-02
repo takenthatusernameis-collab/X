@@ -170,6 +170,7 @@ Do not modify:
 - `AGENTS.md`;
 - `ENTERPRISE.md`;
 - `MANUAL_SETUP.md`;
+- `PERSISTENCE_POLICY.md`;
 - secret-handling or authority configuration.
 
 Do not expand your own authority.
