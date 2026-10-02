@@ -14,7 +14,9 @@ Continuously improve the enterprise's ability to make increasingly effective dec
 - Kilo Code CLI: autonomous agent operating inside the current runner.
 - Repository: persistent institutional memory and research state.
 - Git history: durable audit trail.
-- Existing deterministic research/backtest infrastructure: preferred execution layer whenever available.
+- Deterministic research/backtest infrastructure: `research/backtest/`
+  (event-driven backtest, walk-forward IS/OOS, synthetic-data
+  validation, leakage checks) plus `tests/`. Preferred execution layer.
 
 ### Safety boundary
 
