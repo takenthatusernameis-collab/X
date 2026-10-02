@@ -2,27 +2,38 @@
 
 The repository-side infrastructure is configured on `main`.
 
-## Required GitHub Actions secret
+## Kilo API key
 
-No secret is required for the free-model workflow.
+The free-model workflow does **not** require `KILO_API_KEY` for inference.
 
-The workflow uses Kilo's built-in Gateway provider with a currently documented free model and anonymous free-model access. You may leave `KILO_API_KEY` unset.
+If you already have `KILO_API_KEY` configured as a GitHub Actions repository secret, the workflow will run a separate, non-model diagnostic before each activation:
 
-Do not commit any API key to the repository.
+- `VALID` means `kilo profile --json` successfully authenticated to Kilo;
+- `INVALID` means Kilo explicitly rejected the credential as an authentication failure;
+- `UNVERIFIED` means the profile check failed for another reason;
+- `NOT_CONFIGURED` means the secret is absent.
 
-## Optional Kilo API key
-
-A `KILO_API_KEY` can be configured as a GitHub Actions repository secret if you later want authenticated Kilo Gateway access or change the enterprise to use paid models. It is not required for the current free-only workflow.
-
-Adding an API key does not make the selected free model paid; free models remain $0 on Kilo's side. However, Kilo's current documentation does not promise a higher free-model request allowance for authenticated users, so do not add the key expecting unlimited or materially higher free throughput.
+The key is never printed, committed, or written to the repository. The diagnostic step does not send a paid model request.
 
 ## Free model
 
-The workflow currently pins `minimax/minimax-m3:free` instead of the Auto Free virtual model. This is deliberate: the latest activation reached Kilo successfully but the CLI returned `Model not found: kilo-auto/free`, so a concrete currently documented free model avoids that catalog-resolution failure.
+The research agent uses Kilo's OpenAI-compatible Gateway endpoint with the documented free model `minimax/minimax-m3:free`, registered as a local custom model. This bypasses the unstable built-in model-catalog resolution that previously produced:
 
-Kilo's free models are available to authenticated and anonymous users. Anonymous free-model access is currently rate-limited to 200 requests per hour per IP, and free-model availability can change over time.
+`Model not found: kilo-auto/free`
 
-Auto Free (`kilo-auto/free`) remains a supported Kilo model tier, but its underlying routing changes server-side. The repository therefore prefers the explicit model for CI reliability until the CLI/catalog behavior is confirmed stable.
+and later:
+
+`Model not found: minimax/minimax-m3:free`
+
+The Gateway documentation defines the OpenAI-compatible endpoint at `https://api.kilo.ai/api/gateway`, and Kilo's custom-model documentation supports mapping a local model key to an API-facing model ID with the `id` field.
+
+The model is currently listed by Kilo as free, with $0 input/output pricing. Free-model availability and upstream limits can change.
+
+## Anonymous versus authenticated free inference
+
+The agent itself does not receive `KILO_API_KEY`, so the normal research activation can use the free model anonymously. Kilo documents anonymous access to free models and currently applies a 200 requests/hour/IP limit to free-model requests, including authenticated free requests.
+
+The API key is therefore treated as an optional diagnostic credential rather than a dependency for the research loop.
 
 ## No other credential is required
 
@@ -30,19 +41,20 @@ The workflow uses GitHub's automatically provided repository-scoped workflow tok
 
 Kilo is not given a GitHub write token, a personal access token, or a credential for any other repository.
 
-## What the workflow will do
+## Workflow behavior
 
-- wake every 5 minutes;
-- allow only one active enterprise run;
-- keep the newest pending activation when a prior run is still active;
-- give Kilo a bounded execution window;
-- allow Kilo to run research/backtests inside the disposable runner;
-- preserve safe repository changes after normal completion or Kilo failure/timeout;
-- block autonomous persistence of the workflow/security configuration;
-- never give Kilo a GitHub write token.
+- wakes every 5 minutes;
+- permits only one active enterprise run;
+- keeps the newest pending activation when a prior run is still active;
+- diagnoses the optional Kilo API key without exposing it;
+- gives Kilo a bounded execution window;
+- allows Kilo to run research/backtests inside the disposable runner;
+- preserves safe repository changes after normal completion or Kilo failure/timeout;
+- blocks autonomous persistence of the workflow/security configuration;
+- never gives Kilo a GitHub write token.
 
 ## Verification
 
 After the workflow changes are committed, let the scheduled workflow create a fresh run or manually trigger **Actions -> Kilo Research Enterprise Wake -> Run workflow**.
 
-Inspect the fresh run logs and repository changes before relying on the 5-minute schedule.
+Inspect the fresh run logs and the **Kilo API key diagnostic** step before relying on the 5-minute schedule.
