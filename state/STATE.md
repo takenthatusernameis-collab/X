@@ -12,6 +12,11 @@
 4. Add a regime-stability stress test: verify a candidate's out-of-sample
    results are stable across different regime parameterizations rather
    than fitting one regime mix. **Status: done** (this activation).
+5. Add an asset-universe robustness sweep: verify a candidate's results do
+   not rest on a single asset (concentration vs consistency verdicts), the
+   robustness dimension that completes the methodology's perturbation /
+   regime-stability / asset-universe trio. **Status: done** (this
+   activation).
 
 ## Status
 
@@ -164,23 +169,54 @@ The null dispersion in the stress tests shifted slightly (0.019 -> 0.003)
 because the coin-flip signal's equity curve is now computed with realized
 exit proceeds; the verdicts themselves are unchanged.
 
+## Current activation (asset-universe robustness testing)
+
+Added an asset-universe robustness sweep to the enterprise so that every
+candidate is checked for concentration in a single asset before its results
+are admitted into the evidence base. This closes the final robustness
+dimension listed in `research/METHODOLOGY.md` (perturbation, regime
+stability, asset-universe stability).
+
+- Added `research/backtest/universe.py`: `sweep_across_assets()` runs the
+  same walk-forward validation across a family of assets;
+  `asset_sweep_summary()` computes per-asset OOS medians, a coin-flip null
+  benchmark, and a verdict of CONSISTENT (edge spread across assets),
+  CONCENTRATED (the best asset carries >= 60% of the positive edge), or
+  NO_EDGE (indistinguishable from the null everywhere). `uniform_regime_assets()`
+  builds deterministic families of synthetic assets sharing one regime
+  structure with shifted drifts; `flat_regime_assets()` builds a
+  no-edge reference universe.
+- Added `tests/test_universe.py` (10 tests: determinism, empty/mismatched
+  input handling, single-asset edge case, detection of CONCENTRATED and
+  CONSISTENT verdicts, and NO_EDGE against the coin-flip null).
+- Added `examples/universe_sweep.py`: MA crossover walk-forward across a
+  7-asset family with drifts from -6% to +12%; reports per-asset medians,
+  the null benchmark, and the verdict.
+
+Verified result (seed 42, regime-switching synthetic data; tooling-validation
+only): the MA crossover on a 7-asset drifted family reports medians near zero
+in every asset (-0.133 .. +0.020), best-asset edge share 41%, verdict
+NO_EDGE — the sweep distinguishes noise from concentration correctly. On a
+contrived family with one strong-drift asset the sweep reports CONCENTRATED
+(80% edge share, best asset asset_0); on a family with uniform strong
+positive drifts it reports CONSISTENT (edge in all assets, share < 60%).
+
 ## Next activation
 
 1. Real-data readiness: if an in-scope public real dataset is identified for
     research-only simulation, create its manifest per
     `research/REAL_DATA_FEASIBILITY.md` and pass the pre-run leakage review
     checklist before any real-data execution.
-2. Margin/collateral modeling: completed this activation — `BacktestConfig`
-    now models maintenance margin with automatic liquidation on call
-    (`MarginCall` records, `total_margin_calls` in walk-forward
-    aggregates); all defaults preserve prior behavior.
+2. Regression discipline: run the full test suite and all three walk-forward
+    examples together after any research/code change to catch regressions
+    early.
 
 ## Verification (executed)
 
 The framework is deterministic and the full suite executes:
 
 - `pip install -q numpy` (resolved numpy 2.5.3); all modules compile.
-- `python -m unittest discover -s tests -v`: **62 tests, all passing**
+- `python -m unittest discover -s tests -v`: **72 tests, all passing**
   (31 engine/metrics/data + 14 perturbation + 11 regime-stability + 6 new
   margin/exit-fill tests).
 - `python -m examples.ma_crossover`: runs end-to-end and prints the full
@@ -191,6 +227,9 @@ The framework is deterministic and the full suite executes:
 - `python -m examples.regime_stability_demo`: runs end-to-end and prints
   all three verdicts; two independent runs produce byte-identical output
   (sha256 `2d3bc5c4...`).
+- `python -m examples.universe_sweep`: runs end-to-end and prints the asset-
+  universe verdict (NO_EDGE on the MA crossover across a 7-asset drifted
+  family); deterministic across reruns.
 
 Corrected verified results on seed 42 (regime-switching synthetic data;
 tooling-validation only), superseding the unverified figures in the

@@ -9,6 +9,7 @@ Structure:
 - metrics.py         : deterministic performance/risk metrics
 - leakage.py         : look-ahead and equity-fill integrity checks
 - perturbation.py    : parameter-sensitivity / robustness testing
+- universe.py        : asset-universe robustness / concentration testing
 """
 from __future__ import annotations
 
@@ -60,6 +61,17 @@ from .regime_stability import (
     direction_signal,
     always_long_signal,
 )
+from .universe import (
+    ASSET_VERDICT_CONCENTRATED,
+    ASSET_VERDICT_CONSISTENT,
+    ASSET_VERDICT_NO_EDGE,
+    AssetSweepResult,
+    AssetSweepSummary,
+    sweep_across_assets,
+    asset_sweep_summary,
+    uniform_regime_assets,
+    flat_regime_assets,
+)
 
 __all__ = [
     "__version__",
@@ -98,4 +110,13 @@ __all__ = [
     "random_signals",
     "noise_benchmark",
     "sweep_summary",
+    "ASSET_VERDICT_CONCENTRATED",
+    "ASSET_VERDICT_CONSISTENT",
+    "ASSET_VERDICT_NO_EDGE",
+    "AssetSweepResult",
+    "AssetSweepSummary",
+    "sweep_across_assets",
+    "asset_sweep_summary",
+    "uniform_regime_assets",
+    "flat_regime_assets",
 ]
