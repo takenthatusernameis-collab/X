@@ -62,6 +62,12 @@ class TestUniverseReproducibility(unittest.TestCase):
         self.assertEqual(summary1.assets_positive_share, summary2.assets_positive_share)
         self.assertEqual(summary1.verdict, summary2.verdict)
 
+        # The default is now per_asset_null=True: the default path must
+        # report per-asset significance flags (documented contract).
+        self.assertIsNotNone(summary1.asset_null_medians)
+        self.assertIsNotNone(summary1.asset_significance)
+        self.assertEqual(len(summary1.asset_null_medians), summary1.n_assets)
+
     def test_asset_family_reproducible(self):
         """uniform_regime_assets must regenerate the same family each call."""
         a1 = bt.uniform_regime_assets(

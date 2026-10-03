@@ -229,21 +229,39 @@ Result (seed 42, 7-asset drifted family): the null dispersion tightened from
 +0.109 (global, first 3 assets) to +0.079 (per-asset, all 7), effective
 tolerance +0.158, and every asset falls within its own null — 0 / 7
 significant assets, verdict NO_EDGE, unchanged from the prior run. An
-independent determinism re-run produced identical fields and hash
+ independent determinism re-run produced identical fields and hash
 (3968836896295251151).
+
+## Current activation (default per-asset nulls)
+
+Enabled the per-asset coin-flip null as the default in `asset_sweep_summary`
+so that each asset in a universe sweep is judged against its own coin-flip
+baseline rather than a single global null estimated from a small sample of
+assets. The per-asset path was implemented and unit-tested in the prior
+activation; this activation flipped the default and re-verified the full
+suite and all four examples.
+
+- `research/backtest/universe.py`: `asset_sweep_summary()` default changed
+  from `per_asset_null=False` to `per_asset_null=True`; docstring updated to
+  document the new default and that `noise_n` is ignored in that case.
+- `tests/test_universe.py`: `TestUniverseReproducibility.test_sweep_reproducible`
+  gained an assertion that the default path reports `asset_null_medians` and
+  `asset_significance` (lengths equal `n_assets`), locking in the documented
+  contract.
+
+All canonical verdicts are unchanged under the new default: `CONCENTRATED`
+(one-strong-asset family), `CONSISTENT` (uniform-strong family), and
+`NO_EDGE` (MA crossover on the 7-asset family; flat family). `universe_sweep`
+verdict: NO_EDGE, 0/7 significant assets, best-asset share 41.3%. The suite
+re-ran with 77 tests passing, and `research/checks/determinism_check.py`
+reports `r1 == r2: True`. See `logs/ACTIVATION-2026-10-03.md`.
 
 ## Next activation
 
 1. Regression discipline: run the full test suite and all four walk-forward
     examples together after any research/code change to catch regressions
     early.
-2. Default per-asset nulls: the `per_asset_null=True` path is implemented,
-    tested (5 new tests), and demonstrated in `examples/universe_sweep.py`;
-    consider enabling it as the default since it tightens the NO_EDGE check
-    and the flags are deterministic. If flipped, re-run the suite and
-    examples to confirm the four canonical verdicts (NO_EDGE, CONCENTRATED,
-    CONSISTENT on the contrived families) remain unchanged.
-3. Real-data readiness: if an in-scope public real dataset is identified for
+2. Real-data readiness: if an in-scope public real dataset is identified for
     research-only simulation, create its manifest per
     `research/REAL_DATA_FEASIBILITY.md` and pass the pre-run leakage review
     checklist before any real-data execution.
@@ -255,7 +273,9 @@ The framework is deterministic and the full suite executes:
 - `pip install -q numpy` (resolved numpy 2.5.3); all modules compile.
 - `python -m unittest discover -s tests -v`: **77 tests, all passing**
   (9 data + 19 engine + 8 metrics + 15 perturbation + 11 regime-stability
-  + 15 asset-universe).
+  + 15 asset-universe); 0 failures/errors, including the new assertion that
+  the `asset_sweep_summary` default path reports per-asset significance
+  flags.
 - `python -m examples.ma_crossover`: runs end-to-end and prints the full
   perturbation deviation scan; two independent runs produce byte-identical
   output (sha256 `baeee6a3...`).
@@ -315,6 +335,11 @@ cases, not realistic parameterizations):
 Note: the activation log's earlier quantitative claims (e.g. full-sample
 +15.99%, Sharpe 0.05) were not reproducible; the log had been written with
 Python execution unavailable, so the verified run above supersedes it.
+
+Note: `hash(str(...))` values are process-dependent under Python's default
+string-hash randomization (PYTHONHASHSEED). The deterministic invariant is
+field-level equality of the re-runs (and byte-identical output), not the
+printed hash; recorded hash values should be treated as process-local.
 ## Evidence standard
 
 Synthetic data validates tooling only; it is not evidence that any

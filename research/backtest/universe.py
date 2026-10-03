@@ -304,7 +304,7 @@ def asset_sweep_summary(
     baseline: ParameterSet,
     noise_n: int = 3,
     cfg: Optional[BacktestConfig] = None,
-    per_asset_null: bool = False,
+    per_asset_null: bool = True,
 ) -> AssetSweepSummary:
     """Summarize an AssetSweepResult with concentration and verdict logic.
 
@@ -312,19 +312,22 @@ def asset_sweep_summary(
         result: the asset sweep result.
         baseline: the reference parameter set.
         noise_n: number of coin-flip assets run as a null benchmark to
-            estimate framework noise dispersion (used when
-            per_asset_null=False).
+            estimate framework noise dispersion (ignored when
+            per_asset_null=True).
         cfg: backtest config used for the null benchmark; defaults to the
             configuration used in the sweep (BacktestConfig()).
-        per_asset_null: when True, run the coin-flip null separately for each
-            asset and report per-asset significance flags against each asset's
-            own null baseline. The NO_EDGE check then matches every asset to
-            its own null instead of a single global null.
+        per_asset_null: default True. Run the coin-flip null separately for
+            each asset and report per-asset significance flags against each
+            asset's own null baseline. The NO_EDGE check then matches every
+            asset to its own null instead of a single global null. When
+            False, only the first `noise_n` assets are used, which preserves
+            the pre-2026-10-03 behavior.
 
     Returns:
         AssetSweepSummary with a verdict of CONSISTENT / CONCENTRATED /
         NO_EDGE, plus per-asset medians, concentration measures, and
-        (when per_asset_null=True) per-asset significance flags.
+        (when per_asset_null=False — the prior API) per-asset significance
+        flags set to None.
     """
     cfg = cfg or BacktestConfig()
     medians = np.array(result.baseline_median_log_returns, dtype=np.float64)

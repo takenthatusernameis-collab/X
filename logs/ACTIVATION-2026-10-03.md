@@ -114,19 +114,64 @@ median (+0.065) farther than 0.05 from the baseline (-0.081); this is honest
 reporting of null noise, not a framework defect (the deviation scan is still
 flat and mixed-sign, which is the robustness signal).
 
-Known limitation (unchanged): the significance flags are currently opt-in
-(`per_asset_null=True`); flipping the default is the lowest-risk follow-on.
+Follow-on activation — 2026-10-03 (default per-asset nulls).
+
+## Objective
+
+Enable the per-asset coin-flip null as the `asset_sweep_summary` default. This
+tightens the NO_EDGE check: each asset is judged against its own
+coin-flip baseline rather than a global null estimated from a small sample of
+assets, which can mask asset-specific edges. The path was implemented, tested,
+and demonstrated in the prior record; this activation flips the default and
+confirms the canonical verdicts (NO_EDGE, CONCENTRATED, CONSISTENT) are
+unchanged.
+
+## Work performed
+
+- `research/backtest/universe.py`: `asset_sweep_summary()` default changed
+  from `per_asset_null=False` to `per_asset_null=True`; docstring updated to
+  document the new default and that `noise_n` is ignored in that case.
+- `tests/test_universe.py`: `TestUniverseReproducibility.test_sweep_reproducible`
+  gained an assertion that the default path now reports
+  `asset_null_medians` and `asset_significance` (lengths equal `n_assets`),
+  locking in the documented contract.
+
+## Verification (executed)
+
+- `python3 -m unittest discover -s tests -v`: **77 tests, all passing**
+  (9 data + 19 engine + 8 metrics + 15 perturbation + 11 regime-stability +
+  15 asset-universe); 0 failures/errors. The new per-asset default assertion
+  passes.
+- All four examples exit 0:
+  - `ma_crossover`: full-sample -106.93% (zero cost); walk-forward OOS mean
+    log return -0.123, positive folds 37/88; perturbation sweep best
+    parameter set +0.045, flat scan.
+  - `volatility_regime_filter`: full-sample -1.72%; OOS mean -0.001, median
+    0.000, positive folds 8/90.
+  - `regime_stability_demo`: REGIME_DEPENDENT, REGIME_STABLE,
+    CONSISTENT_WITH_NOISE, CONSISTENT_WITH_NOISE — all as expected.
+  - `universe_sweep`: verdict NO_EDGE, 0/7 significant assets, best-asset
+    share 41.3% — unchanged.
+- Contrived verdicts with the new default, all passing:
+  `test_concentrated_detection` -> CONCENTRATED,
+  `test_consistent_detection` -> CONSISTENT,
+  `test_no_edge_on_flat_family` -> NO_EDGE.
+- `python3 research/checks/determinism_check.py`: `r1 == r2: True`.
+
+## Notes
+
+- `hash(str(...))` values are process-dependent under Python's default
+  string-hash randomization (PYTHONHASHSEED). The deterministic invariant is
+  the `r1 == r2` field equality (and identical output), not the printed hash;
+  recorded hash values should be treated as process-local.
+- All quantitative figures are synthetic-data tooling-validation only.
 
 ## Next actions for the next activation
 
 1. Regression discipline: run the full suite and all four examples together
    after any research/code change (add a short CI-free checklist to
    `research/README.md` if desired).
-2. Default per-asset nulls: the `per_asset_null=True` path is implemented,
-   tested, and demonstrated; flipping the default tightens the NO_EDGE check
-   and is deterministic. If done, re-run the suite and examples to confirm
-   the canonical verdicts (NO_EDGE, CONCENTRATED, CONSISTENT) are unchanged.
-3. Real-data readiness: if an in-scope public real dataset is identified for
+2. Real-data readiness: if an in-scope public real dataset is identified for
    research-only simulation, create its manifest per
    `research/REAL_DATA_FEASIBILITY.md` and pass the pre-run leakage review
    checklist before any real-data execution.
