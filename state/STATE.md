@@ -199,26 +199,63 @@ in every asset (-0.133 .. +0.020), best-asset edge share 41%, verdict
 NO_EDGE — the sweep distinguishes noise from concentration correctly. On a
 contrived family with one strong-drift asset the sweep reports CONCENTRATED
 (80% edge share, best asset asset_0); on a family with uniform strong
-positive drifts it reports CONSISTENT (edge in all assets, share < 60%).
+  positive drifts it reports CONSISTENT (edge in all assets, share < 60%).
+
+## Current activation (asset-universe significance flags)
+
+Added a per-asset significance flag to the asset-universe sweep so that each
+asset is judged against its own coin-flip null, rather than against a single
+global null. This closes the documented gap: with only a handful of
+walk-forward folds per asset the null dispersion can be large, and a global
+tolerance can mask a signal that is meaningful for a particular asset.
+
+- `research/backtest/universe.py`: `AssetSweepSummary` gained
+  `asset_null_medians` (coin-flip baseline per asset), `asset_significance`
+  (per-asset flag: candidate median distinguishable from its own null), and
+  `n_significant_assets`. The `verdict` property uses per-asset nulls when
+  they are available; the NO_EDGE check then compares every asset to its own
+  null. `asset_sweep_summary` gained the `per_asset_null=True` option; the
+  default (`False`) preserves the prior API and all existing verdicts.
+  `inspect()` prints the per-asset significance flags and the effective
+  tolerance.
+- `examples/universe_sweep.py` now runs with `per_asset_null=True`, so the
+  example reports the flags.
+- `tests/test_universe.py` — new `TestPerAssetNull` class (5 tests:
+  determinism, flat family stays NO_EDGE under the per-asset null, agreement
+  with the global-null path on a clear NO_EDGE case, single significant edge
+  yields CONCENTRATED, and self-consistency of the flags).
+
+Result (seed 42, 7-asset drifted family): the null dispersion tightened from
++0.109 (global, first 3 assets) to +0.079 (per-asset, all 7), effective
+tolerance +0.158, and every asset falls within its own null — 0 / 7
+significant assets, verdict NO_EDGE, unchanged from the prior run. An
+independent determinism re-run produced identical fields and hash
+(3968836896295251151).
 
 ## Next activation
 
-1. Real-data readiness: if an in-scope public real dataset is identified for
+1. Regression discipline: run the full test suite and all four walk-forward
+    examples together after any research/code change to catch regressions
+    early.
+2. Default per-asset nulls: the `per_asset_null=True` path is implemented,
+    tested (5 new tests), and demonstrated in `examples/universe_sweep.py`;
+    consider enabling it as the default since it tightens the NO_EDGE check
+    and the flags are deterministic. If flipped, re-run the suite and
+    examples to confirm the four canonical verdicts (NO_EDGE, CONCENTRATED,
+    CONSISTENT on the contrived families) remain unchanged.
+3. Real-data readiness: if an in-scope public real dataset is identified for
     research-only simulation, create its manifest per
     `research/REAL_DATA_FEASIBILITY.md` and pass the pre-run leakage review
     checklist before any real-data execution.
-2. Regression discipline: run the full test suite and all three walk-forward
-    examples together after any research/code change to catch regressions
-    early.
 
 ## Verification (executed)
 
 The framework is deterministic and the full suite executes:
 
 - `pip install -q numpy` (resolved numpy 2.5.3); all modules compile.
-- `python -m unittest discover -s tests -v`: **72 tests, all passing**
-  (31 engine/metrics/data + 14 perturbation + 11 regime-stability + 6 new
-  margin/exit-fill tests).
+- `python -m unittest discover -s tests -v`: **77 tests, all passing**
+  (9 data + 19 engine + 8 metrics + 15 perturbation + 11 regime-stability
+  + 15 asset-universe).
 - `python -m examples.ma_crossover`: runs end-to-end and prints the full
   perturbation deviation scan; two independent runs produce byte-identical
   output (sha256 `baeee6a3...`).

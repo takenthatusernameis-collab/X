@@ -269,3 +269,106 @@ class TestSummaryConcentrationMath(unittest.TestCase):
         self.assertAlmostEqual(summary.assets_positive_share, 10.0 / 13.0)
         # 80% >= threshold -> CONCENTRATED
         self.assertEqual(summary.verdict, bt.ASSET_VERDICT_CONCENTRATED)
+
+
+class TestPerAssetNull(unittest.TestCase):
+    """Per-asset coin-flip null and significance flags."""
+
+    def test_per_asset_null_reproducible(self):
+        """Per-asset significance must be fully deterministic."""
+        np.random.seed(42)
+        assets = bt.uniform_regime_assets(
+            [
+                bt.Regime(drift_annual=0.03, vol_annual=0.18),
+                bt.Regime(drift_annual=-0.01, vol_annual=0.35),
+            ],
+            n_assets=4, drift_offsets=[-0.06, 0.0, 0.03, 0.12], seed=7, n_bars=800,
+        )
+        grid = [bt.parameter_grid_around((("fast", 20), ("slow", 60)))[0]]
+        result = bt.sweep_across_assets(
+            ma_crossover_signals, assets, grid, (("fast", 20), ("slow", 60)),
+            train_window=120, test_window=40, warmup=30,
+        )
+        s1 = bt.asset_sweep_summary(result, (("fast", 20), ("slow", 60)),
+                                    per_asset_null=True)
+        s2 = bt.asset_sweep_summary(result, (("fast", 20), ("slow", 60)),
+                                    per_asset_null=True)
+        self.assertEqual(s1.asset_null_medians, s2.asset_null_medians)
+        self.assertEqual(s1.asset_significance, s2.asset_significance)
+        self.assertEqual(s1.verdict, s2.verdict)
+
+    def test_per_asset_null_flat_family_no_edge(self):
+        """A flat family must still be NO_EDGE under the per-asset null."""
+        assets = bt.flat_regime_assets(6, seed=42, n_bars=800)
+        grid = bt.parameter_grid_around((("fast", 20), ("slow", 60)))
+        result = bt.sweep_across_assets(
+            ma_crossover_signals, assets, grid, (("fast", 20), ("slow", 60)),
+            train_window=120, test_window=40, warmup=30,
+        )
+        summary = bt.asset_sweep_summary(result, (("fast", 20), ("slow", 60)),
+                                        per_asset_null=True)
+        self.assertEqual(summary.verdict, bt.ASSET_VERDICT_NO_EDGE)
+        self.assertIsNotNone(summary.asset_null_medians)
+        self.assertIsNotNone(summary.asset_significance)
+        self.assertEqual(sum(summary.asset_significance), 0)
+
+    def test_per_asset_null_agrees_with_global_on_flat(self):
+        """Per-asset null must not change a clear NO_EDGE verdict."""
+        assets = bt.flat_regime_assets(6, seed=42, n_bars=800)
+        grid = bt.parameter_grid_around((("fast", 20), ("slow", 60)))
+        result = bt.sweep_across_assets(
+            ma_crossover_signals, assets, grid, (("fast", 20), ("slow", 60)),
+            train_window=120, test_window=40, warmup=30,
+        )
+        s_global = bt.asset_sweep_summary(result, (("fast", 20), ("slow", 60)))
+        s_pa = bt.asset_sweep_summary(result, (("fast", 20), ("slow", 60)),
+                                      per_asset_null=True)
+        self.assertEqual(s_global.verdict, s_pa.verdict)
+        self.assertEqual(s_global.verdict, bt.ASSET_VERDICT_NO_EDGE)
+
+    def test_per_asset_null_one_edge_concentrated(self):
+        """A single significant edge must yield CONCENTRATED with one flag."""
+        assets = [bt.generate_bars(400, seed=i) for i in range(3)]
+        fold_rets = [
+            [[0.01, -0.01], [0.00, -0.02]],   # asset 0: near zero
+            [[0.00, -0.01], [0.00, -0.03]],   # asset 1: near zero
+            [[0.04, 0.05], [0.01, 0.02]],     # asset 2: positive edge
+        ]
+        result = bt.AssetSweepResult(
+            assets=assets,
+            asset_names=["a", "b", "c"],
+            param_sets=[("fast", 20), ("fast", 40)],
+            fold_total_returns=fold_rets,
+            baseline_median_log_returns=[-0.02, 0.03, 0.10],
+            n_folds=2, n_periods=400,
+            train_window_bars=120, test_window_bars=40,
+        )
+        summary = bt.asset_sweep_summary(result, (("fast", 20),),
+                                        per_asset_null=True)
+        self.assertIsNotNone(summary.asset_null_medians)
+        self.assertIsNotNone(summary.asset_significance)
+        self.assertEqual(len(summary.asset_null_medians), 3)
+        self.assertEqual(len(summary.asset_significance), 3)
+        self.assertEqual(summary.verdict, bt.ASSET_VERDICT_CONCENTRATED)
+        self.assertGreater(summary.n_significant_assets, 0)
+
+    def test_per_asset_null_self_consistent(self):
+        """Significance flags must match the per-asset tolerance rule."""
+        assets = bt.flat_regime_assets(4, seed=99, n_bars=800)
+        grid = [{"fast": 20}]
+        result = bt.sweep_across_assets(
+            lambda closes, **p: [bt.Signal(date=i + 1, weight=0.0)
+                                 for i in range(len(closes))],
+            assets, grid, (("fast", 20),),
+            train_window=120, test_window=40, warmup=10,
+        )
+        summary = bt.asset_sweep_summary(result, (("fast", 20),),
+                                        per_asset_null=True)
+        tol = max(0.05, 2.0 * summary.null_dispersion)
+        for m, n, sig in zip(
+            summary.median_log_returns, summary.asset_null_medians,
+            summary.asset_significance,
+        ):
+            self.assertEqual(sig, abs(m - n) > tol)
+        self.assertEqual(summary.n_significant_assets,
+                         sum(summary.asset_significance))

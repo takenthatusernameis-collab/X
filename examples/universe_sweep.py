@@ -6,7 +6,8 @@ Demonstrates the asset-universe sweep from `research/backtest/universe`:
   drifting annual drifts from -6% to +12%.
 - The MA crossover is run walk-forward across the whole family.
 - The sweep reports per-asset OOS medians, a null (coin-flip) benchmark,
-  and the verdict: CONSISTENT / CONCENTRATED / NO_EDGE.
+  per-asset significance flags against each asset's own null, and the verdict:
+  CONSISTENT / CONCENTRATED / NO_EDGE.
 
 Expected pattern on this family: the MA crossover has no robust edge, so the
 sweep reports NO_EDGE and the medians are flat across the drift gradient.
@@ -53,7 +54,8 @@ def main():
         warmup=warmup,
         overlap_window=60,
     )
-    summary = bt.asset_sweep_summary(result, baseline=(("fast", fast), ("slow", slow)))
+    summary = bt.asset_sweep_summary(result, baseline=(("fast", fast), ("slow", slow)),
+                                     per_asset_null=True)
     print(summary.inspect())
 
     print()

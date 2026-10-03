@@ -101,22 +101,38 @@ class AssetSweepSummary:
     best_asset_concentration: float  # best asset's median share of positive edge pool
     null_median_log_return: Optional[float]
     null_dispersion: float
+    asset_null_medians: Optional[List[float]]
+    """Coin-flip baseline median per asset when per_asset_null=True, else
+    None. Each entry is the coin-flip signal's median log return on the same
+    asset, so the comparison matches each asset's own noise level."""
+    asset_significance: Optional[List[bool]]
+    """Per-asset significance flag: the asset's candidate median lies outside
+    max(0.05, 2*null_dispersion) of its own coin-flip null baseline."""
+    n_significant_assets: int
+    """Count of assets with a significant edge under the per-asset flag. Equal
+    to positive_assets when per_asset_null=False."""
 
     @property
     def verdict(self) -> str:
         """CONSISTENT / CONCENTRATED / NO_EDGE."""
         if self.n_assets == 0:
             return ASSET_VERDICT_NO_EDGE
-        # No edge anywhere: every asset's median lies within the noise
-        # benchmark's own dispersion (2 sigma) or the practical floor of
-        # 0.05 log returns, whichever is larger. This keeps NO_EDGE robust to
-        # the number of assets and folds rather than a fixed absolute gap.
         effective_tol = max(0.05, 2.0 * self.null_dispersion)
-        within_tol = sum(
-            1 for m in self.median_log_returns
-            if self.null_median_log_return is not None
-            and abs(m - self.null_median_log_return) <= effective_tol
-        )
+        # No edge anywhere: every asset's median lies within tolerance of its
+        # own coin-flip null (when a per-asset null is available), otherwise of
+        # the global null benchmark. Matching each asset to its own null keeps
+        # the check faithful to that asset's noise level.
+        if self.asset_null_medians is not None:
+            within_tol = sum(
+                1 for m, n in zip(self.median_log_returns, self.asset_null_medians)
+                if abs(m - n) <= effective_tol
+            )
+        else:
+            within_tol = sum(
+                1 for m in self.median_log_returns
+                if self.null_median_log_return is not None
+                and abs(m - self.null_median_log_return) <= effective_tol
+            )
         if within_tol >= self.n_assets:
             return ASSET_VERDICT_NO_EDGE
         # Concentrated: the best asset accounts for the majority of wins.
@@ -151,6 +167,27 @@ class AssetSweepSummary:
             f"Best asset: {self.best_asset} ({self.best_median_log_return:+.3f}); "
             f"worst asset: {self.worst_asset} ({self.worst_median_log_return:+.3f})"
         )
+        if self.asset_significance is not None:
+            effective_tol = max(0.05, 2.0 * self.null_dispersion)
+            lines.append("")
+            lines.append(
+                f"Per-asset significance vs own coin-flip null (tolerance "
+                f"{effective_tol:+.3f}):"
+            )
+            flag_lines = [
+                f"  {name}: {m:+.3f} vs own-null {n:+.3f} -> "
+                + ("edge  " if sig else "noise")
+                for name, m, n, sig in zip(
+                    self.asset_names,
+                    self.median_log_returns,
+                    self.asset_null_medians,
+                    self.asset_significance,
+                )
+            ]
+            lines.extend(flag_lines)
+            lines.append(
+                f"Significant assets: {self.n_significant_assets} / {self.n_assets}"
+            )
         lines.append(
             f"Best asset's share of the positive edge: "
             f"{self.assets_positive_share:.1%}"
@@ -267,6 +304,7 @@ def asset_sweep_summary(
     baseline: ParameterSet,
     noise_n: int = 3,
     cfg: Optional[BacktestConfig] = None,
+    per_asset_null: bool = False,
 ) -> AssetSweepSummary:
     """Summarize an AssetSweepResult with concentration and verdict logic.
 
@@ -274,13 +312,19 @@ def asset_sweep_summary(
         result: the asset sweep result.
         baseline: the reference parameter set.
         noise_n: number of coin-flip assets run as a null benchmark to
-            estimate framework noise dispersion.
+            estimate framework noise dispersion (used when
+            per_asset_null=False).
         cfg: backtest config used for the null benchmark; defaults to the
             configuration used in the sweep (BacktestConfig()).
+        per_asset_null: when True, run the coin-flip null separately for each
+            asset and report per-asset significance flags against each asset's
+            own null baseline. The NO_EDGE check then matches every asset to
+            its own null instead of a single global null.
 
     Returns:
         AssetSweepSummary with a verdict of CONSISTENT / CONCENTRATED /
-        NO_EDGE, plus per-asset medians and concentration measures.
+        NO_EDGE, plus per-asset medians, concentration measures, and
+        (when per_asset_null=True) per-asset significance flags.
     """
     cfg = cfg or BacktestConfig()
     medians = np.array(result.baseline_median_log_returns, dtype=np.float64)
@@ -298,12 +342,20 @@ def asset_sweep_summary(
     else:
         assets_positive_share = 0.0
 
-    # Null benchmark: run coin-flip signals across `noise_n` assets to estimate
-    # framework noise. This keeps the verdicts tied to the framework's own
-    # null hypothesis rather than an arbitrary threshold.
+    # Null benchmark: run coin-flip signals to estimate framework noise.
+    # When per_asset_null, the null is computed separately for each asset so
+    # the NO_EDGE check and the per-asset significance flags match every asset
+    # to its own null baseline; otherwise only the first `noise_n` assets are
+    # used, which preserves the prior behavior.
     grid = parameter_grid_around(baseline)
-    null_medians: List[float] = []
-    for a in range(min(noise_n, len(result.assets))):
+    n_assets = len(result.assets)
+    if per_asset_null:
+        n_null_assets = n_assets
+    else:
+        n_null_assets = min(noise_n, n_assets)
+
+    null_medians_per_asset: List[float] = []
+    for a in range(n_null_assets):
         noise = noise_benchmark(
             result.assets[a],
             param_grid=grid,
@@ -315,12 +367,33 @@ def asset_sweep_summary(
             periods_per_year=252,
             seed=42 + a * 1000,
         )
-        null_medians.append(noise.baseline_median_log_return)
+        null_medians_per_asset.append(noise.baseline_median_log_return)
 
-    null_median = float(np.mean(null_medians)) if null_medians else 0.0
-    null_dispersion = (
-        float(np.std(null_medians, ddof=1)) if len(null_medians) >= 2 else 0.0
+    # Global null reference for the summary: mean of the computed null medians.
+    null_median = (
+        float(np.mean(null_medians_per_asset)) if null_medians_per_asset else 0.0
     )
+    null_dispersion = (
+        float(np.std(null_medians_per_asset, ddof=1))
+        if len(null_medians_per_asset) >= 2
+        else 0.0
+    )
+
+    # Per-asset significance: compare each asset's candidate median against
+    # its own null baseline; None when per_asset_null=False to preserve the
+    # prior API.
+    if per_asset_null:
+        asset_null_medians = null_medians_per_asset
+        effective_tol = max(0.05, 2.0 * null_dispersion)
+        asset_significance = [
+            bool(abs(m - n) > effective_tol)
+            for m, n in zip(medians, asset_null_medians)
+        ]
+        n_significant_assets = int(np.sum(asset_significance))
+    else:
+        asset_null_medians = None
+        asset_significance = None
+        n_significant_assets = positive_count
 
     return AssetSweepSummary(
         asset_names=result.asset_names,
@@ -340,6 +413,9 @@ def asset_sweep_summary(
         best_asset_concentration=assets_positive_share,
         null_median_log_return=null_median,
         null_dispersion=null_dispersion,
+        asset_null_medians=asset_null_medians,
+        asset_significance=asset_significance,
+        n_significant_assets=n_significant_assets,
     )
 
 
