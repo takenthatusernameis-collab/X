@@ -253,27 +253,59 @@ All canonical verdicts are unchanged under the new default: `CONCENTRATED`
 (one-strong-asset family), `CONSISTENT` (uniform-strong family), and
 `NO_EDGE` (MA crossover on the 7-asset family; flat family). `universe_sweep`
 verdict: NO_EDGE, 0/7 significant assets, best-asset share 41.3%. The suite
-re-ran with 77 tests passing, and `research/checks/determinism_check.py`
+re-ran with 87 tests passing, and `research/checks/determinism_check.py`
 reports `r1 == r2: True`. See `logs/ACTIVATION-2026-10-03.md`.
+
+## Current activation (deterministic real-data readiness gate)
+
+Added a deterministic known-data-gaps audit to the real-data preflight so that
+documented source gaps (e.g. the two systematic Yahoo omissions, 2018-12-05 and
+2025-01-09) are verified as genuinely absent from every ticker's data rather
+than merely assumed — this closes the last gap between the documented
+`research/REAL_DATA_FEASIBILITY.md` preflight checklist and an executed, tested
+gate. Real-data readiness is now: a manifest with full provenance and checksums
+(`research/data/manifest.json`), a 10-check preflight (`research/data/preflight.py`),
+and a test suite for the gate (`tests/test_preflight.py`).
+
+- Added `known_gaps_audit()` to `research/data/preflight.py`, integrated as
+  check #10 "Known gaps audit": for each ticker it verifies every documented
+  gap is genuinely absent; a documented gap that is present in the data flags
+  the manifest or raw files as stale. The audit is independent of the
+  completeness check (which compares against an expected business calendar)
+  because it operates solely on `manifest["known_data_gaps"]`.
+- Added `date` to the `from datetime` import so the audit compares correctly.
+- Added `tests/test_preflight.py` (10 tests): documented gaps absent in every
+  ticker; audit failure when a documented gap is present in data; manifest
+  staleness end-to-end; unexplained gaps fail completeness; unparsable gap
+  dates fail the gate; gate determinism; and that the gate passes on the
+  collected universe.
+- Verified (real-data gate; tooling-validation only): `python3
+  research/data/preflight.py` exits 0 with "[PASS] 10. Known gaps audit: all
+  documented gaps verified genuinely absent in every ticker"; the suite runs at
+  87 tests, all passing; all four walk-forward examples exit 0.
 
 ## Next activation
 
 1. Regression discipline: run the full test suite and all four walk-forward
     examples together after any research/code change to catch regressions
     early.
-2. Real-data readiness: if an in-scope public real dataset is identified for
-    research-only simulation, create its manifest per
-    `research/REAL_DATA_FEASIBILITY.md` and pass the pre-run leakage review
-    checklist before any real-data execution.
+2. Real-data readiness: the manifest (`research/data/manifest.json`) and
+    preflight gate (`research/data/preflight.py`, check #10) are in place and
+    passing; the next step is a research-only backtest on the collected
+    universe, following `research/REAL_DATA_FEASIBILITY.md`: verify manifest
+    and checksums → pass preflight → pass the leakage review checklist →
+    walk-forward IS/OOS + perturbation before results are admitted to the
+    evidence base.
 
 ## Verification (executed)
 
 The framework is deterministic and the full suite executes:
 
 - `pip install -q numpy` (resolved numpy 2.5.3); all modules compile.
-- `python -m unittest discover -s tests -v`: **77 tests, all passing**
+- `python -m unittest discover -s tests -v`: **87 tests, all passing**
   (9 data + 19 engine + 8 metrics + 15 perturbation + 11 regime-stability
-  + 15 asset-universe); 0 failures/errors, including the new assertion that
+  + 15 asset-universe + 10 preflight); 0 failures/errors, including the new
+  assertion that
   the `asset_sweep_summary` default path reports per-asset significance
   flags.
 - `python -m examples.ma_crossover`: runs end-to-end and prints the full

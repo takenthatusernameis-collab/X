@@ -176,11 +176,37 @@ unchanged.
    `research/REAL_DATA_FEASIBILITY.md` and pass the pre-run leakage review
    checklist before any real-data execution.
 
+## Current activation (deterministic real-data readiness gate)
+
+Added a deterministic known-data-gaps audit to the real-data preflight so that
+documented source gaps (e.g. the two systematic Yahoo omissions, 2018-12-05 and
+2025-01-09) are verified as genuinely absent from every ticker's data rather
+than merely assumed — this closes the last gap between the documented
+`research/REAL_DATA_FEASIBILITY.md` preflight checklist and an executed, tested
+gate. Real-data readiness is now: a manifest with full provenance and checksums
+(`research/data/manifest.json`), a 10-check preflight (`research/data/preflight.py`),
+and a test suite for the gate (`tests/test_preflight.py`).
+
+- Added `known_gaps_audit()` to `research/data/preflight.py`, integrated as
+  check #10 "Known gaps audit": for each ticker it verifies every documented
+  gap is genuinely absent; a documented gap that is present in the data flags
+  the manifest or raw files as stale. The audit is independent of the
+  completeness check (which compares against an expected business calendar)
+  because it operates solely on `manifest["known_data_gaps"]`.
+- Added `tests/test_preflight.py` (10 tests): documented gaps absent in every
+  ticker; audit failure when a documented gap is present in data; manifest
+  staleness end-to-end; unexplained gaps fail completeness; unparsable gap
+  dates fail the gate; determinism; and that the gate passes as-is.
+- Verified (real-data gate; tooling-validation only): `python3
+  research/data/preflight.py` exits 0 with "[PASS] 10. Known gaps audit: all
+  documented gaps verified genuinely absent in every ticker"; the suite runs at
+  87 tests, all passing; all four walk-forward examples exit 0.
+
 ## Handoff
 
 The enterprise now has complete, verified, deterministic robustness tooling
 (perturbation, regime stability, asset-universe with per-asset significance
-flags), a green 77-test suite, and four byte-reproducible examples. A fresh
+flags), an 87-test suite, and four byte-reproducible examples. A fresh
 activation can reproduce this state with:
 
 ```

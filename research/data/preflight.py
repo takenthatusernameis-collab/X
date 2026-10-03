@@ -12,6 +12,7 @@ research/REAL_DATA_FEASIBILITY.md:
 7. Price positivity and no zero-price bars
 8. Survivorship (fixed universe from manifest)
 9. Feature consistency (no future information)
+10. Known gaps audit (documented gaps are genuinely absent per ticker)
 
 Usage:
     python3 research/data/preflight.py
@@ -22,7 +23,7 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
 
 import numpy as np
@@ -76,6 +77,34 @@ def load_csv(path):
         "lows": np.asarray(lows, dtype=np.float64),
         "closes": np.asarray(closes, dtype=np.float64),
         "volumes": np.asarray(volumes, dtype=np.float64),
+    }
+
+
+def known_gaps_audit(ticker, data_dates, documented_gaps):
+    """Verify each documented gap is genuinely absent from `data_dates`.
+
+    Args:
+        ticker: ticker name for reporting.
+        data_dates: iterable of "YYYY-MM-DD" strings present in the data.
+        documented_gaps: set of datetime.date objects from manifest["known_data_gaps"].
+
+    Returns:
+        dict with keys: ok (bool), missing_in_ticker (dates genuinely absent),
+        present_but_documented_missing (dates present in data yet documented as missing).
+    """
+    missing_in_ticker = []
+    present_but_documented_missing = []
+    for g in sorted(documented_gaps):
+        gs = g.strftime("%Y-%m-%d") if isinstance(g, date) else str(g)
+        if gs in data_dates:
+            present_but_documented_missing.append(gs)
+        else:
+            missing_in_ticker.append(gs)
+    return {
+        "ticker": ticker,
+        "ok": not present_but_documented_missing,
+        "missing_in_ticker": missing_in_ticker,
+        "present_but_documented_missing": present_but_documented_missing,
     }
 
 
@@ -216,14 +245,16 @@ def main():
         print("No tickers loaded; aborting remaining checks.")
         return 1
 
-    # 2. Completeness: no missing business dates (per ticker), versus documented NYSE calendar
-    documented_gaps = set()
+    # Parse documented data gaps early; used by the completeness check and the gap audit.
     raw_gaps = manifest.get("known_data_gaps", [])
+    documented_gaps = set()
     for g in raw_gaps:
         try:
             documented_gaps.add(datetime.strptime(g, "%Y-%m-%d").date())
         except ValueError:
             errors.append(("known_data_gaps", f"unparsable gap date {g!r}"))
+
+    # 2. Completeness: no missing business dates (per ticker), versus documented NYSE calendar
     for ticker, data in tickers.items():
         start_d = datetime.strptime(str(data["dates"][0]), "%Y-%m-%d").date()
         end_d = datetime.strptime(str(data["dates"][-1]), "%Y-%m-%d").date()
@@ -308,6 +339,31 @@ def main():
             bool(ok),
             "all closes positive, no zero-price bars" if ok else f"{int((~close_pos | ~no_zero).sum())} bad closes",
         )
+
+    # 10. Known gaps audit: every documented gap must be genuinely absent from
+    # each ticker's data; a documented gap that is present means the manifest or
+    # the raw files are stale (re-collected data that now includes a documented gap).
+    audit_ok = True
+    audit_failures = []
+    for entry in manifest["entries"]:
+        ticker = entry["ticker"]
+        if ticker not in tickers:
+            audit_ok = False
+            audit_failures.append(f"{ticker}: no data loaded")
+            continue
+        aud = known_gaps_audit(ticker, set(tickers[ticker]["dates"]), documented_gaps)
+        if not aud["ok"]:
+            audit_ok = False
+            audit_failures.append(f"{ticker}: documented gap present in data {aud['present_but_documented_missing']}")
+    report(
+        "10. Known gaps audit",
+        audit_ok,
+        (
+            "all documented gaps verified genuinely absent in every ticker"
+            if audit_ok
+            else f"{len(audit_failures)} ticker(s) with stale documented gaps: " + "; ".join(audit_failures)
+        ),
+    )
 
     summary = (
         "=== Preflight summary ===\n"
