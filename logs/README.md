@@ -2,6 +2,8 @@
 
 Keep concise human-readable activation records for substantive work, important failures, and durable handoffs.
 
-A timestamp may be included when useful for reconstructing chronology, but it is optional guidance rather than a required log field. When used, define it as the UTC time at which the logged event or action occurred, preferably in ISO 8601 format such as `2026-10-03T15:43:00Z`. Do not backfill or infer a precise time that was not observed. The date-based activation filename already provides a basic temporal anchor.
+**Timestamped logging is the default operational standard for new activation records.** When timestamps are observable, include UTC timestamps for the activation start and finish and for consequential work/checkpoints that make progress easier to reconstruct. Prefer ISO 8601 format such as `2026-10-03T15:43:00Z`. A timestamp records the UTC time at which the logged event or action actually occurred; never backfill or infer a precise time that was not observed. When only a date or coarser time is known, record only that known precision rather than inventing a precise timestamp.
+
+The date-based activation filename remains a basic temporal anchor, but it is not a substitute for observed timestamps when those timestamps are available.
 
 Do not store credentials or confidential information here.
