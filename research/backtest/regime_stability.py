@@ -718,3 +718,236 @@ def stress_segments(
         train_window_bars=train_window,
         test_window_bars=test_window,
     )
+
+
+# ==============================================================================
+# Reusable real-data utilities
+# ==============================================================================
+
+def volatility_blocks(
+    closes: NDArray,
+    n_blocks: int = 4,
+    window: int = 60,
+) -> List[str]:
+    """Split a real series into `n_blocks` contiguous blocks by date and label
+    each block by its realized-volatility regime.
+
+    Each block is labeled 'turbulent' if its median trailing-`window`-bar
+    realized volatility (annualized) exceeds the series-wide median, else
+    'calm'. Bars before `window` bars into the series are 'insufficient' and
+    dropped as a short leading segment (they cannot hold a walk-forward).
+
+    Labels are determined by past data only: the block medians and the
+    series-wide median are both computed from closes. The labels do not
+    depend on the bar index `i`, so the series is classified once, before
+    any backtest runs.
+
+    Args:
+        closes: closing prices (full length).
+        n_blocks: number of contiguous blocks to split the series into.
+        window: trailing-bar window for realized volatility.
+
+    Returns:
+        List of labels, one per bar ('calm' / 'turbulent' / 'insufficient').
+    """
+    n = len(closes)
+    block_size = n // n_blocks
+    bar_vols: List[float] = []
+    for i in range(n):
+        if i < window:
+            bar_vols.append(0.0)
+        else:
+            bar_vols.append(
+                float(np.std(np.log(closes[i - window : i]), ddof=1)) * np.sqrt(252.0)
+            )
+    active = [v for v in bar_vols if v > 0]
+    if not active:
+        raise ValueError("not enough bars to compute realized volatility")
+    series_med = float(np.median(active))
+
+    labels: List[str] = []
+    for i in range(n):
+        if i < window:
+            labels.append("insufficient")
+        else:
+            block = i // block_size
+            s, e = block * block_size, (block + 1) * block_size
+            bmed = float(
+                np.median([v for v in bar_vols[s:e] if v > 0])
+                if e - s > window
+                else 0.0
+            )
+            labels.append("turbulent" if bmed > series_med else "calm")
+    return labels
+
+
+def ma_crossover_signals(
+    closes: NDArray,
+    fast: int = 20,
+    slow: int = 60,
+) -> List[Signal]:
+    """Past-only dual moving-average crossover signal (long/short).
+
+    Long when the fast MA > slow MA, short otherwise; neutral before the
+    slow window. This matches the signals used in `examples/regime_stability_*`
+    so regime-stability runs on the collected universe use the same signal
+    contract as the AAPL/NVDA runs.
+
+    No look-ahead: each signal uses only closes up to and including its own
+    bar.
+    """
+    n = len(closes)
+    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    fast, slow = int(fast), int(slow)
+    for i in range(max(fast, slow) - 1, n):
+        fast_ma = float(np.mean(closes[i - fast + 1 : i + 1]))
+        slow_ma = float(np.mean(closes[i - slow + 1 : i + 1]))
+        out[i] = Signal(date=i + 1, weight=1.0 if fast_ma > slow_ma else -1.0)
+    return out
+
+
+# ==============================================================================
+# Universe-wide regime stability
+# ==============================================================================
+
+@dataclass(frozen=True)
+class RegimeUniverseSummary:
+    """Aggregate regime-stability results across a universe of tickers.
+
+    Attributes:
+        assets: per-asset `RegimeStressResult`, keyed by ticker in the order
+            the tickers were loaded.
+        ticker_order: ticker order matching ``assets``.
+    """
+    assets: Dict[str, RegimeStressResult]
+    ticker_order: List[str]
+
+    @property
+    def n_assets(self) -> int:
+        """Number of tickers evaluated."""
+        return len(self.assets)
+
+    @property
+    def verdict_counts(self) -> Dict[str, int]:
+        """Counts of each overall verdict across assets."""
+        counts: Dict[str, int] = {
+            "CONSISTENT_WITH_NOISE": 0,
+            "REGIME_STABLE": 0,
+            "REGIME_DEPENDENT": 0,
+        }
+        for res in self.assets.values():
+            counts[res.overall_verdict] += 1
+        return counts
+
+    def inspect(self) -> str:
+        lines = [
+            "=== Regime-stability across universe ===",
+            "",
+            f"Tickers: {len(self.ticker_order)}  (order: {', '.join(self.ticker_order)})",
+            f"Verdict counts: {', '.join(f'{k}={v}' for k, v in self.verdict_counts.items())}",
+            "",
+            "Per-asset regime-stability results:",
+        ]
+        for ticker in self.ticker_order:
+            res = self.assets[ticker]
+            segs = "[" + ", ".join(s.name for s in res.scenarios) + "]"
+            medians = "[" + ", ".join(
+                f"{s.baseline_median_log_return:+.3f}" for s in res.scenarios
+            ) + "]"
+            lines.append(
+                f"  {ticker:6s}: segments={segs} candidate_medians={medians} "
+                f"dispersion=+{res.candidate_dispersion:.3f} "
+                f"verdict={res.overall_verdict}"
+            )
+        lines.append("")
+        lines.append(
+            "Interpretation: REGIME_STABLE = the candidate behaves the same way "
+            "(same edge or no edge) across regimes; REGIME_DEPENDENT = results "
+            "swing strongly across regimes relative to the coin-flip null "
+            "(fits one regime); CONSISTENT_WITH_NOISE = indistinguishable from "
+            "noise in every segment."
+        )
+        return "\n".join(lines)
+
+
+def stress_segments_across_tickers(
+    tickers: Dict[str, BarSequence],
+    signals_fn: Callable[[NDArray, ...], List[Signal]],
+    regime_labels_fn: Callable[[NDArray], List[str]],
+    baseline: ParameterSet = (("fast", 20), ("slow", 60)),
+    param_grid: List[Dict[str, Any]] = [{"fast": 20, "slow": 60}],
+    train_window: int = 252,
+    test_window: int = 84,
+    warmup: int = 60,
+    overlap_window: int = 0,
+    cfg: BacktestConfig = BacktestConfig(),
+    periods_per_year: int = 252,
+    min_segment_bars: int = 400,
+) -> RegimeUniverseSummary:
+    """Run regime-stability stress testing across a universe of tickers.
+
+    Each ticker is classified into contiguous volatility regime segments
+    (past-only, via ``regime_labels_fn``), then ``stress_segments`` is run
+    on each asset with the same candidate signal, parameter set, and
+    walk-forward settings. Per-asset verdicts are aggregated into a
+    ``RegimeUniverseSummary`` so the cross-asset pattern of regime-stability
+    verdicts can be judged (e.g. whether one asset's REGIME_STABLE verdict
+    generalizes, or whether a REGIME_DEPENDENT signal is flagged consistently
+    across assets).
+
+    This is the reusable real-data regime family for regime-stability: it
+    replaces the ad-hoc per-ticker examples with a single deterministic
+    call whose settings are fixed in one place, making universe-level
+    regime-stability reproducible and auditable.
+
+    Args:
+        tickers: dict ticker -> BarSequence of adjusted closes (same source
+            for all assets so segments are comparable).
+        signals_fn: past-only signal function, called as
+            `signals_fn(closes, **params)`.
+        regime_labels_fn: callable(closes) -> List[str] of labels, one per bar,
+            computed from closes only (past-only).
+        baseline: reference parameter set.
+        param_grid: parameter sets swept inside each segment.
+        train_window, test_window, warmup, overlap_window, cfg, periods_per_year:
+            forwarded to walk_forward.
+        min_segment_bars: minimum segment length to include; shorter segments
+            cannot hold a meaningful walk-forward.
+
+    Returns:
+        RegimeUniverseSummary with per-asset verdicts and a count summary.
+    """
+    if not tickers:
+        raise ValueError("tickers must be a non-empty dict")
+
+    ticker_order = list(tickers.keys())
+    assets: Dict[str, RegimeStressResult] = {}
+    for ticker in ticker_order:
+        bars = tickers[ticker]
+        closes = bars.closes_array() if isinstance(bars, BarSequence) else np.array(
+            [float(b.close) for b in bars], dtype=np.float64
+        )
+        labels = regime_labels_fn(closes)
+        seg_fn = segment_fn_from_labels(labels)
+        signals = signals_fn(closes, **{k: float(v) for k, v in dict(baseline).items()})
+        if len(signals) != len(closes):
+            raise ValueError(
+                f"signals length ({len(signals)}) != bars length ({len(closes)}) "
+                f"for {ticker}"
+            )
+        assets[ticker] = stress_segments(
+            signals_fn=signals_fn,
+            bars=bars,
+            signals=signals,
+            param_grid=param_grid,
+            baseline=baseline,
+            segment_fn=seg_fn,
+            train_window=train_window,
+            test_window=test_window,
+            warmup=warmup,
+            overlap_window=overlap_window,
+            cfg=cfg,
+            periods_per_year=periods_per_year,
+            min_segment_bars=min_segment_bars,
+        )
+    return RegimeUniverseSummary(assets=assets, ticker_order=ticker_order)

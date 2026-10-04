@@ -63,6 +63,10 @@ from .regime_stability import (
     stress_segments,
     segment_fn_from_labels,
     volatility_segments,
+    ma_crossover_signals,
+    volatility_blocks,
+    RegimeUniverseSummary,
+    stress_segments_across_tickers,
 )
 from .universe import (
     ASSET_VERDICT_CONCENTRATED,
@@ -126,6 +130,10 @@ __all__ = [
     "stress_segments",
     "segment_fn_from_labels",
     "volatility_segments",
+    "ma_crossover_signals",
+    "volatility_blocks",
+    "RegimeUniverseSummary",
+    "stress_segments_across_tickers",
     "load_ticker",
     "load_universe",
 ]
