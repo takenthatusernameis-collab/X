@@ -636,7 +636,7 @@ Results (real data, tooling-validation + one real-data candidate):
 - Objective: add durable unit tests for `research/backtest/regime_stability.py`
   `stress_segments`, the last function in the robustness toolkit without
   dedicated tests. This closes the explicit UNVERIFIED gap from the prior
-  activation (record `ACTIVATION-2026-10-04-T18-21.md`), which had exercised
+  activation (the earlier 18:21 UTC section in this daily file), which had exercised
   `stress_segments` end-to-end via `examples/regime_stability_real_data.py` only.
 
 ## Work performed
