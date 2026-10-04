@@ -6,4 +6,7 @@ Keep concise human-readable activation records for substantive work, important f
 
 The date-based activation filename remains a basic temporal anchor, but it is not a substitute for observed timestamps when those timestamps are available.
 
+**Transparency priority:** the repository owner values performance transparency and honest progress reporting, and a separate AI supervisor actively monitors workflow progression for bottlenecks, regressions, stalls, and failures. Activation logs are therefore operational observability data, not cosmetic documentation. Correctly timestamped logs should be prioritized as part of the activation handoff so that both human and automated supervision can reconstruct what actually happened and when.
+
+
 Do not store credentials or confidential information here.
