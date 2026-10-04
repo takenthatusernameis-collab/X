@@ -284,30 +284,54 @@ and a test suite for the gate (`tests/test_preflight.py`).
   documented gaps verified genuinely absent in every ticker"; the suite runs at
   87 tests, all passing; all four walk-forward examples exit 0.
 
+## Current activation (loader verification completed)
+
+The corrected real-data loader from the prior activation (commit `40a131b`, which
+reads the CSV `adjclose` field at index `p[5]`) has now been executed and
+verified end-to-end, closing the UNVERIFIED state documented in the previous
+activation record.
+
+- Added `tests/test_loader.py` (9 tests): contract checks that the loader returns
+  the CSV `adjclose` field and not raw `close` (AAPL first row: 2.714299 vs
+  3.241071); bar counts match `manifest["per_ticker_bars"]` for all 10 tickers;
+  date mapping starts at each ticker's `first_available_date` and matches CSV
+  row order; determinism across reruns; and a full real-data pipeline check:
+  AAPL MA-crossover signals pass `check_signal_integrity`, the full-sample run
+  passes `check_equity_matches_fills`, and the walk-forward completes with
+  populated fold metrics (4465 bars).
+- Verified: `python3 tests/test_loader.py` — 9 tests OK; `python -m unittest
+  discover -s tests -v` — **96 tests, all OK** (87 existing + 9 new loader tests);
+  `python3 research/data/preflight.py` — PREFLIGHT PASSED (57 checks, incl.
+  known-gaps audit); all four walk-forward examples exit 0 with aggregates
+  matching the STATE.md verified figures (ma_crossover: 88 folds / 7392 OOS;
+  volatility_regime_filter: 90 folds / 7560 OOS; regime_stability_demo: all three
+  verdicts; universe_sweep: NO_EDGE, 0/7 significant, 41.3% share).
+
+This activation's regression-discipline item is therefore complete and verified;
+the corrected loader no longer has an open verification gap.
+
 ## Next activation
 
-1. Regression discipline: run the full test suite and all four walk-forward
-    examples together after any research/code change to catch regressions
-    early.
+1. Regression discipline: now verified — the full suite and all four examples
+     run cleanly together (`python -m unittest discover -s tests -v`, then the
+     four `python -m examples/*` modules); re-run this combo after any future
+     research/code change.
 2. Real-data readiness: the manifest (`research/data/manifest.json`) and
-    preflight gate (`research/data/preflight.py`, check #10) are in place and
-    passing; the next step is a research-only backtest on the collected
-    universe, following `research/REAL_DATA_FEASIBILITY.md`: verify manifest
-    and checksums → pass preflight → pass the leakage review checklist →
-    walk-forward IS/OOS + perturbation before results are admitted to the
-    evidence base.
+     preflight gate (`research/data/preflight.py`, check #10) are in place and
+     passing; the next step is a research-only backtest on the collected
+     universe, following `research/REAL_DATA_FEASIBILITY.md`: verify manifest
+     and checksums → pass preflight → pass the leakage review checklist →
+     walk-forward IS/OOS + perturbation before results are admitted to the
+     evidence base.
 
 ## Verification (executed)
 
 The framework is deterministic and the full suite executes:
 
 - `pip install -q numpy` (resolved numpy 2.5.3); all modules compile.
-- `python -m unittest discover -s tests -v`: **87 tests, all passing**
+- `python -m unittest discover -s tests -v`: **96 tests, all passing**
   (9 data + 19 engine + 8 metrics + 15 perturbation + 11 regime-stability
-  + 15 asset-universe + 10 preflight); 0 failures/errors, including the new
-  assertion that
-  the `asset_sweep_summary` default path reports per-asset significance
-  flags.
+  + 15 asset-universe + 10 preflight + 9 loader); 0 failures/errors.
 - `python -m examples.ma_crossover`: runs end-to-end and prints the full
   perturbation deviation scan; two independent runs produce byte-identical
   output (sha256 `baeee6a3...`).
