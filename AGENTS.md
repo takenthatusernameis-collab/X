@@ -199,6 +199,14 @@ Do not equate a successful command with a correct conclusion.
 
 Do not claim verification that did not occur.
 
+## Operational transparency and supervisory visibility
+
+The repository owner places a high value on performance transparency, honest reporting, and easy reconstruction of workflow progress. A separate AI supervisor actively monitors workflow progression, looks for bottlenecks, regressions, stalled work, and failures, and uses repository state and activation records as evidence rather than relying on conversational claims.
+
+Therefore, **correctly timestamped activation logging is a priority operational requirement, not optional documentation polish**. For every substantive activation, make the human-readable activation record part of the definition of done: record observed UTC timestamps for activation start/finish and consequential progress or checkpoints whenever those timestamps are available, using ISO 8601 format. Do not invent or backfill timestamps. Distinguish clearly between CHANGED, VERIFIED, UNVERIFIED, and NEXT so the owner and supervisory AI can assess actual progress and detect blockers without ambiguity.
+
+Logging should not displace materially more important research execution or verification, but it should be completed before the activation is considered cleanly handed off whenever substantive work occurred. If logging cannot be completed, record that failure and the smallest safe recovery step rather than silently omitting the record.
+
 ## Persistence and handoff
 
 The runner is disposable.
