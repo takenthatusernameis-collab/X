@@ -578,12 +578,28 @@ stress testing of the AAPL MA crossover across real market regimes.
   sits within the noise tolerance on the full walk-forward).
 - Results are deterministic across reruns (identical medians and verdict).
 
+### Test coverage added
+
+`stress_segments` (previously untested) now has dedicated unit tests in
+`tests/test_regime_stability.py` (class `TestStressSegments`, 10 tests) covering:
+`segment_fn_from_labels` contract, `volatility_segments` past-only prefix,
+segment-boundary detection and `min_segment_bars` filtering, error handling
+(under-sized segments, mismatched signal length), determinism on the collected
+AAPL series, a known-vertex regime-dependence case (long-only across engineered
+calm/up-drift regimes), and a bounded-coin-flip null on real segments.
+
 ## Next activation
 
-1. No immediate blockers. Candidates: (a) fold-level significance test on
-   the AAPL candidate's walk-forward (independent of the framework's
-   coin-flip band); (b) regime-stability on a second ticker or on the
-   universe with the new `stress_segments` helper; (c) document a real-data
-   regime family (`research/backtest/regime_stability.py` canonical
-   scenarios) for reusable real-data stress tests.
+1. Run the new `TestStressSegments` suite (in `tests/test_regime_stability.py`)
+   and confirm all 9 tests pass — this activation's work was not executable
+   (bash denied in this environment), so the suite is unverified here.
+2. Run `stress_segments` on a second ticker (e.g. NVDA, which was the only
+   marginally significant asset in the universe sweep) and compare AAPL vs
+   NVDA regime-stability verdicts to check whether the AAPL finding generalizes.
+3. Optional: fold-level significance test on the AAPL candidate's walk-forward
+   (t-statistic / CI) — already exists as `research/checks/verify_aapl_stats.py`
+   for AAPL; could be extended to a per-asset t-statistic over the collected
+   universe.
+4. Optional: run regime-stability on the full collected universe with a
+   reusable real-data regime family defined in `regime_stability.py`.
 

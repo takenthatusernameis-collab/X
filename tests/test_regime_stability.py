@@ -193,5 +193,223 @@ class TestRegimeStressEdgeCases(unittest.TestCase):
         self.assertIn(result.overall_verdict, ("CONSISTENT_WITH_NOISE", "REGIME_DEPENDENT"))
 
 
+def _make_two_regime_bars(n_bars: int = 800, seed: int = 99) -> bt.BarSequence:
+    """Build a deterministic bar series with two volatility regimes.
+
+    Segment 1 (calm): drift 0 / low vol -- a long-only position is ~noise.
+    Segment 2 (up-drift): strong positive drift -- a long-only position has a
+    large edge. volatility_segments separates them, so always_long_signal is
+    regime-dependent by construction. Used as a known-vertex for
+    stress_segments.
+    """
+    regimes = [
+        bt.Regime(drift_annual=0.0, vol_annual=0.02, intraday_range_scale=0.005),
+        bt.Regime(drift_annual=1.5, vol_annual=0.15, intraday_range_scale=0.02),
+    ]
+    return bt.generate_bars(
+        n_bars=n_bars, regimes=regimes, p_transition=0.0,
+        start_price=100.0, seed=seed,
+    )
+
+
+def _make_aapl_fixture():
+    """Load the AAPL collected series and its past-only volatility labels once."""
+    from research.data.preflight import load_manifest
+
+    manifest = load_manifest()
+    assert manifest["dataset_id"].startswith("yf-ohlcv"), "unexpected manifest"
+    bars, dates = bt.load_ticker("AAPL")
+    closes = bars.closes_array()
+    labels = bt.volatility_segments(closes, window=60)
+    seg_fn = bt.segment_fn_from_labels(labels)
+    return bars, seg_fn
+
+
+class TestStressSegmentsConstruction(unittest.TestCase):
+    """Segmentation of a series by a past-only segment function."""
+
+    def test_segment_fn_from_labels_contract(self):
+        labels = ["insufficient"] * 40 + ["calm"] * 200 + ["turbulent"] * 300
+        seg_fn = bt.segment_fn_from_labels(labels)
+        for i, exp in enumerate(labels):
+            self.assertEqual(seg_fn(np.zeros(1000), i), exp)
+
+    def test_volatility_segments_past_only_prefix(self):
+        closes = np.ones(100) * 100.0
+        labels = bt.volatility_segments(closes, window=30)
+        self.assertEqual(sum(1 for l in labels if l == "insufficient"), 30)
+
+    def test_stress_segments_segment_boundaries(self):
+        bars = _make_two_regime_bars(600, seed=99)
+        labels = bt.volatility_segments(bars.closes_array(), window=30)
+        seg_fn = bt.segment_fn_from_labels(labels)
+        baseline = (("fast", 20.0), ("slow", 60.0))
+        stress = bt.stress_segments(
+            lambda c, **p: [bt.Signal(date=i + 1, weight=0.0) for i in range(len(c))],
+            bars, [{"fast": 20.0, "slow": 60.0}], baseline,
+            segment_fn=seg_fn, train_window=60, test_window=20,
+            warmup=0, min_segment_bars=200,
+        )
+        # leading "insufficient" prefix is dropped; calm + normal -> 2 segments
+        self.assertEqual(len(stress.scenarios), 2)
+        names = [s.name for s in stress.scenarios]
+        self.assertIn("calm", names)
+        for s in stress.scenarios:
+            self.assertGreater(s.n_folds, 0)
+            self.assertGreater(s.n_periods, 0)
+            self.assertTrue(
+                np.isfinite(s.baseline_median_log_return) and np.isfinite(s.noise_median_log_return),
+                msg=s.name,
+            )
+
+    def test_stress_segments_min_segment_filtering(self):
+        bars = bt.generate_bars(860, seed=53)
+        labels = (["calm"] * 400) + (["normal"] * 60) + (["turbulent"] * 400)
+        seg_fn = bt.segment_fn_from_labels(labels)
+        neutral = lambda c, **p: [bt.Signal(date=i + 1, weight=0.0) for i in range(len(c))]
+        grid = [{"fast": 20.0, "slow": 60.0}]
+        baseline = (("fast", 20.0), ("slow", 60.0))
+        stress_lo = bt.stress_segments(neutral, bars, grid, baseline, segment_fn=seg_fn,
+                                       train_window=60, test_window=20, min_segment_bars=50)
+        stress_hi = bt.stress_segments(neutral, bars, grid, baseline, segment_fn=seg_fn,
+                                       train_window=60, test_window=20, min_segment_bars=250)
+        self.assertEqual(len(stress_lo.scenarios), 3)
+        self.assertEqual(len(stress_hi.scenarios), 2)
+
+    def test_stress_segments_short_segments_raise(self):
+        bars = bt.generate_bars(150, seed=61)
+        labels = ["calm"] * 150
+        seg_fn = bt.segment_fn_from_labels(labels)
+        grid = [{"fast": 20.0, "slow": 60.0}]
+        baseline = (("fast", 20.0), ("slow", 60.0))
+        with self.assertRaises(ValueError):
+            bt.stress_segments(
+                lambda c, **p: [bt.Signal(date=i + 1, weight=0.0) for i in range(len(c))],
+                bars, grid, baseline, segment_fn=seg_fn,
+                train_window=60, test_window=20, min_segment_bars=400,
+            )
+
+    def test_stress_segments_signal_length_mismatch_raises(self):
+        bars = bt.generate_bars(400, seed=67)
+        seg_fn = lambda c, i: "calm" if i % 2 == 0 else "turbulent"
+        grid = [{"fast": 20.0, "slow": 60.0}]
+        baseline = (("fast", 20.0), ("slow", 60.0))
+        short_signals = [bt.Signal(date=i + 1, weight=0.0) for i in range(len(bars) - 5)]
+        with self.assertRaises(ValueError):
+            bt.stress_segments(
+                lambda c, **p: short_signals, bars, grid, baseline,
+                segment_fn=seg_fn, train_window=60, test_window=20, min_segment_bars=50,
+            )
+
+
+class TestStressSegmentsDeterminism(unittest.TestCase):
+    """A stress_segments result must be fully deterministic given fixed inputs."""
+
+    def test_stress_segments_determinism(self):
+        bars, seg_fn = _make_aapl_fixture()
+        baseline = (("fast", 20.0), ("slow", 60.0))
+        grid = [{"fast": 20.0, "slow": 60.0}]
+
+        def signals(closes, fast, slow):
+            n = len(closes)
+            out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
+            for i in range(slow - 1, n):
+                fm = np.mean(closes[i - fast + 1 : i + 1])
+                sm = np.mean(closes[i - slow + 1 : i + 1])
+                out[i] = bt.Signal(date=i + 1, weight=1.0 if fm > sm else -1.0)
+            return out
+
+        r1 = bt.stress_segments(
+            signals, bars, grid, baseline, segment_fn=seg_fn,
+            train_window=60, test_window=20, warmup=0, min_segment_bars=200,
+        )
+        r2 = bt.stress_segments(
+            signals, bars, grid, baseline, segment_fn=seg_fn,
+            train_window=60, test_window=20, warmup=0, min_segment_bars=200,
+        )
+        self.assertEqual(r1.overall_verdict, r2.overall_verdict)
+        for a, b in zip(r1.scenarios, r2.scenarios):
+            self.assertEqual(a.name, b.name)
+            self.assertEqual(a.n_folds, b.n_folds)
+            self.assertEqual(a.n_periods, b.n_periods)
+            self.assertEqual(a.baseline_median_log_return, b.baseline_median_log_return)
+            self.assertEqual(a.noise_median_log_return, b.noise_median_log_return)
+            self.assertEqual(a.edge_status, b.edge_status)
+        self.assertEqual(r1.inspect(), r2.inspect())
+
+
+class TestStressSegmentsKnownVertex(unittest.TestCase):
+    """Regime-dependence on real structure must be detectable."""
+
+    def test_always_long_across_calm_and_up_drift_is_regime_dependent(self):
+        bars = _make_two_regime_bars(800, seed=99)
+        labels = bt.volatility_segments(bars.closes_array(), window=60)
+        seg_fn = bt.segment_fn_from_labels(labels)
+        grid = [{"fast": 20.0, "slow": 60.0}]
+        baseline = (("fast", 20.0), ("slow", 60.0))
+        result = bt.stress_segments(
+            bt.always_long_signal, bars, grid, baseline, segment_fn=seg_fn,
+            train_window=60, test_window=20, warmup=0, min_segment_bars=200,
+        )
+        self.assertEqual(result.overall_verdict, "REGIME_DEPENDENT")
+        self.assertTrue(result.regime_dependent)
+        # Candidate medians swing from ~noise (calm) to a large edge (up-drift);
+        # the swing must exceed the coin-flip null's swing across the same
+        # segments.
+        self.assertGreater(result.candidate_dispersion, 0.03)
+        self.assertGreater(result.candidate_dispersion, result.null_dispersion)
+
+    def test_stress_segments_coin_flip_stays_bounded_across_real_segments(self):
+        bars, seg_fn = _make_aapl_fixture()
+        grid = [{"fast": 20.0, "slow": 60.0}]
+        baseline = (("fast", 20.0), ("slow", 60.0))
+
+        def coin_signals(closes, **params):
+            return bt.random_signals(len(closes), seed=42)
+
+        result = bt.stress_segments(
+            coin_signals, bars, grid, baseline, segment_fn=seg_fn,
+            train_window=60, test_window=20, warmup=0, min_segment_bars=200,
+        )
+        # A coin-flip signal cannot have regime dependence: its dispersion
+        # across segments stays small, so it never lands REGIME_DEPENDENT.
+        self.assertFalse(result.regime_dependent)
+        self.assertLess(result.candidate_dispersion, 0.35)
+        self.assertLess(result.null_dispersion, 0.35)
+
+
+class TestStressSegmentsRealData(unittest.TestCase):
+    """A run on the collected universe must produce a well-formed result."""
+
+    def test_stress_segments_real_data_structure(self):
+        bars, seg_fn = _make_aapl_fixture()
+        baseline = (("fast", 20.0), ("slow", 60.0))
+        grid = [{"fast": 20.0, "slow": 60.0}]
+
+        def signals(closes, fast, slow):
+            n = len(closes)
+            out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
+            for i in range(slow - 1, n):
+                fm = np.mean(closes[i - fast + 1 : i + 1])
+                sm = np.mean(closes[i - slow + 1 : i + 1])
+                out[i] = bt.Signal(date=i + 1, weight=1.0 if fm > sm else -1.0)
+            return out
+
+        result = bt.stress_segments(
+            signals, bars, grid, baseline, segment_fn=seg_fn,
+            train_window=60, test_window=20, warmup=0, min_segment_bars=200,
+        )
+        self.assertGreater(len(result.scenarios), 1)
+        self.assertIn(result.overall_verdict,
+                      ("REGIME_STABLE", "REGIME_DEPENDENT", "CONSISTENT_WITH_NOISE"))
+        for s in result.scenarios:
+            self.assertGreater(s.n_folds, 0)
+            self.assertGreater(s.n_periods, 0)
+            self.assertTrue(np.isfinite(s.baseline_median_log_return))
+            self.assertTrue(np.isfinite(s.noise_median_log_return))
+        self.assertIsInstance(result.inspect(), str)
+        self.assertGreater(len(result.inspect()), 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
