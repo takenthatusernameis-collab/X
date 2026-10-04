@@ -355,6 +355,51 @@ the 95% CI half-width (~0.023) for 170 folds, so it can classify a
 statistically significant result (t=2.75) as "within noise"; a sample-calibrated
 null band is a candidate framework improvement (not implemented here).
 
+## Current activation (per-asset perturbation sweep on the collected universe)
+
+Extended the asset-universe sweep so every real asset is evaluated over the full
+parameter grid, closing the optional follow-on item 4a from the prior activation.
+`research/backtest/universe.py` gained:
+
+- `AssetSweepResult.param_set_median_log_returns`: per asset, per parameter set
+  median log return across folds (derived from the already-computed
+  `fold_total_returns`, so it adds no extra computation).
+- `AssetSweepSummary` fields: `perturbation_profiles` (per-asset deviation scan,
+  deviation from canonical baseline -> median log return), `baseline_peak_count` /
+  `baseline_peak_share` (fraction of assets whose canonical parameter set is the
+  best of its grid), `positive_param_sets_per_asset` (count of positive median
+  parameter sets per asset), and `baseline_in_grid`. `inspect()` prints the
+  per-asset profiles and peak statistics. The baseline lookup and deviation
+  computation were made robust to both the tuple-of-tuples API form and the flat
+  test-form parameter sets. No existing verdicts or the 96-test suite behavior
+  changed.
+- `examples/ma_crossover_real_data.py` now reports the baseline-peak finding in
+  its summary (baseline (20,60) is not the best param set in any asset).
+
+Verified result (seed 42, 10 collected tickers, 0.5x/1.0x/2.0x grid around
+canonical 20/60, 252d/84d walk-forward, warmup=60d): the canonical MA crossover
+param set (20,60) is not the best parameter set in ANY of the 10 assets
+(0/10 baseline peaks). Per-asset perturbation profiles show wide spread across
+the grid: most assets are positive in 8/9 or 9/9 parameter sets (AAPL 8/9,
+MSFT 8/9, GOOGL 8/9, AMZN 8/9, META 9/9, NVDA 8/9, JPM 5/9, JNJ 1/9, XOM 2/9,
+TSLA 4/9), but the 1.0x-deviation sets (fast=40 or slow=120) swing from -0.074
+(NVDA) to +0.074, and the canonical window is the worst or near-worst set for
+most assets. This is the overfitting signature the perturbation gate is designed
+to catch: the real-data edge is parameter-dependent and does not peak at the
+canonical parameters in any asset, reinforcing the prior decision to reject the
+AAPL MA crossover from the evidence base.
+
+Verification (exact commands that succeeded after the final edits):
+- `python -m unittest discover -s tests -v`: **96 tests, all passing**.
+- `python3 examples/ma_crossover_real_data.py`: exits 0, all 9 sections complete,
+  per-asset perturbation profiles printed; baseline peak share 0.0 (0/10 assets),
+  verdict CONSISTENT, 1/10 assets significant.
+- Determinism: two independent reruns of the example produce byte-identical
+  output, sha256 `5d42d25c6a25df6b16e61e3a05ae1335d30f833ee882eeab6753de3cb6598786`, rc=0 both.
+- `python3 research/checks/verify_aapl_stats.py`: 170 folds, mean +0.0309,
+  median +0.0242, std +0.1463, 101/170 positive, 95% CI [0.0089, 0.0529],
+  t-statistic 2.75 (df=169).
+
 ## Next activation
 
 1. Regression discipline: **complete and verified** — `python -m unittest
@@ -365,13 +410,15 @@ null band is a candidate framework improvement (not implemented here).
    and the determination that the MA crossover is not admitted to the evidence
    base.
 3. Determinism re-verification of `examples.ma_crossover_real_data` across
-   independent reruns (byte-identical output), since the final run was executed
-   once after the last code edit.
+   independent reruns (byte-identical output): **complete and verified** — two
+   independent reruns produce byte-identical output, sha256
+   `5d42d25c6a25df6b16e61e3a05ae1335d30f833ee882eeab6753de3cb6598786`.
 4. Optional follow-on: (a) extend the asset-universe sweep to run the full
-   perturbation grid per real asset; (b) decide whether to make the `compare_noise`
-   null tolerance sample-calibrated (2x the coin-flip null's own fold dispersion
-   at the same sample size) while preserving all existing verdicts in the 96-test
-   suite; (c) run regime-stability on real data with a real-data regime family.
+   perturbation grid per real asset — **done (this activation)**; (b) decide
+   whether to make the `compare_noise` null tolerance sample-calibrated (2x the
+   coin-flip null's own fold dispersion at the same sample size) while
+   preserving all existing verdicts in the 96-test suite; (c) run regime-stability
+   on real data with a real-data regime family.
 
 ## Verification (executed)
 

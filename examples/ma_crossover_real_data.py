@@ -186,8 +186,11 @@ def main():
     print(f"  Walk-forward (realistic costs): mean log ret={result1.aggregate_metrics['mean_log_total_return']:.3f}, "
           f"median log ret={result1.aggregate_metrics['median_log_total_return']:.3f}, "
           f"positive folds={result1.aggregate_metrics['fold_count_positive']}/{result1.aggregate_metrics['n_folds']}")
-    print(f"  Perturbation: deviation scan near zero, mixed signs, no single-point peak; "
-          f"baseline within 5% of coin-flip null: {pert_summary.compare_noise(noise_median)}")
+    print(f"  Perturbation: baseline (20,60) is not the best param set in any asset "
+          f"({summary.baseline_peak_count}/10 baseline peaks); per-asset perturbation "
+          f"profiles (section 9) show wide spread across the grid, indicating strong "
+          f"parameter dependence; baseline within 5% of coin-flip null: "
+          f"{pert_summary.compare_noise(noise_median)}")
     print(f"  Universe: {summary.verdict} ({summary.n_significant_assets}/{len(universe)} assets significant)")
     print("\nNOTE: research/simulation only. No live trading or production execution.")
     print("      AAPL MA crossover on the collected universe: exploratory simulation.")

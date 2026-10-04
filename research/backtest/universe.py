@@ -39,7 +39,7 @@ Research/simulation only. Not live trading.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-from typing import Any, Callable, List, Optional, Sequence
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 import numpy as np
 from numpy.typing import NDArray
@@ -79,6 +79,20 @@ class AssetSweepResult:
     def n_assets(self) -> int:
         return len(self.asset_names)
 
+    @property
+    def param_set_median_log_returns(self) -> List[List[float]]:
+        """Per asset, per parameter set: median log return across folds.
+
+        Derived from `fold_total_returns`; the walk-forwards are already done,
+        so this adds no further computation.
+        """
+        out: List[List[float]] = []
+        for asset_returns in self.fold_total_returns:
+            log_rets = np.log1p(np.clip(
+                np.array(asset_returns, dtype=np.float64), -1.0 + 1e-12, None))
+            out.append(np.median(log_rets, axis=1).tolist())
+        return out
+
 
 @dataclass(frozen=True)
 class AssetSweepSummary:
@@ -111,6 +125,22 @@ class AssetSweepSummary:
     n_significant_assets: int
     """Count of assets with a significant edge under the per-asset flag. Equal
     to positive_assets when per_asset_null=False."""
+    perturbation_profiles: Dict[str, List[Tuple[float, float]]]
+    """Per-asset perturbation profiles: (deviation from baseline, median log
+    return) sorted by ascending deviation. One profile per asset over the full
+    sweep grid."""
+    baseline_peak_count: int
+    """Number of assets for which the baseline parameter set is the best
+    (argmax) of its parameter-set medians."""
+    baseline_peak_share: float
+    """Fraction of assets whose baseline parameter set is the best of its
+    parameter-set medians (baseline_peak_count / n_assets)."""
+    positive_param_sets_per_asset: List[int]
+    """For each asset, the number of parameter sets (of the grid) whose median
+    log return across folds is positive."""
+    baseline_in_grid: bool
+    """Whether the baseline parameter set was present in the sweep grid.
+    Baseline peak statistics are only defined in that case."""
 
     @property
     def verdict(self) -> str:
@@ -198,6 +228,28 @@ class AssetSweepSummary:
                 f"Null (coin-flip across assets): median log return "
                 f"{self.null_median_log_return:+.3f}, null dispersion {self.null_dispersion:+.3f}"
             )
+        lines.append("")
+        lines.append("Per-asset perturbation profiles (median log return by parameter")
+        lines.append("set, ascending deviation from the baseline):")
+        for name, pairs in self.perturbation_profiles.items():
+            lines.append(f"  {name}:")
+            for dev, med in pairs:
+                marker = "  <-- baseline" if abs(dev) < 1e-12 else ""
+                lines.append(f"    deviation {dev:4.2f}x:  {med:+.3f}{marker}")
+        lines.append("")
+        baseline_peak = self.baseline_peak_count
+        if self.baseline_in_grid:
+            lines.append(
+                f"Baseline parameter set is the best for {baseline_peak} / {self.n_assets} assets"
+                f" (baseline peak share {self.baseline_peak_share:.1%})."
+            )
+            for name, c in zip(self.asset_names, self.positive_param_sets_per_asset):
+                lines.append(f"  {name}: {c} of {len(self.perturbation_profiles[name])} parameter sets positive")
+        else:
+            for name, c in zip(self.asset_names, self.positive_param_sets_per_asset):
+                lines.append(f"  {name}: {c} of {len(self.perturbation_profiles[name])} parameter sets positive")
+            lines.append("  (baseline parameter set was not present in the sweep grid; "
+                         "baseline peak statistics are not defined).")
         lines.append("")
         lines.append(f"Overall verdict: {self.verdict}")
         lines.append("")
@@ -398,6 +450,54 @@ def asset_sweep_summary(
         asset_significance = None
         n_significant_assets = positive_count
 
+    # Per-asset perturbation profiles: median log return for each parameter
+    # set in the sweep grid, expressed as deviation from the baseline.
+    # The walk-forwards for the grid are already done
+    # (AssetSweepResult.fold_total_returns), so this adds no further
+    # computation.
+    baseline_dict = dict(baseline)
+
+    # Robust normalization of a parameter set to a list of (name, value)
+    # pairs. Handles both the tuple-of-tuples form (("fast", 20), ("slow", 60))
+    # used by sweep_across_assets and the flat ("fast", 20) pair form used in
+    # some tests.
+    def _param_pairs(ps: Any) -> List[Tuple[str, Any]]:
+        if not ps:
+            return []
+        if isinstance(ps[0], tuple) and len(ps[0]) >= 2:
+            return [(str(p[0]), p[1]) for p in ps]
+        return [(str(a), b) for a, b in zip(ps[0::2], ps[1::2])]
+
+    baseline_idx = next(
+        (i for i, ps in enumerate(result.param_sets)
+         if _param_pairs(ps) == _param_pairs(baseline)),
+        None,
+    )
+    param_set_medians = result.param_set_median_log_returns
+    perturbation_profiles: Dict[str, List[Tuple[float, float]]] = {}
+    baseline_peak_count = 0
+    positive_param_sets_per_asset: List[int] = []
+    for name, med in zip(result.asset_names, param_set_medians):
+        medians_array = np.array(med, dtype=np.float64)
+        devs = [
+            round(max(abs(v / baseline_dict[k] - 1.0) for k, v in _param_pairs(ps)), 6)
+            for ps in result.param_sets
+        ]
+        perturbation_profiles[name] = sorted(zip(devs, medians_array.tolist()))
+        if baseline_idx is not None:
+            baseline_med = medians_array[baseline_idx]
+            # baseline is the best parameter set for this asset when its median
+            # equals the maximum across parameter sets (tie-safe).
+            if baseline_med >= medians_array.max() - 1e-12:
+                baseline_peak_count += 1
+        positive_param_sets_per_asset.append(int(np.sum(medians_array > 0)))
+
+    n_assets = len(result.asset_names)
+    baseline_in_grid = baseline_idx is not None
+    baseline_peak_share = (
+        baseline_peak_count / n_assets if n_assets else 0.0
+    )
+
     return AssetSweepSummary(
         asset_names=result.asset_names,
         baseline_param_set=baseline,
@@ -419,6 +519,11 @@ def asset_sweep_summary(
         asset_null_medians=asset_null_medians,
         asset_significance=asset_significance,
         n_significant_assets=n_significant_assets,
+        perturbation_profiles=perturbation_profiles,
+        baseline_peak_count=baseline_peak_count,
+        baseline_peak_share=baseline_peak_share,
+        positive_param_sets_per_asset=positive_param_sets_per_asset,
+        baseline_in_grid=baseline_in_grid,
     )
 
 
