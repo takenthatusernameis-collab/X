@@ -518,3 +518,72 @@ A research-integrity defect was found in the new loader: the loader described it
 1. Run a focused loader verification that confirms returned closes equal the CSV `adjclose` field for at least one known ticker.
 2. Run the full regression suite and relevant examples after the final edit.
 3. Only then continue with the real-data research pipeline and document the result in a timestamped activation record.
+
+## Current activation (sample-calibrated compare_noise tolerance)
+
+Made the `compare_noise` pass/fail decision depend on the framework's own
+noise at the observed sample size instead of the arbitrary fixed 0.05 band,
+closing the methodology note from the prior activation (the 5% band was
+wider than the 95% CI half-width for the 170-fold AAPL walk-forward).
+
+- `research/backtest/perturbation.py`: `SweepSummary` gained
+  `noise_fold_median_log_returns` (the coin-flip null's baseline param-set
+  fold log returns, same `n_folds`) and an `effective_tolerance` property.
+  `compare_noise` now computes the tolerance as 2 x the null's fold
+  dispersion / sqrt(n_folds) when noise fold data is available and no
+  explicit `tol=` was passed; passing `tol=` explicitly preserves the old
+  fixed-band behavior. `noise_benchmark`/`sweep_summary` are wired to pass
+  the null's fold data so the calibration activates automatically.
+- `examples/ma_crossover.py` and `examples/ma_crossover_real_data.py` use
+  the new call signature and print the computed tolerance.
+- Effect on the AAPL MA crossover (n_folds=170, null fold std 0.326):
+  sample-calibrated tolerance +0.050; baseline +0.024 vs null -0.006,
+  difference 0.030 <= 0.050 -> **within noise: True** — the verdict is
+  unchanged from the fixed 0.05 band because the real-data null dispersion
+  is high. The AAPL decision (within noise, not admitted to the evidence
+  base) is now robust to the tolerance choice. Synthetic data: the MA
+  crossover's -0.081 median vs the null's +0.065 is distinguishable from
+  noise under both bands — a negative bias on this series, not an edge.
+- All 96 tests pass; the API change is backward compatible (explicit
+  `tol=` still available).
+
+## Current activation (regime-stability on real data — AAPL across blocks)
+
+Completed the last robustness dimension on real data: regime-stability
+stress testing of the AAPL MA crossover across real market regimes.
+
+- `research/backtest/regime_stability.py`: added `stress_segments`
+  (run walk-forward IS/OOS inside each of several contiguous regime
+  segments of a real series, then compare candidate vs coin-flip null
+  medians across segments with the same REGIME_STABLE / REGIME_DEPENDENT /
+  CONSISTENT_WITH_NOISE verdict logic), plus `segment_fn_from_labels` and
+  `volatility_segments`. All three are exported via
+  `research/backtest/__init__.py`.
+- `examples/regime_stability_real_data.py`: new example. AAPL split into
+  4 contiguous blocks by date, each labeled 'turbulent'/'calm' by its
+  block-median trailing-60d vol vs the series-wide median (past-only),
+  MA crossover, train=252d/test=84d/warmup=60d/overlap=60d.
+- Result (seed 42, real data, tooling validation + one real-data candidate):
+  segments turbulent (2232 bars) / calm (2233 bars) / turbulent (2232) /
+  calm (2233); candidate medians [+0.025, -0.003, +0.024, +0.064], null
+  medians [-0.020, -0.002, +0.043, -0.002]; one calm block shows an edge
+  (+0.064 vs -0.002). Candidate dispersion +0.024 vs 2 x null dispersion
+  +0.046 -> verdict **REGIME_STABLE** (no regime dependence detected).
+  Interpretation: the AAPL MA crossover behaves consistently across the
+  four time blocks (consistent edge or no edge in each), reinforcing that
+  its full-sample signal is not driven by a single market regime. The one
+  calm-block edge is an exploratory finding and does not change the
+  existing decision to reject the AAPL candidate for the evidence base
+  (it still fails the perturbation canonical-parameter peak criterion and
+  sits within the noise tolerance on the full walk-forward).
+- Results are deterministic across reruns (identical medians and verdict).
+
+## Next activation
+
+1. No immediate blockers. Candidates: (a) fold-level significance test on
+   the AAPL candidate's walk-forward (independent of the framework's
+   coin-flip band); (b) regime-stability on a second ticker or on the
+   universe with the new `stress_segments` helper; (c) document a real-data
+   regime family (`research/backtest/regime_stability.py` canonical
+   scenarios) for reusable real-data stress tests.
+

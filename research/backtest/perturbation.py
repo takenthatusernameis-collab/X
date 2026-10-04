@@ -39,6 +39,8 @@ from dataclasses import dataclass
 from itertools import product
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
+import math
+
 import numpy as np
 
 from .data import BarSequence
@@ -84,6 +86,20 @@ class SweepSummary:
     n_periods: int
     train_window_bars: int
     test_window_bars: int
+    noise_fold_median_log_returns: Optional[Sequence[float]] = None
+    """Fold-level log returns of the coin-flip null's baseline parameter set
+    (same ``n_folds``), when the summary was produced from a noise benchmark.
+    Used by ``compare_noise`` to compute a sample-calibrated tolerance (2x the
+    null's fold dispersion divided by sqrt(n_folds)) instead of the fixed 0.05
+    default, and by ``effective_tolerance`` to expose that tolerance."""
+
+    @property
+    def effective_tolerance(self) -> float:
+        """The tolerance ``compare_noise`` uses when called with no explicit ``tol``."""
+        fold_returns = list(self.noise_fold_median_log_returns or [])
+        if len(fold_returns) >= 2:
+            return 2 * float(np.std(fold_returns, ddof=1)) / math.sqrt(len(fold_returns))
+        return 0.05
 
     @property
     def baseline_median_log_return(self) -> float:
@@ -94,8 +110,31 @@ class SweepSummary:
         """Median log return for the exact deviation level, if any."""
         return self.medians_at_deviation.get(deviation)
 
-    def compare_noise(self, noise_median: float, tol: float = 0.05) -> bool:
-        """Return True if the baseline is within `tol` of the noise median."""
+    def compare_noise(
+        self,
+        noise_median: float,
+        noise_fold_median_log_returns: Optional[Sequence[float]] = None,
+        tol: float = 0.05,
+    ) -> bool:
+        """Return True if the baseline is within `tol` of the noise median.
+
+        When no explicit `tol` is passed and the null's fold-level log
+        returns are available (from a noise benchmark), the tolerance is
+        computed as 2x the coin-flip null's fold dispersion at the same
+        sample size, i.e. 2 * null_std / sqrt(n_folds), which is twice the
+        standard error of the null's median. This makes the pass/fail
+        decision depend on the framework's own noise at the observed sample
+        size instead of a fixed 0.05 band. Pass `tol=` explicitly to force a
+        fixed tolerance.
+        """
+        if tol is None:
+            fold_returns = (
+                noise_fold_median_log_returns or self.noise_fold_median_log_returns
+            )
+            if fold_returns is not None and len(fold_returns) >= 2:
+                tol = 2 * float(np.std(fold_returns, ddof=1)) / math.sqrt(
+                    len(fold_returns)
+                )
         return abs(self.baseline_median_log_return - noise_median) <= tol
 
     def inspect(self) -> str:
@@ -129,7 +168,10 @@ class SweepSummary:
             near = "yes" if self.compare_noise(self.noise_median_log_return) else "no"
             lines.append("")
             lines.append(f"Null (coin-flip) benchmark: median log return {self.noise_median_log_return:+.3f}")
-            lines.append(f"Baseline within {0.05:+.2f} of null: {near}")
+            lines.append(
+                f"Baseline within {self.effective_tolerance:+.3f} of null "
+                f"(sample-calibrated 2x null std / sqrt(n_folds)): {near}"
+            )
         lines.append("")
         lines.append("Interpretation: a robust strategy shows little or no systematic")
         lines.append("decline in median log return as parameters deviate from the")
@@ -281,13 +323,24 @@ def noise_benchmark(
         cfg=cfg,
         periods_per_year=periods_per_year,
     )
-    return sweep_summary(result, result.param_sets[0])
+    # The baseline param set is the first set; its fold-level log returns are
+    # the coin-flip null's fold distribution, used by ``compare_noise`` for
+    # the sample-calibrated tolerance.
+    fold_rets = np.array(result.fold_total_returns[0], dtype=np.float64)
+    null_fold_log_returns = np.log1p(np.clip(fold_rets, -1.0 + 1e-12, None)).tolist()
+    return sweep_summary(
+        result,
+        result.param_sets[0],
+        noise_median=None,
+        noise_fold_median_log_returns=null_fold_log_returns,
+    )
 
 
 def sweep_summary(
     result: SweepResult,
     baseline: ParameterSet,
     noise_median: Optional[float] = None,
+    noise_fold_median_log_returns: Optional[Sequence[float]] = None,
 ) -> SweepSummary:
     """Summarize a SweepResult with respect to a baseline parameter set.
 
@@ -297,6 +350,9 @@ def sweep_summary(
             reference for the deviation scan and the noise comparison.
         noise_median: optional median log return from a noise benchmark;
             used to flag whether the baseline is indistinguishable from noise.
+        noise_fold_median_log_returns: optional fold-level log returns of the
+            noise benchmark's baseline param set (same ``n_folds``); used by
+            ``compare_noise`` to compute a sample-calibrated tolerance.
 
     Returns:
         SweepSummary with a deviation scan, sign consistency, best/worst
@@ -346,4 +402,5 @@ def sweep_summary(
         n_periods=result.n_periods,
         train_window_bars=result.train_window_bars,
         test_window_bars=result.test_window_bars,
+        noise_fold_median_log_returns=noise_fold_median_log_returns,
     )

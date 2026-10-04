@@ -60,6 +60,9 @@ from .regime_stability import (
     stress_regime_scenarios,
     direction_signal,
     always_long_signal,
+    stress_segments,
+    segment_fn_from_labels,
+    volatility_segments,
 )
 from .universe import (
     ASSET_VERDICT_CONCENTRATED,
@@ -120,6 +123,9 @@ __all__ = [
     "asset_sweep_summary",
     "uniform_regime_assets",
     "flat_regime_assets",
+    "stress_segments",
+    "segment_fn_from_labels",
+    "volatility_segments",
     "load_ticker",
     "load_universe",
 ]

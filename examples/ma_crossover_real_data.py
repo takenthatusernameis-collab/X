@@ -156,8 +156,14 @@ def main():
         warmup=WARMUP, overlap_window=60, cfg=cfg0, seed=99,
     )
     noise_median = noise_summary.baseline_median_log_return
+    baseline_within_noise_tol = pert_summary.compare_noise(
+        noise_median, noise_summary.noise_fold_median_log_returns
+    )
     print(f"  Null (coin-flip) benchmark: median log return {noise_median:+.3f}")
-    print(f"  Baseline within noise tolerance (5%): {pert_summary.compare_noise(noise_median)}")
+    print(f"  Sample-calibrated tolerance (2x null std / sqrt(n_folds)): "
+          f"{pert_summary.effective_tolerance:+.3f}")
+    print(f"  Baseline within sample-calibrated noise tolerance: "
+          f"{baseline_within_noise_tol}")
 
     # 9. Asset-universe sweep: does any edge rest on a single asset?
     print("\n=== 9. Asset-universe robustness sweep (all 10 tickers, per-asset nulls) ===")
@@ -189,8 +195,8 @@ def main():
     print(f"  Perturbation: baseline (20,60) is not the best param set in any asset "
           f"({summary.baseline_peak_count}/10 baseline peaks); per-asset perturbation "
           f"profiles (section 9) show wide spread across the grid, indicating strong "
-          f"parameter dependence; baseline within 5% of coin-flip null: "
-          f"{pert_summary.compare_noise(noise_median)}")
+          f"parameter dependence; baseline within the sample-calibrated noise "
+          f"tolerance: {baseline_within_noise_tol}")
     print(f"  Universe: {summary.verdict} ({summary.n_significant_assets}/{len(universe)} assets significant)")
     print("\nNOTE: research/simulation only. No live trading or production execution.")
     print("      AAPL MA crossover on the collected universe: exploratory simulation.")

@@ -523,3 +523,195 @@ def regime_stress(
         train_window_bars=train_window,
         test_window_bars=test_window,
     )
+
+
+def volatility_segments(
+    closes: NDArray,
+    vol_calm: float = 0.15,
+    vol_turbulent: float = 0.28,
+    window: int = 60,
+) -> List[str]:
+    """Past-only classification of each bar by trailing realized volatility.
+
+    Uses only closes[:i], so no look-ahead is possible. Bars return one of
+    'calm', 'normal', or 'turbulent'; very short prefixes return 'insufficient'
+    and are dropped as segments (they cannot hold a walk-forward).
+
+    Args:
+        closes: closing prices.
+        vol_calm, vol_turbulent: annualized realized-vol thresholds.
+        window: trailing-bar window for realized volatility.
+
+    Returns:
+        List of labels, one per bar.
+    """
+    labels: List[str] = []
+    for i in range(len(closes)):
+        if i < window:
+            labels.append("insufficient")
+        else:
+            rv = float(np.std(np.log(closes[i - window : i]), ddof=1)) * np.sqrt(
+                252.0
+            )
+            if rv < vol_calm:
+                labels.append("calm")
+            elif rv < vol_turbulent:
+                labels.append("normal")
+            else:
+                labels.append("turbulent")
+    return labels
+
+
+def segment_fn_from_labels(labels: List[str]) -> Callable[[NDArray, int], str]:
+    """Turn a precomputed past-only label list into the segment_fn callable
+    expected by ``stress_segments``. Labels do not depend on closes, so the
+    closes argument is unused."""
+
+    def fn(_closes: NDArray, i: int) -> str:
+        return labels[i]
+
+    return fn
+
+
+def stress_segments(
+    signals_fn: Callable[[NDArray, ...], List[Signal]],
+    bars: BarSequence,
+    signals: List[Signal],
+    param_grid: List[Dict[str, Any]],
+    baseline: ParameterSet,
+    segment_fn: Callable[[NDArray, int], str],
+    train_window: int,
+    test_window: int,
+    warmup: int = 0,
+    overlap_window: int = 0,
+    cfg: BacktestConfig = BacktestConfig(),
+    periods_per_year: int = 252,
+    min_segment_bars: int = 400,
+) -> RegimeStressResult:
+    """Stress-test a candidate across contiguous segments of a real series
+    classified by a past-only regime function.
+
+    Each bar is classified by `segment_fn(closes, i)` using only closes[:i]
+    (past-only), producing contiguous segments. Each qualifying segment is
+    backtested with walk-forward IS/OOS, and the candidate's per-segment
+    median log returns are compared against a coin-flip null benchmark run on
+    the same segments, using the same verdict logic as ``regime_stress``:
+    CONSISTENT_WITH_NOISE (no edge in any segment), REGIME_DEPENDENT
+    (candidate's cross-segment swing exceeds 2x the null's), or
+    REGIME_STABLE (consistent edge or no edge everywhere).
+
+    Segments are shorter than a full series by construction, so walk-forward
+    fold counts may differ across segments; per-segment fold counts are
+    reported in the result.
+
+    Args:
+        signals_fn: past-only signal function, called as
+            `signals_fn(closes, **params)`.
+        bars: the bar series (full length).
+        signals: the full past-only signal series (same length as `bars`).
+        param_grid: parameter sets to sweep inside each segment.
+        baseline: the reference parameter set.
+        segment_fn: callable(closes: np.ndarray, i: int) -> segment label,
+            using closes[:i] only (past-only).
+        train_window, test_window, warmup, overlap_window, cfg, periods_per_year:
+            forwarded to walk_forward.
+        min_segment_bars: minimum segment length to include; shorter segments
+            cannot hold a meaningful walk-forward.
+
+    Returns:
+        RegimeStressResult with one scenario per segment and an overall
+        verdict.
+    """
+    if isinstance(bars, BarSequence):
+        closes = bars.closes_array()
+    else:
+        closes = np.array([float(b.close) for b in bars], dtype=np.float64)
+
+    # BarSequence only supports single-index getitem, so convert once here.
+    bars_list = list(bars) if isinstance(bars, BarSequence) else bars
+
+    labels = [segment_fn(closes, i) for i in range(len(closes))]
+    segments: List[Tuple[str, int, int]] = []
+    cur = labels[0]
+    start = 0
+    for i in range(1, len(labels)):
+        if labels[i] != cur:
+            if i - start >= min_segment_bars:
+                segments.append((cur, start, i))
+            cur = labels[i]
+            start = i
+    if len(labels) - start >= min_segment_bars:
+        segments.append((cur, start, len(labels)))
+
+    if not segments:
+        raise ValueError(f"no segment has >= {min_segment_bars} bars")
+
+    scenario_results: List[RegimeScenarioResult] = []
+    for name, s, e in segments:
+        seg_bars = bars_list[s:e]
+        seg_signals = signals[s:e]
+        sweep = parameter_sweep(
+            signals_fn=signals_fn,
+            bars=seg_bars,
+            param_grid=param_grid,
+            train_window=train_window,
+            test_window=test_window,
+            warmup=warmup,
+            overlap_window=overlap_window,
+            cfg=cfg,
+            periods_per_year=periods_per_year,
+        )
+        cand_summary = sweep_summary(sweep, baseline)
+        noise = noise_benchmark(
+            seg_bars,
+            param_grid=param_grid,
+            train_window=train_window,
+            test_window=test_window,
+            warmup=0,
+            overlap_window=0,
+            cfg=cfg,
+            periods_per_year=periods_per_year,
+        )
+        edge_status = (
+            EdgeFree
+            if abs(cand_summary.baseline_median_log_return - noise.baseline_median_log_return)
+            <= OUTLIER_TOL
+            else EdgePresent
+        )
+        scenario_results.append(RegimeScenarioResult(
+            name=name,
+            param_sets=sweep.param_sets,
+            baseline_param_set=baseline,
+            baseline_median_log_return=cand_summary.baseline_median_log_return,
+            noise_median_log_return=noise.baseline_median_log_return,
+            edge_status=edge_status,
+            n_folds=sweep.n_folds,
+            n_periods=sweep.n_periods,
+            median_log_returns=cand_summary.median_log_returns,
+        ))
+
+    candidate_medians = np.array([s.baseline_median_log_return for s in scenario_results])
+    null_medians = np.array([s.noise_median_log_return for s in scenario_results])
+    candidate_dispersion = float(np.std(candidate_medians))
+    null_dispersion = float(np.std(null_medians))
+
+    if all(abs(s.baseline_median_log_return) <= OUTLIER_TOL for s in scenario_results):
+        verdict = "CONSISTENT_WITH_NOISE"
+    elif candidate_dispersion > 2.0 * null_dispersion:
+        verdict = "REGIME_DEPENDENT"
+    else:
+        verdict = "REGIME_STABLE"
+
+    first = scenario_results[0]
+    return RegimeStressResult(
+        scenarios=scenario_results,
+        param_sets=first.param_sets,
+        baseline_param_set=first.baseline_param_set,
+        overall_verdict=verdict,
+        candidate_dispersion=candidate_dispersion,
+        null_dispersion=null_dispersion,
+        n_folds=first.n_folds,
+        n_periods=first.n_periods,
+        train_window_bars=train_window,
+        test_window_bars=test_window,
+    )

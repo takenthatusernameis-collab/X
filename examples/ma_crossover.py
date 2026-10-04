@@ -143,7 +143,10 @@ def main():
     print("Null (coin-flip) benchmark: median log return",
           f"{noise_summary.baseline_median_log_return:+.3f}")
     print("Baseline indistinguishable from noise:",
-          summary.compare_noise(noise_summary.baseline_median_log_return))
+          summary.compare_noise(
+              noise_summary.baseline_median_log_return,
+              noise_summary.noise_fold_median_log_returns,
+          ))
 
     print()
     print("NOTE: data is synthetic and intended only for tooling validation.")
