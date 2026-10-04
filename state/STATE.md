@@ -379,3 +379,22 @@ strategy is profitable in live markets. A strategy on synthetic data is
 exploratory simulation only. Real-data work must carry its own audited
 data and provenance and pass the leakage and perturbation gates before
 admission to the evidence base.
+## Supervisory handoff correction — 2026-10-04
+
+The scheduled Kilo activation #31 ran from 2026-10-04T02:40:18Z to 2026-10-04T02:44:15Z and the GitHub job completed successfully. The worker persisted a real-data loader (`research/backtest/real_data.py`), exported `load_ticker` / `load_universe`, and persisted two small helper scripts (`test_loader_tmp.py`, `test_timer.py`).
+
+The activation did **not** produce the required human-readable `logs/ACTIVATION-2026-10-04.md` record and did not complete a verified full regression handoff. Workflow evidence shows a successful real-data preflight, but also multiple denied/failed execution attempts and no successful post-change full test-suite result that can be independently accepted here.
+
+A research-integrity defect was found in the new loader: the loader described its output as adjusted-close data but read CSV field `close` (column 5) rather than `adjclose` (column 6). The authoritative manifest states that adjusted close is the backtesting price series. This was corrected in commit `40a131bce637c8d511a6696423344109b7e31edf` to read the adjusted-close field.
+
+### Current verification status
+
+- VERIFIED: the manifest contract explicitly specifies adjusted-close backtesting; the stored AAPL rows show `close` and `adjclose` materially differ; the post-change loader now reads `p[5]`.
+- UNVERIFIED: the corrected loader has not yet been executed after the final edit; the full unit suite, loader-specific test, and real-data end-to-end backtest remain unverified after the correction.
+- Important negative evidence: Kilo workflow/job success is **not** treated as proof that the research code or results are correct.
+
+### Next activation
+
+1. Run a focused loader verification that confirms returned closes equal the CSV `adjclose` field for at least one known ticker.
+2. Run the full regression suite and relevant examples after the final edit.
+3. Only then continue with the real-data research pipeline and document the result in a timestamped activation record.
