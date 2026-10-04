@@ -72,6 +72,7 @@ from .universe import (
     uniform_regime_assets,
     flat_regime_assets,
 )
+from .real_data import load_ticker, load_universe
 
 __all__ = [
     "__version__",
@@ -119,4 +120,6 @@ __all__ = [
     "asset_sweep_summary",
     "uniform_regime_assets",
     "flat_regime_assets",
+    "load_ticker",
+    "load_universe",
 ]
