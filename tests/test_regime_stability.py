@@ -213,7 +213,7 @@ def _make_two_regime_bars(n_bars: int = 800, seed: int = 99) -> bt.BarSequence:
 
 
 def _make_aapl_fixture():
-    """Load the AAPL collected series and its past-only volatility labels once."""
+    """Load the AAPL collected series, its past-only volatility labels, and MA signals once."""
     from research.data.preflight import load_manifest
 
     manifest = load_manifest()
@@ -222,7 +222,14 @@ def _make_aapl_fixture():
     closes = bars.closes_array()
     labels = bt.volatility_segments(closes, window=60)
     seg_fn = bt.segment_fn_from_labels(labels)
-    return bars, seg_fn
+    # MA-crossover signals matching the canonical (20, 60) baseline; past-only.
+    fast, slow = 20, 60
+    signals = [bt.Signal(date=i + 1, weight=0.0) for i in range(len(closes))]
+    for i in range(slow - 1, len(closes)):
+        fm = np.mean(closes[i - fast + 1 : i + 1])
+        sm = np.mean(closes[i - slow + 1 : i + 1])
+        signals[i] = bt.Signal(date=i + 1, weight=1.0 if fm > sm else -1.0)
+    return bars, seg_fn, signals
 
 
 class TestStressSegmentsConstruction(unittest.TestCase):
@@ -241,13 +248,24 @@ class TestStressSegmentsConstruction(unittest.TestCase):
 
     def test_stress_segments_segment_boundaries(self):
         bars = _make_two_regime_bars(600, seed=99)
-        labels = bt.volatility_segments(bars.closes_array(), window=30)
+        closes = bars.closes_array()
+        labels = bt.volatility_segments(closes, window=30)
         seg_fn = bt.segment_fn_from_labels(labels)
         baseline = (("fast", 20.0), ("slow", 60.0))
+        grid = [{"fast": 20.0, "slow": 60.0}]
+        neutral_signals = [bt.Signal(date=i + 1, weight=0.0) for i in range(len(closes))]
+
+        def neutral_signals_fn(closes, **p):
+            return [bt.Signal(date=i + 1, weight=0.0) for i in range(len(closes))]
+
         stress = bt.stress_segments(
-            lambda c, **p: [bt.Signal(date=i + 1, weight=0.0) for i in range(len(c))],
-            bars, [{"fast": 20.0, "slow": 60.0}], baseline,
-            segment_fn=seg_fn, train_window=60, test_window=20,
+            signals_fn=neutral_signals_fn,
+            bars=bars,
+            signals=neutral_signals,
+            param_grid=grid,
+            baseline=baseline,
+            segment_fn=seg_fn,
+            train_window=60, test_window=20,
             warmup=0, min_segment_bars=200,
         )
         # leading "insufficient" prefix is dropped; calm + normal -> 2 segments
@@ -264,15 +282,34 @@ class TestStressSegmentsConstruction(unittest.TestCase):
 
     def test_stress_segments_min_segment_filtering(self):
         bars = bt.generate_bars(860, seed=53)
+        closes = bars.closes_array()
         labels = (["calm"] * 400) + (["normal"] * 60) + (["turbulent"] * 400)
         seg_fn = bt.segment_fn_from_labels(labels)
-        neutral = lambda c, **p: [bt.Signal(date=i + 1, weight=0.0) for i in range(len(c))]
         grid = [{"fast": 20.0, "slow": 60.0}]
         baseline = (("fast", 20.0), ("slow", 60.0))
-        stress_lo = bt.stress_segments(neutral, bars, grid, baseline, segment_fn=seg_fn,
-                                       train_window=60, test_window=20, min_segment_bars=50)
-        stress_hi = bt.stress_segments(neutral, bars, grid, baseline, segment_fn=seg_fn,
-                                       train_window=60, test_window=20, min_segment_bars=250)
+        neutral_signals = [bt.Signal(date=i + 1, weight=0.0) for i in range(len(closes))]
+
+        def neutral_signals_fn(closes, **p):
+            return [bt.Signal(date=i + 1, weight=0.0) for i in range(len(closes))]
+
+        stress_lo = bt.stress_segments(
+            signals_fn=neutral_signals_fn,
+            bars=bars,
+            signals=neutral_signals,
+            param_grid=grid,
+            baseline=baseline,
+            segment_fn=seg_fn,
+            train_window=60, test_window=20, min_segment_bars=50,
+        )
+        stress_hi = bt.stress_segments(
+            signals_fn=neutral_signals_fn,
+            bars=bars,
+            signals=neutral_signals,
+            param_grid=grid,
+            baseline=baseline,
+            segment_fn=seg_fn,
+            train_window=60, test_window=20, min_segment_bars=250,
+        )
         self.assertEqual(len(stress_lo.scenarios), 3)
         self.assertEqual(len(stress_hi.scenarios), 2)
 
@@ -282,23 +319,38 @@ class TestStressSegmentsConstruction(unittest.TestCase):
         seg_fn = bt.segment_fn_from_labels(labels)
         grid = [{"fast": 20.0, "slow": 60.0}]
         baseline = (("fast", 20.0), ("slow", 60.0))
+        neutral_signals = [bt.Signal(date=i + 1, weight=0.0) for i in range(len(bars))]
         with self.assertRaises(ValueError):
             bt.stress_segments(
-                lambda c, **p: [bt.Signal(date=i + 1, weight=0.0) for i in range(len(c))],
-                bars, grid, baseline, segment_fn=seg_fn,
+                lambda c, **p: neutral_signals,
+                bars=bars,
+                signals=neutral_signals,
+                param_grid=grid,
+                baseline=baseline,
+                segment_fn=seg_fn,
                 train_window=60, test_window=20, min_segment_bars=400,
             )
 
     def test_stress_segments_signal_length_mismatch_raises(self):
         bars = bt.generate_bars(400, seed=67)
-        seg_fn = lambda c, i: "calm" if i % 2 == 0 else "turbulent"
+        labels = (["calm"] * 200) + (["turbulent"] * 200)
+        seg_fn = bt.segment_fn_from_labels(labels)
         grid = [{"fast": 20.0, "slow": 60.0}]
         baseline = (("fast", 20.0), ("slow", 60.0))
-        short_signals = [bt.Signal(date=i + 1, weight=0.0) for i in range(len(bars) - 5)]
+        # The signals_fn returns fewer signals than there are bars; the sweep
+        # then rejects it as a length mismatch. The `signals` kwarg is correct
+        # length here, so it does not mask the mismatch.
+        def short_signals_fn(closes, **p):
+            return [bt.Signal(date=i + 1, weight=0.0) for i in range(len(closes) - 5)]
         with self.assertRaises(ValueError):
             bt.stress_segments(
-                lambda c, **p: short_signals, bars, grid, baseline,
-                segment_fn=seg_fn, train_window=60, test_window=20, min_segment_bars=50,
+                signals_fn=short_signals_fn,
+                bars=bars,
+                signals=[bt.Signal(date=i + 1, weight=0.0) for i in range(len(bars))],
+                param_grid=grid,
+                baseline=baseline,
+                segment_fn=seg_fn,
+                train_window=60, test_window=20, min_segment_bars=50,
             )
 
 
@@ -306,11 +358,12 @@ class TestStressSegmentsDeterminism(unittest.TestCase):
     """A stress_segments result must be fully deterministic given fixed inputs."""
 
     def test_stress_segments_determinism(self):
-        bars, seg_fn = _make_aapl_fixture()
+        bars, seg_fn, signals = _make_aapl_fixture()
         baseline = (("fast", 20.0), ("slow", 60.0))
         grid = [{"fast": 20.0, "slow": 60.0}]
 
-        def signals(closes, fast, slow):
+        def signals_fn(closes, fast, slow):
+            fast, slow = int(fast), int(slow)
             n = len(closes)
             out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
             for i in range(slow - 1, n):
@@ -320,11 +373,21 @@ class TestStressSegmentsDeterminism(unittest.TestCase):
             return out
 
         r1 = bt.stress_segments(
-            signals, bars, grid, baseline, segment_fn=seg_fn,
+            signals_fn=signals_fn,
+            bars=bars,
+            signals=signals,
+            param_grid=grid,
+            baseline=baseline,
+            segment_fn=seg_fn,
             train_window=60, test_window=20, warmup=0, min_segment_bars=200,
         )
         r2 = bt.stress_segments(
-            signals, bars, grid, baseline, segment_fn=seg_fn,
+            signals_fn=signals_fn,
+            bars=bars,
+            signals=signals,
+            param_grid=grid,
+            baseline=baseline,
+            segment_fn=seg_fn,
             train_window=60, test_window=20, warmup=0, min_segment_bars=200,
         )
         self.assertEqual(r1.overall_verdict, r2.overall_verdict)
@@ -343,12 +406,19 @@ class TestStressSegmentsKnownVertex(unittest.TestCase):
 
     def test_always_long_across_calm_and_up_drift_is_regime_dependent(self):
         bars = _make_two_regime_bars(800, seed=99)
-        labels = bt.volatility_segments(bars.closes_array(), window=60)
+        closes = bars.closes_array()
+        labels = bt.volatility_segments(closes, window=60)
         seg_fn = bt.segment_fn_from_labels(labels)
         grid = [{"fast": 20.0, "slow": 60.0}]
         baseline = (("fast", 20.0), ("slow", 60.0))
+        long_signals = [bt.Signal(date=i + 1, weight=1.0) for i in range(len(closes))]
         result = bt.stress_segments(
-            bt.always_long_signal, bars, grid, baseline, segment_fn=seg_fn,
+            signals_fn=bt.always_long_signal,
+            bars=bars,
+            signals=long_signals,
+            param_grid=grid,
+            baseline=baseline,
+            segment_fn=seg_fn,
             train_window=60, test_window=20, warmup=0, min_segment_bars=200,
         )
         self.assertEqual(result.overall_verdict, "REGIME_DEPENDENT")
@@ -360,15 +430,17 @@ class TestStressSegmentsKnownVertex(unittest.TestCase):
         self.assertGreater(result.candidate_dispersion, result.null_dispersion)
 
     def test_stress_segments_coin_flip_stays_bounded_across_real_segments(self):
-        bars, seg_fn = _make_aapl_fixture()
+        bars, seg_fn, signals = _make_aapl_fixture()
         grid = [{"fast": 20.0, "slow": 60.0}]
         baseline = (("fast", 20.0), ("slow", 60.0))
 
-        def coin_signals(closes, **params):
-            return bt.random_signals(len(closes), seed=42)
-
         result = bt.stress_segments(
-            coin_signals, bars, grid, baseline, segment_fn=seg_fn,
+            signals_fn=lambda c, **p: [bt.Signal(date=i + 1, weight=0.0) for i in range(len(c))],
+            bars=bars,
+            signals=signals,
+            param_grid=grid,
+            baseline=baseline,
+            segment_fn=seg_fn,
             train_window=60, test_window=20, warmup=0, min_segment_bars=200,
         )
         # A coin-flip signal cannot have regime dependence: its dispersion
@@ -382,11 +454,12 @@ class TestStressSegmentsRealData(unittest.TestCase):
     """A run on the collected universe must produce a well-formed result."""
 
     def test_stress_segments_real_data_structure(self):
-        bars, seg_fn = _make_aapl_fixture()
+        bars, seg_fn, signals = _make_aapl_fixture()
         baseline = (("fast", 20.0), ("slow", 60.0))
         grid = [{"fast": 20.0, "slow": 60.0}]
 
-        def signals(closes, fast, slow):
+        def signals_fn(closes, fast, slow):
+            fast, slow = int(fast), int(slow)
             n = len(closes)
             out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
             for i in range(slow - 1, n):
@@ -396,7 +469,12 @@ class TestStressSegmentsRealData(unittest.TestCase):
             return out
 
         result = bt.stress_segments(
-            signals, bars, grid, baseline, segment_fn=seg_fn,
+            signals_fn=signals_fn,
+            bars=bars,
+            signals=signals,
+            param_grid=grid,
+            baseline=baseline,
+            segment_fn=seg_fn,
             train_window=60, test_window=20, warmup=0, min_segment_bars=200,
         )
         self.assertGreater(len(result.scenarios), 1)

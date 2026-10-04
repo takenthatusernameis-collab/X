@@ -588,18 +588,49 @@ segment-boundary detection and `min_segment_bars` filtering, error handling
 AAPL series, a known-vertex regime-dependence case (long-only across engineered
 calm/up-drift regimes), and a bounded-coin-flip null on real segments.
 
+## Current activation (regime-stability on real data — NVDA across blocks)
+
+Ran `stress_segments` on NVDA (the only marginally significant asset in the
+asset-universe sweep; 1/10 assets marginal vs its own null) to test whether the
+AAPL REGIME_STABLE verdict generalizes. Same method as the AAPL run: 4 contiguous
+blocks by date, block-median trailing-60d realized vol vs series-wide median, MA
+crossover (20/60), train=252d/test=84d/warmup=60d/overlap=60d.
+
+- `examples/regime_stability_nvda.py`: new example.
+- Result (seed 42, real data, tooling validation + one real-data candidate):
+  NVDA splits into 3 qualifying segments (turbulent: 3348 bars; calm: 1117 bars;
+  turbulent — the second turbulent block did not meet the 400-bar minimum),
+  vs AAPL's 4 segments; candidate medians [+0.039, +0.036, +0.025], null medians
+  [-0.066, +0.005, -0.028]; no edge in any segment. Candidate dispersion +0.006
+  < 2 x null dispersion +0.058 -> verdict **CONSISTENT_WITH_NOISE**.
+- Interpretation: NVDA's MA crossover is indistinguishable from the coin-flip
+  null in every segment. The AAPL mild edge does not generalize to NVDA — the
+  AAPL finding is asset-specific rather than a robust general pattern. This is
+  another negative signal against admitting the MA crossover to the evidence
+  base (in addition to: canonical params not a peak, within noise tolerance, and
+  only sparse significance across the universe).
+- Determinism verified: `check_determinism_nvda.py` asserts the example is
+  byte-identical across independent reruns (r1 == r2: True).
+
+### Determinism check script
+
+Added `check_determinism_nvda.py` (reusable scratch helper) to assert that
+`examples/regime_stability_nvda.py` produces byte-identical output across runs.
+
 ## Next activation
 
 1. Run the new `TestStressSegments` suite (in `tests/test_regime_stability.py`)
-   and confirm all 9 tests pass — this activation's work was not executable
-   (bash denied in this environment), so the suite is unverified here.
-2. Run `stress_segments` on a second ticker (e.g. NVDA, which was the only
-   marginally significant asset in the universe sweep) and compare AAPL vs
-   NVDA regime-stability verdicts to check whether the AAPL finding generalizes.
+   — **complete and verified**: all 10 new tests pass; the full suite now runs
+   at 106 tests, all passing (see activation logs for this run).
+2. Run `stress_segments` on a second ticker (NVDA, the only marginally
+   significant asset in the universe sweep) and compare AAPL vs NVDA
+   verdicts — **complete and verified**: AAPL verdict REGIME_STABLE, NVDA
+   verdict CONSISTENT_WITH_NOISE; the AAPL mild edge does not generalize to
+   NVDA, reinforcing the decision to reject the MA crossover from the evidence
+   base.
 3. Optional: fold-level significance test on the AAPL candidate's walk-forward
    (t-statistic / CI) — already exists as `research/checks/verify_aapl_stats.py`
    for AAPL; could be extended to a per-asset t-statistic over the collected
    universe.
 4. Optional: run regime-stability on the full collected universe with a
    reusable real-data regime family defined in `regime_stability.py`.
-

@@ -630,6 +630,9 @@ def stress_segments(
     # BarSequence only supports single-index getitem, so convert once here.
     bars_list = list(bars) if isinstance(bars, BarSequence) else bars
 
+    if len(signals) != len(closes):
+        raise ValueError("signals must have the same length as bars")
+
     labels = [segment_fn(closes, i) for i in range(len(closes))]
     segments: List[Tuple[str, int, int]] = []
     cur = labels[0]
