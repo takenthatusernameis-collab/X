@@ -251,8 +251,29 @@ jobs:
         env:
           KILO_DISABLE_EXTERNAL_SKILLS: "true"
         run: |
-          set -euo pipefail
-          kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)"
+          set +e
+
+          # A fresh Kilo session is intentionally retried only for the specific
+          # gateway/provider failure observed in run #35. Other failures remain
+          # hard failures so the workflow cannot hide genuine defects.
+          kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > /tmp/kilo-primary.log 2>&1
+          status=$?
+          cat /tmp/kilo-primary.log
+
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+
+          if grep -Eq 'invalid request error trace_id:' /tmp/kilo-primary.log; then
+            echo "::warning::Kilo gateway returned a transient invalid-request trace; retrying once with a fresh Kilo session."
+            sleep 5
+            kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > /tmp/kilo-retry.log 2>&1
+            retry_status=$?
+            cat /tmp/kilo-retry.log
+            exit "$retry_status"
+          fi
+
+          exit "$status"
 
       - name: Persist safe repository changes
         if: always()
