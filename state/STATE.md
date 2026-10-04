@@ -310,19 +310,68 @@ activation record.
 This activation's regression-discipline item is therefore complete and verified;
 the corrected loader no longer has an open verification gap.
 
+## Current activation (real-data pipeline on the collected universe)
+
+The first research pipeline on real, collected data is now executed end-to-end
+(`examples/ma_crossover_real_data.py`): manifest checksums verified (10/10 OK),
+preflight gate passed (all 57 checks), leakage review passed (signal integrity +
+fill-equity audit), walk-forward IS/OOS with zero and realistic costs, a
+perturbation sweep (0.5x/1.0x/2.0x around canonical 20/60) with a coin-flip null
+benchmark, and an asset-universe sweep across all 10 collected tickers with
+per-asset nulls. Baseline state re-verified independently: 96 tests passing,
+all four synthetic examples reproducing their documented seed-42 figures.
+
+**AAPL MA crossover (2009-01-02 to 2026-10-02, adjusted close, walk-forward
+train=252d/test=84d/warmup=60d, overlap=60d, 170 folds / 14,280 OOS periods):**
+- Zero cost: mean log return +0.031, median +0.024, std +0.146; 101/170
+  positive folds. Realistic costs: mean +0.031, median +0.023 (survives costs).
+- Full-sample reference (zero cost): 78 trades, total +225.44%, sharpe 0.53,
+  max DD 30.98%, turnover 93.8x (reference only; not the evidence).
+- Perturbation: medians +0.023 .. +0.033 across the 9 param sets (8/9
+  positive); flat deviation scan (0.00x +0.024, 0.50x +0.023, 1.00x +0.019)
+  but the canonical (20, 60) set is not the grid optimum ((10, 60) = +0.033);
+  coin-flip null median -0.006; baseline within the tooling's 5% null tolerance
+  (|+0.024 - (-0.006)| = 0.030 <= 0.05). Independent cross-check: t-statistic
+  2.75 (df=169); 95% CI for the mean log fold return [0.0089, 0.0529], which
+  excludes zero.
+- Universe: per-asset medians AAPL +0.017, MSFT +0.018, GOOGL +0.008, AMZN
+  +0.015, META +0.031, NVDA +0.036, TSLA -0.004, JPM +0.001, JNJ -0.019,
+  XOM -0.005; 7/10 positive; 1/10 significant vs own null (NVDA, marginal);
+  best-asset share 28.3%; verdict CONSISTENT.
+
+**Assessment (exploratory, not admitted to the evidence base):** the AAPL MA
+crossover shows a marginally significant walk-forward edge over 2009-2026 but
+fails the robustness expectations (canonical parameters are not a peak; within
+the null tolerance; only sparse significance across the universe). It is
+recorded as an exploratory candidate rejected for further study. Contrast with
+the synthetic-data finding of no edge (median -0.081 per fold on the
+regime-switching generator) indicates the generator does not capture
+persistent-drift regimes, so the synthetic "no edge" result is generator-specific
+and cannot be generalized; direct real-data walk-forward testing is the more
+informative validation path for trend-based ideas.
+
+**Methodology note:** the `compare_noise` fixed 5% null tolerance is wider than
+the 95% CI half-width (~0.023) for 170 folds, so it can classify a
+statistically significant result (t=2.75) as "within noise"; a sample-calibrated
+null band is a candidate framework improvement (not implemented here).
+
 ## Next activation
 
-1. Regression discipline: now verified — the full suite and all four examples
-     run cleanly together (`python -m unittest discover -s tests -v`, then the
-     four `python -m examples/*` modules); re-run this combo after any future
-     research/code change.
-2. Real-data readiness: the manifest (`research/data/manifest.json`) and
-     preflight gate (`research/data/preflight.py`, check #10) are in place and
-     passing; the next step is a research-only backtest on the collected
-     universe, following `research/REAL_DATA_FEASIBILITY.md`: verify manifest
-     and checksums → pass preflight → pass the leakage review checklist →
-     walk-forward IS/OOS + perturbation before results are admitted to the
-     evidence base.
+1. Regression discipline: **complete and verified** — `python -m unittest
+   discover -s tests -v` (96 OK) plus the four walk-forward examples, re-run
+   after any research/code change.
+2. Real-data readiness: **complete** — the real-data pipeline ran on the
+   collected universe; see the "Current activation" section above for results
+   and the determination that the MA crossover is not admitted to the evidence
+   base.
+3. Determinism re-verification of `examples.ma_crossover_real_data` across
+   independent reruns (byte-identical output), since the final run was executed
+   once after the last code edit.
+4. Optional follow-on: (a) extend the asset-universe sweep to run the full
+   perturbation grid per real asset; (b) decide whether to make the `compare_noise`
+   null tolerance sample-calibrated (2x the coin-flip null's own fold dispersion
+   at the same sample size) while preserving all existing verdicts in the 96-test
+   suite; (c) run regime-stability on real data with a real-data regime family.
 
 ## Verification (executed)
 
