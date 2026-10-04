@@ -4,7 +4,7 @@ Keep concise human-readable activation records for substantive work, important f
 
 **Timestamped logging is the default operational standard for new activation records.** When timestamps are observable, include UTC timestamps for the activation start and finish and for consequential work/checkpoints that make progress easier to reconstruct. Prefer ISO 8601 format such as `2026-10-03T15:43:00Z`. A timestamp records the UTC time at which the logged event or action actually occurred; never backfill or infer a precise time that was not observed. When only a date or coarser time is known, record only that known precision rather than inventing a precise timestamp.
 
-The date-based activation filename remains a basic temporal anchor, but it is not a substitute for observed timestamps when those timestamps are available.
+The date-based activation filename is the canonical container for that day's records. Do not create a separate file per activation minute. Append each new substantive activation to `logs/ACTIVATION-YYYY-MM-DD.md` under a section such as `## Activation — 21:56 UTC`, while keeping observed ISO 8601 UTC timestamps inside the section authoritative.
 
 **Transparency priority:** the repository owner values performance transparency and honest progress reporting, and a separate AI supervisor actively monitors workflow progression for bottlenecks, regressions, stalls, and failures. Activation logs are therefore operational observability data, not cosmetic documentation. Correctly timestamped logs should be prioritized as part of the activation handoff so that both human and automated supervision can reconstruct what actually happened and when.
 

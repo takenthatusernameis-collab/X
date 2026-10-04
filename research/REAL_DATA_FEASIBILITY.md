@@ -72,7 +72,7 @@ placed alongside the data under `research/data/`. The manifest records:
 - `owner` and `created` timestamp.
 
 The manifest is the audit trail. A real-data run summary (per
-`logs/ACTIVATION-*.md`) must cite the manifest id used for that run.
+`logs/ACTIVATION-YYYY-MM-DD.md`) must cite the manifest id used for that run.
 
 ## Data-quality preflight checklist
 
