@@ -41,7 +41,7 @@ def _read_ticker_csv(ticker: str) -> Tuple[
             opens.append(float(p[1]))
             highs.append(float(p[2]))
             lows.append(float(p[3]))
-            closes.append(float(p[4]))
+            closes.append(float(p[5]))  # adjusted close per manifest
             volumes.append(float(p[6]))
     return (
         np.asarray(opens, dtype=np.float64),
