@@ -99,6 +99,8 @@ Use existing repository preflight infrastructure where it already exists.
 
 A preflight PASS means the checks actually ran. A skipped or unavailable check remains UNVERIFIED.
 
+Do not spend the activation merely redesigning the controller or prompt. First use the existing lifecycle to establish fresh execution evidence. Promote control-plane improvements only when the observed bottleneck materially justifies them.
+
 Do not infer from "python exists", "kilo exists", or a successful process start that the actual required operation works.
 
 # 2. Representative smoke test
