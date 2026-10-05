@@ -8,7 +8,7 @@ Improve the repository's ability to discover, evaluate, falsify, validate, repro
 
 Preserve existing functionality, interfaces, repositories, research methodology, and successful behavior wherever possible. Make the smallest high-leverage change that materially improves the current bottleneck.
 
-Do not optimize for activity, edits, experiment count, positive results, or a green workflow. Optimize for truthful progress and durable learning.
+Do not optimize for activity, edits, experiment count, positive results, or a green workflow. Optimize for truthful progress, durable learning, and independent verification.
 
 # Reliability lifecycle
 
