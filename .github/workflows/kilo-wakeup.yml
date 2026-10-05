@@ -289,7 +289,9 @@ jobs:
           initial_checkpoint_mtime="$(stat -c %Y state/worker_progress.md)"
 
           : > /tmp/kilo-primary.log
-          stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > /tmp/kilo-primary.log 2>&1 &
+          # Stream Kilo stdout/stderr into the live GitHub Actions log while also
+          # retaining a local copy for liveness checks and post-run diagnostics.
+          stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-primary.log) 2>&1 &
           kilo_pid=$!
 
           stall_seconds=1800
@@ -366,8 +368,7 @@ jobs:
             fi
           fi
 
-          cat /tmp/kilo-primary.log
-
+          echo "Kilo primary session exited with status $status; live output was streamed above."
           if [ "$status" -eq 0 ]; then
             exit 0
           fi
@@ -376,7 +377,8 @@ jobs:
             echo "::warning::Kilo gateway returned a transient invalid-request trace; retrying once with a fresh Kilo session."
             sleep 5
             : > /tmp/kilo-retry.log
-            stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > /tmp/kilo-retry.log 2>&1 &
+            # Stream retry output live as well.
+            stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-retry.log) 2>&1 &
             retry_pid=$!
             retry_stale=0
 
@@ -410,7 +412,7 @@ jobs:
 
             wait "$retry_pid"
             retry_status=$?
-            cat /tmp/kilo-retry.log
+            echo "Kilo retry session exited with status $retry_status; live retry output was streamed above."
             exit "$retry_status"
           fi
 
