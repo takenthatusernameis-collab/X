@@ -13,13 +13,346 @@ permissions:
   contents: write
 
 jobs:
-  execute:
+  kilo:
+    name: Autonomous Kilo activation
     runs-on: ubuntu-24.04
     timeout-minutes: 355
+
     steps:
-      - uses: actions/checkout@v6
+      - name: Checkout repository
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
-      - run: npm install -g @kilocode/cli
-      - run: kilo --version
+
+      - name: Install Kilo Code CLI
+        run: npm install -g @kilocode/cli
+
+      - name: Verify Kilo installation
+        run: kilo --version
+
+      - name: Diagnose Kilo API key
+        id: kilo_auth
+        continue-on-error: true
+        env:
+          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$KILO_API_KEY" ]; then
+            echo "KILO_API_KEY_CHECK=NOT_CONFIGURED"
+            {
+              echo "### Kilo API key diagnostic"
+              echo "KILO_API_KEY: **not configured**"
+              echo
+              echo "The research workflow does not require the key because the selected model is free."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          status="$(curl --silent --show-error --connect-timeout 10 --max-time 20 \
+            --output /tmp/kilo-profile-response --write-out '%{http_code}' \
+            -H "Authorization: Bearer $KILO_API_KEY" \
+            -H "Accept: application/json" \
+            https://api.kilo.ai/api/profile || true)"
+
+          case "$status" in
+            200)
+              echo "KILO_API_KEY_CHECK=VALID"
+              {
+                echo "### Kilo API key diagnostic"
+                echo "KILO_API_KEY: **valid** — authenticated Kilo profile request returned HTTP 200."
+                echo
+                echo "The key itself was not printed or persisted."
+              } >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            401)
+              echo "::error::KILO_API_KEY_CHECK=INVALID"
+              {
+                echo "### Kilo API key diagnostic"
+                echo "KILO_API_KEY: **invalid or rejected** — Kilo returned HTTP 401."
+                echo
+                echo "The key itself was not printed or persisted."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+              ;;
+            *)
+              echo "::warning::KILO_API_KEY_CHECK=UNVERIFIED"
+              {
+                echo "### Kilo API key diagnostic"
+                echo "KILO_API_KEY: **unverified** — Kilo profile endpoint returned HTTP $status rather than 200 or 401."
+                echo
+                echo "The key itself was not printed or persisted."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+              ;;
+          esac
+
+      - name: Discover a currently available free model
+        id: discover_model
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from urllib.request import Request, urlopen
+
+          url = "https://api.kilo.ai/api/gateway/models"
+          request = Request(url, headers={"Accept": "application/json"})
+          with urlopen(request, timeout=20) as response:
+              payload = json.load(response)
+
+          models = payload.get("data", [])
+          free = [
+              m for m in models
+              if isinstance(m.get("id"), str) and m["id"].endswith(":free")
+          ]
+
+          preferred = [
+              "minimax/minimax-m2.1:free",
+              "z-ai/glm-5:free",
+          ]
+
+          selected = None
+          for model_id in preferred:
+              candidate = next((m for m in free if m.get("id") == model_id), None)
+              if candidate:
+                  selected = candidate
+                  break
+
+          if selected is None:
+              def tool_capable(model):
+                  values = model.get("supported_parameters") or []
+                  return bool(
+                      model.get("tool_calling")
+                      or model.get("tool_call")
+                      or any(str(v).lower() in {"tools", "tool_choice"} for v in values)
+                  )
+
+              candidates = [m for m in free if tool_capable(m)]
+              candidates.sort(key=lambda m: m.get("id", ""))
+              if candidates:
+                  selected = candidates[0]
+
+          if selected is None:
+              ids = sorted(str(m.get("id")) for m in free if m.get("id"))
+              raise SystemExit(
+                  "No suitable tool-capable free Kilo model was found. "
+                  f"Available free IDs: {ids[:40]}"
+              )
+
+          model_id = selected["id"]
+          model_name = selected.get("name") or model_id
+
+          with open("/tmp/kilo-free-model-id", "w", encoding="utf-8") as f:
+              f.write(model_id)
+
+          with open("/tmp/kilo-free-model-name", "w", encoding="utf-8") as f:
+              f.write(model_name)
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
+              f.write(f"KILO_FREE_MODEL_ID={model_id}\n")
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write("### Free model discovery\n")
+              f.write(f"Selected current free model: `{model_id}`\n")
+              f.write("Model selection came from Kilo's live `/models` catalogue.\n")
+
+          print(f"Selected current free model: {model_id}")
+          PY
+
+      - name: Prepare trusted Kilo research configuration
+        run: |
+          set -euo pipefail
+          test -n "$KILO_FREE_MODEL_ID"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          model_id = os.environ["KILO_FREE_MODEL_ID"]
+          model_name = Path("/tmp/kilo-free-model-name").read_text(encoding="utf-8")
+
+          config = {
+              "$schema": "https://app.kilo.ai/config.json",
+              "enabled_providers": ["openai-compatible"],
+              "model": "openai-compatible/free-kilo",
+              "small_model": "openai-compatible/free-kilo",
+              "subagent_model": "openai-compatible/free-kilo",
+              "provider": {
+                  "openai-compatible": {
+                      "options": {
+                          "baseURL": "https://api.kilo.ai/api/gateway"
+                      },
+                      "models": {
+                          "free-kilo": {
+                              "id": model_id,
+                              "name": model_name,
+                              "tool_call": True
+                          }
+                      }
+                  }
+              },
+              "sandbox": {
+                  "enabled": False,
+                  "network": "allow",
+                  "allowed_hosts": [
+                      "github.com:443",
+                      "api.github.com:443",
+                      "raw.githubusercontent.com:443",
+                      "api.kilo.ai:443",
+                      "pypi.org:443",
+                      "files.pythonhosted.org:443",
+                      "registry.npmjs.org:443"
+                  ]
+              }
+          }
+
+          path = Path(os.environ["HOME"]) / ".config" / "kilo" / "kilo.json"
+          path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+          os.chmod(path, 0o600)
+
+          print(f"Prepared secretless Kilo research config for {model_id}.")
+          PY
+
+      - name: Validate trusted Kilo configuration
+        run: |
+          set -euo pipefail
+          test "$(stat -c '%a' "$HOME/.config/kilo/kilo.json")" = "600"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["HOME"]) / ".config" / "kilo" / "kilo.json"
+          config = json.loads(path.read_text(encoding="utf-8"))
+
+          assert config["enabled_providers"] == ["openai-compatible"]
+          assert config["model"] == "openai-compatible/free-kilo"
+          assert config["small_model"] == "openai-compatible/free-kilo"
+          assert config["subagent_model"] == "openai-compatible/free-kilo"
+
+          gateway = config["provider"]["openai-compatible"]
+          assert gateway["options"]["baseURL"] == "https://api.kilo.ai/api/gateway"
+          assert "apiKey" not in gateway["options"]
+
+          model = gateway["models"]["free-kilo"]
+          assert model["id"].endswith(":free")
+          assert model["tool_call"] is True
+
+          assert config["sandbox"]["enabled"] is False
+          print(f"Trusted Kilo configuration validated for {model['id']}.")
+          PY
+
+      - name: Run Kilo
+        id: kilo
+        continue-on-error: true
+        timeout-minutes: 340
+        env:
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
+        run: |
+          set +e
+
+          # A fresh Kilo session is intentionally retried only for the specific
+          # gateway/provider failure observed in run #35. Other failures remain
+          # hard failures so the workflow cannot hide genuine defects.
+          kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > /tmp/kilo-primary.log 2>&1
+          status=$?
+          cat /tmp/kilo-primary.log
+
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+
+          if grep -Eq 'invalid request error trace_id:' /tmp/kilo-primary.log; then
+            echo "::warning::Kilo gateway returned a transient invalid-request trace; retrying once with a fresh Kilo session."
+            sleep 5
+            kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > /tmp/kilo-retry.log 2>&1
+            retry_status=$?
+            cat /tmp/kilo-retry.log
+            exit "$retry_status"
+          fi
+
+          exit "$status"
+
+      - name: Persist safe repository changes
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          KILO_OUTCOME: ${{ steps.kilo.outcome }}
+        run: |
+          set -euo pipefail
+
+          # Trusted control-plane paths are never agent-persisted.
+          git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
+          git reset -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
+
+          # Ordinary research files, diagnostics, tests, examples and scratch
+          # helpers are allowed to persist when they provide future value.
+          git add -A
+
+          # Never persist generated Python build artifacts from verification.
+          git reset -- \
+            ':(glob)**/__pycache__/**' \
+            ':(glob)**/*.pyc' \
+            ':(glob)**/*.py.c' 2>/dev/null || true
+
+          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)$' >/tmp/kilo_protected_paths; then
+            echo "Protected paths unexpectedly staged:"
+            cat /tmp/kilo_protected_paths
+            exit 1
+          fi
+
+          if git diff --cached --binary | grep -E -n 'eyJ[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}\.[A-Za-z0-9_-]{16,}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY' >/tmp/kilo_secret_scan; then
+            echo "Potential secret material detected in staged changes:"
+            cat /tmp/kilo_secret_scan
+            exit 1
+          fi
+
+          if git diff --cached --name-only | grep -E '(^|/)(\.env(\..*)?|id_rsa|id_dsa|id_ecdsa|id_ed25519|credentials\.(json|ya?ml|toml)|secrets\.(json|ya?ml|toml))$|\.(pem|key)$' >/tmp/kilo_credential_paths; then
+            echo "Credential/secret-like paths are not allowed to persist:"
+            cat /tmp/kilo_credential_paths
+            exit 1
+          fi
+
+          if git diff --cached --binary | grep -E -n 'ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|AKIA[0-9A-Z]{16}|AIza[0-9A-Za-z_-]{30,}|sk-[A-Za-z0-9_-]{20,}|kilo_[A-Za-z0-9_-]{20,}' >/tmp/kilo_high_confidence_credentials; then
+            echo "High-confidence credential/token material detected in staged changes:"
+            cat /tmp/kilo_high_confidence_credentials
+            exit 1
+          fi
+
+          if git diff --cached --summary | grep -E '^ create mode 120000 ' >/tmp/kilo_symlinks; then
+            echo "Symbolic links are not allowed to persist:"
+            cat /tmp/kilo_symlinks
+            exit 1
+          fi
+
+          if git diff --cached --quiet; then
+            echo "No safe repository changes to persist."
+            exit 0
+          fi
+
+          git config user.name "kilo-research-enterprise"
+          git config user.email "kilo-research-enterprise@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+
+          git commit -m "Kilo activation: update research state"
+          git fetch origin "$GITHUB_REF_NAME"
+          git rebase "origin/$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
+
+          echo "Kilo activation outcome: $KILO_OUTCOME"
+
+      - name: Report Kilo outcome
+        if: always()
+        env:
+          KILO_OUTCOME: ${{ steps.kilo.outcome }}
+        run: |
+          if [ "$KILO_OUTCOME" = "success" ]; then
+            echo "Kilo activation completed successfully."
+          elif [ "$KILO_OUTCOME" = "skipped" ]; then
+            echo "Kilo activation was skipped."
+          else
+            echo "Kilo activation ended with outcome: $KILO_OUTCOME"
+            exit 1
+          fi
