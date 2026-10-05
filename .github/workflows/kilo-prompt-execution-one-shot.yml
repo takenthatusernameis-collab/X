@@ -301,6 +301,22 @@ jobs:
           print(f"Existing receipt status: {receipt['status']}; prior activation {receipt['activation_id']}.")
           PY
 
+          echo "Testing deterministic Kilo outcome reporting, including the prior worker-failure case..."
+          python3 .github/scripts/report_kilo_outcome.py --self-test
+          set +e
+          failure_output="$(python3 .github/scripts/report_kilo_outcome.py \
+            --preflight success \
+            --smoke success \
+            --worker failure \
+            --verify success \
+            --liveness COMPLETED_WITH_SEMANTIC_CHECKPOINTS \
+            --persistence MAIN 2>&1)"
+          failure_rc=$?
+          set -e
+          printf '%s\n' "$failure_output"
+          test "$failure_rc" -ne 0
+          printf '%s\n' "$failure_output" | grep -q "KILO_WORKER_OUTCOME=PARTIAL"
+
           echo "Running deterministic real-data preflight..."
           if ! python3 research/data/preflight.py > /tmp/x-data-preflight.log 2>&1; then
             echo "Deterministic data preflight failed; emitting its full diagnostic:"
