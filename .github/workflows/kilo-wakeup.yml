@@ -395,6 +395,21 @@ jobs:
           test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/remotes/origin/$GITHUB_REF_NAME")"
           test -z "$(git status --porcelain)"
           test ! -e .git/index.lock
+
+          # Recovery branches are durable quarantine state. Surface the newest
+          # one to the next activation without merging or modifying it.
+          recovery_refs="$(git ls-remote --heads origin 'refs/heads/recovery/kilo-run-*' 2>/dev/null | awk '{print $2}' | sed 's#refs/heads/##' | sort -V || true)"
+          if [ -n "$recovery_refs" ]; then
+            latest_recovery_branch="$(printf '%s\n' "$recovery_refs" | tail -n 1)"
+            echo "KILO_RECOVERY_BRANCH=$latest_recovery_branch" >> "$GITHUB_ENV"
+            echo "::notice::Recovery branch awaiting inspection: $latest_recovery_branch"
+            {
+              echo "### Existing Kilo recovery state"
+              echo "Newest recovery branch: `$latest_recovery_branch`"
+              echo "The worker must inspect this quarantine state before starting unrelated new research."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
           echo "Activation event SHA: $GITHUB_SHA"
           echo "Research workspace SHA: $(git rev-parse HEAD)"
 
