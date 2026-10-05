@@ -504,8 +504,13 @@ jobs:
             echo "::warning::Kilo gateway returned a transient invalid-request trace; retrying once with a fresh Kilo session."
             sleep 5
             : > /tmp/kilo-retry.log
-            # Stream retry output live as well.
-            stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-retry.log) 2>&1 &
+            retry_initial_checkpoint_mtime="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo "$initial_checkpoint_mtime")"
+            retry_semantic_progress_seen=0
+            RECOVERY_PROMPT="$(cat .kilo/wakeup-prompt.md)"
+            RECOVERY_PROMPT="$RECOVERY_PROMPT
+
+RECOVERY MODE: continue from the current workspace and preserve useful partial work. The previous session failed on a malformed repository-edit tool call. Read the current file first and provide every required edit argument, including the exact old content and replacement content. Do not repeat the malformed call."
+            stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$RECOVERY_PROMPT" > >(tee /tmp/kilo-retry.log) 2>&1 &
             retry_pid=$!
             retry_stale=0
 
