@@ -251,7 +251,10 @@ jobs:
           set -euo pipefail
 
           echo "=== Research readiness preflight ==="
-          test "$(git branch --show-current)" = "$GITHUB_REF_NAME"
+          # actions/checkout normally uses detached HEAD; validate the exact checked-out
+          # commit/ref instead of requiring a local branch to be attached.
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git show-ref --verify --quiet "refs/remotes/origin/$GITHUB_REF_NAME"
           test -z "$(git status --porcelain)"
           test ! -e .git/index.lock
 
