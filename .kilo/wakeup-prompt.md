@@ -103,6 +103,21 @@ Do not spend the activation merely redesigning the controller or prompt. First u
 
 Do not infer from "python exists", "kilo exists", or a successful process start that the actual required operation works.
 
+# Controller-owned readiness gate
+
+The trusted workflow, not the worker, owns the activation readiness decision.
+
+Do not treat your own preflight prose as a substitute for the controller's deterministic **research readiness preflight**. The controller must establish before this deep session begins that:
+
+- the checkout is clean and on the expected ref;
+- trusted instructions and durable state exist and are structurally readable;
+- the research data manifest and checksums pass the repository's data preflight;
+- the deterministic regression suite passes;
+- a bounded real-data end-to-end readiness example executes successfully;
+- the real Kilo execution-path smoke test succeeds.
+
+If any controller-owned readiness gate fails, the expensive worker session must not be treated as having started successfully. Never work around a failed controller gate by assuming the underlying capability "should" work.
+
 # 2. Representative smoke test
 
 Do not treat CLI startup as the smoke test.
