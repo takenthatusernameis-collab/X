@@ -27,50 +27,14 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Deep audit — after Checkout repository
-        id: deep_audit_1_checkout_repository
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.audit_source_1_checkout_repository.outcome }}
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Checkout repository"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
       - name: Install Kilo Code CLI
         id: audit_source_2_install_kilo_code_cli
         run: npm install -g @kilocode/cli
 
-      - name: Deep audit — after Install Kilo Code CLI
-        id: deep_audit_2_install_kilo_code_cli
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.audit_source_2_install_kilo_code_cli.outcome }}
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Install Kilo Code CLI"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
       - name: Verify Kilo installation
         id: verify_install
         run: kilo --version
 
-      - name: Deep audit — after Verify Kilo installation
-        id: deep_audit_3_verify_kilo_installation
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.verify_install.outcome }}
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Verify Kilo installation"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
       - name: Install research Python dependencies
         id: research_python
         timeout-minutes: 10
@@ -84,18 +48,6 @@ jobs:
           print(f"Research Python environment ready; NumPy {numpy.__version__}.")
           PY
           echo "$RUNNER_TEMP/x-python/bin" >> "$GITHUB_PATH"
-      - name: Deep audit — after Install research Python dependencies
-        id: deep_audit_4_install_research_python_dependencies
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.research_python.outcome }}
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Install research Python dependencies"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
       - name: Diagnose Kilo API key
         id: kilo_auth
         continue-on-error: true
@@ -153,18 +105,6 @@ jobs:
               ;;
           esac
 
-      - name: Deep audit — after Diagnose Kilo API key
-        id: deep_audit_5_diagnose_kilo_api_key
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.kilo_auth.outcome }}
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Diagnose Kilo API key"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
       - name: Discover a currently available free model
         id: discover_model
         run: |
@@ -238,18 +178,6 @@ jobs:
           print(f"Selected current free model: {model_id}")
           PY
 
-      - name: Deep audit — after Discover a currently available free model
-        id: deep_audit_6_discover_a_currently_available_free_model
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.discover_model.outcome }}
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Discover a currently available free model"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
       - name: Prepare trusted Kilo research configuration
         id: audit_source_7_prepare_trusted_kilo_research_configuration
         run: |
@@ -305,18 +233,6 @@ jobs:
           print(f"Prepared secretless Kilo research config for {model_id}.")
           PY
 
-      - name: Deep audit — after Prepare trusted Kilo research configuration
-        id: deep_audit_7_prepare_trusted_kilo_research_configuration
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.audit_source_7_prepare_trusted_kilo_research_configuration.outcome }}
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Prepare trusted Kilo research configuration"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
       - name: Validate trusted Kilo configuration
         id: audit_source_8_validate_trusted_kilo_configuration
         run: |
@@ -347,18 +263,6 @@ jobs:
           print(f"Trusted Kilo configuration validated for {model['id']}.")
           PY
 
-      - name: Deep audit — after Validate trusted Kilo configuration
-        id: deep_audit_8_validate_trusted_kilo_configuration
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.audit_source_8_validate_trusted_kilo_configuration.outcome }}
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Validate trusted Kilo configuration"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
       - name: Research readiness preflight
         id: preflight
         timeout-minutes: 15
@@ -442,7 +346,7 @@ jobs:
 
           echo "RESEARCH_PREFLIGHT=PASS"
       - name: Deep audit — after Research readiness preflight
-        id: deep_audit_9_research_readiness_preflight
+        id: deep_audit_1_research_readiness_preflight
         if: always()
         continue-on-error: true
         env:
@@ -474,18 +378,6 @@ jobs:
           test -s /tmp/kilo-smoke/sentinel.txt
           test "$(cat /tmp/kilo-smoke/sentinel.txt)" = "SMOKE_OK"
           echo "Representative Kilo execution-path smoke test passed."
-      - name: Deep audit — after Smoke-test real Kilo execution path
-        id: deep_audit_10_smoke_test_real_kilo_execution_path
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.kilo_smoke.outcome }}
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Smoke-test real Kilo execution path"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
       - name: Run Kilo
         id: kilo
         if: steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success'
@@ -640,7 +532,7 @@ jobs:
           exit "$status"
 
       - name: Deep audit — after Run Kilo
-        id: deep_audit_11_run_kilo
+        id: deep_audit_2_run_kilo
         if: always()
         continue-on-error: true
         env:
@@ -683,7 +575,7 @@ jobs:
 
           echo "Independent controller verification passed."
       - name: Deep audit — after Independent post-worker verification
-        id: deep_audit_12_independent_post_worker_verification
+        id: deep_audit_3_independent_post_worker_verification
         if: always()
         continue-on-error: true
         env:
@@ -785,7 +677,7 @@ jobs:
           echo "PERSISTENCE_RECOVERY_BRANCH=${recovery_branch}" >> "$GITHUB_ENV"
           echo "::warning::Main integration failed; worker commit preserved on ${recovery_branch}."
       - name: Deep audit — after Verify and persist safe repository changes
-        id: deep_audit_13_verify_and_persist_safe_repository_changes
+        id: deep_audit_4_verify_and_persist_safe_repository_changes
         if: always()
         continue-on-error: true
         env:
@@ -888,7 +780,7 @@ jobs:
             --persistence "${PERSISTENCE_STATUS:-FAILED}"
 
       - name: Deep audit — after Report Kilo outcome
-        id: deep_audit_14_report_kilo_outcome
+        id: deep_audit_5_report_kilo_outcome
         if: always()
         continue-on-error: true
         env:
