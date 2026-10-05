@@ -1,29 +1,32 @@
 {
-  "activation_id": "37255021664",
+  "activation_id": "37257258857",
   "run_attempt": 1,
-  "sha": "53ecbf65de1a9b35a25a9665b42ef71d95562cf8",
+  "sha": "c1a793418d08e35aa4b105bb2d19a6bd183004c4",
   "ref_name": "main",
   "repository": "taketthatusernameis-collab/X",
   "status": "COMPLETE",
-  "objective": "Deep-dive the two REGIME_DEPENDENT assets (AMZN, JPM) from the universe-level regime-stability run: characterize which regime mix drives the swing (block-by-block breakdown) and test a regime-filtered variant (MA crossover active only in turbulent segments).",
-  "phase": "VERIFY",
-  "start_time": "2026-10-05T02:21:14Z",
+  "phase": "COMPLETE",
+  "objective": "Test whether a regime-adaptive MA crossover (faster windows in turbulent regimes, standard in calm) on the REGIME_DEPENDENT assets (AMZN, JPM) produces REGIME_STABLE results, or remains REGIME_DEPENDENT/CONSISTENT_WITH_NOISE - falsifying that the 2009-2013 MA edge is separable by a past-only volatility-regime classifier.",
+  "start_time": "2026-10-05T02:55:34Z",
   "changed": [
-    "research/checks/regime_dependent_deep_dive.py (new file)",
-    "research/checks/verify_dd_independent.py (new file)",
-    "state/STATE.md (new Current activation section; next-activation item 4 marked done)"
+    "research/backtest/regime_stability.py (new function regime_adaptive_ma_signals + signature-aware labels wrapper in stress_segments)",
+    "research/backtest/__init__.py (exported regime_adaptive_ma_signals)",
+    "research/checks/regime_adaptive_ma.py (new regime-adaptive MA test on AMZN/JPM + universe generalization; sys.path off-by-one fix applied)",
+    "research/checks/verify_regime_adaptive.py (new: independent walk_forward recomputation, 6 MATCH assertions)",
+    "state/worker_progress.md (checkpoint updated with verification results)",
+    "state/activation_status.json (receipt updated)"
   ],
   "verified": [
-    "python3 examples/regime_stability_universe.py exits 0; AMZN medians [+0.046, +0.001, -0.154] REGIME_DEPENDENT; JPM [+0.109, -0.006, +0.033] REGIME_DEPENDENT - reproduces documented universe figures",
-    "python3 research/checks/regime_dependent_deep_dive.py exits 0: manifest 10/10 checksums OK, PREFLIGHT PASSED (57 checks), leakage review PASS on AMZN and JPM, per-segment breakdown printed, internal determinism assertion passed, segment-count assertion passed",
-    "python3 research/checks/verify_dd_independent.py exits 0: fresh walk_forward recomputation of all four runs (AMZN/JPM base + filtered) MATCHES deep-dive medians exactly; all four runs deterministic across reruns",
-    "python -m unittest discover -s tests -v: 120 tests, all passing (regression after new files added)"
+    "smoke test: python3 research/checks/regime_adaptive_ma.py exits 0; manifest 10/10 checksums OK; PREFLIGHT PASSED (all 57 checks incl. known-gaps audit); leakage PASS on AMZN and JPM; regime-adaptive MA on AMZN/JPM and 10-asset universe generalization printed (CONSISTENT_WITH_NOISE=5, REGIME_STABLE=4, REGIME_DEPENDENT=1)",
+    "independent verification: python3 research/checks/verify_regime_adaptive.py exits 0; all six published figures (AMZN/JPM base + adaptive + turbulent_only) recomputed via a fresh walk_forward path MATCH the authoritative stress_segments path exactly; all six deterministic across reruns",
+    "regression: python3 -m unittest discover -s tests -v: 120 tests, all passing (post-fix regression)",
+    "file integrity: sha256 regime_adaptive_ma.py = dc1f5a60d7ebac32b8ff6ffba6b913d1041839bc45986374e8dc8832b35dd4b9; verify_regime_adaptive.py = a3af7f14cdc2e328322262284b32beb11f4ba0b4b3f7f89759c7863a4823aae4 (computed at 2026-10-05T03:19:15Z)",
+    "defects repaired and re-verified this activation: regime_adaptive_ma.py sys.path off-by-one (parent.parent.parent.parent -> parent.parent.parent); verify_regime_adaptive.py docstring figures corrected to the verified 2-asset medians"
   ],
   "unverified": [
-    "Precise per-checkpoint and finish UTC timestamps - the `date` shell form is denied in this environment; start 2026-10-05T02:21:14Z is observed",
-    "Byte-identical output sha256 of the two new check files across reruns - both files carry self-asserted determinism but a fresh sha256 cross-file comparison was not run"
+    "Precise per-checkpoint and finish UTC timestamps: the date shell form is denied in this environment; the session start (2026-10-05T02:55:34Z) is carried from prior receipt state and the current time is 2026-10-05T03:19:15Z, but finish is not recorded"
   ],
-  "next": "Regression discipline maintained: after any research/code change re-run the full suite (python -m unittest discover -s tests -v, 120 OK) plus the real-data examples; the new checks are self-determinism-asserting.",
-  "acceptance": "COMPLETE - objective advanced and verified; new durable check infrastructure added (regime-dependence deep-dive + independent verification); negative research conclusion recorded (both assets remain REGIME_DEPENDENT including the regime-filtered variant); full 120-test suite green after changes.",
-  "research_conclusion": "Negative: AMZN and JPM are regime-dependent because their MA-crossover edge is concentrated in one historical regime mix (2009-2013); the regime-filtered variant does not remove the dependence (dispersion comparable to or greater than the coin-flip null). The MA crossover is not admitted to the evidence base."
+  "next": "Fold the regime-adaptive MA verdicts into state/STATE.md as the next durable research conclusion (negative: the regime-adaptive MA does not rescue a REGIME_STABLE edge on AMZN or JPM; not admitted to the evidence base).",
+  "acceptance": "COMPLETE - the regime-adaptive MA hypothesis was tested and falsified via two independent computational paths (stress_segments and a fresh walk_forward recomputation) that agree exactly; AMZN collapses to CONSISTENT_WITH_NOISE, JPM stays REGIME_DEPENDENT even with adaptive windows; framework changes (regime_adaptive_ma_signals + labels wrapper) verified; 120-test suite green after all changes.",
+  "research_conclusion": "Negative: a regime-adaptive MA crossover (fast 10/30 in turbulent, slow 20/60 in calm) does not rescue a REGIME_STABLE edge on AMZN or JPM. AMZN collapses to CONSISTENT_WITH_NOISE (the regime timing removed the swing only by killing the edge); JPM stays REGIME_DEPENDENT (dispersion +0.034 vs 2x null +0.015) even with adaptive windows. Across the 10-asset universe the adaptive variant is CONSISTENT_WITH_NOISE on 5 assets, REGIME_STABLE (no edge) on 4, and REGIME_DEPENDENT only on JPM (1). A past-only volatility classifier cannot separate the good 2009-2013 turbulent regime from the bad 2022-2026 turbulent regime, so the 2009-2013 edge is not separable by volatility-regime timing and is not harvestable as a regime-contingent strategy. The MA crossover remains rejected from the evidence base."
 }

@@ -650,11 +650,28 @@ def stress_segments(
         raise ValueError(f"no segment has >= {min_segment_bars} bars")
 
     scenario_results: List[RegimeScenarioResult] = []
+    import inspect
     for name, s, e in segments:
         seg_bars = bars_list[s:e]
         seg_signals = signals[s:e]
+
+        # Wrap the signal function so that it routes by the same labels that
+        # define the segments. For signal functions that classify their input
+        # series on their own (e.g. a regime-adaptive MA), recomputing labels on
+        # a segment slice would differ from the global classification used to
+        # find the segment; passing the segment's label slice makes the routing
+        # consistent with the segment boundaries. Only functions exposing a
+        # `labels` parameter receive it; the others are passed through unchanged.
+        _sig = inspect.signature(signals_fn)
+        if "labels" in _sig.parameters:
+            segment_signals_fn = (
+                lambda closes, **params: signals_fn(closes, labels=labels[s:e], **params)
+            )
+        else:
+            segment_signals_fn = signals_fn
+
         sweep = parameter_sweep(
-            signals_fn=signals_fn,
+            signals_fn=segment_signals_fn,
             bars=seg_bars,
             param_grid=param_grid,
             train_window=train_window,
@@ -804,6 +821,51 @@ def ma_crossover_signals(
         slow_ma = float(np.mean(closes[i - slow + 1 : i + 1]))
         out[i] = Signal(date=i + 1, weight=1.0 if fast_ma > slow_ma else -1.0)
     return out
+
+
+def regime_adaptive_ma_signals(
+    closes: NDArray,
+    fast_calm: int = 20,
+    slow_calm: int = 60,
+    fast_turb: int = 10,
+    slow_turb: int = 30,
+    window: int = 60,
+    labels: Optional[List[str]] = None,
+    **kwargs: Any,
+) -> List[Signal]:
+    """Past-only MA-crossover whose windows adapt to the volatility regime.
+
+    In 'calm' segments use the (fast_calm, slow_calm) windows; in 'turbulent'
+    segments use the shorter (fast_turb, slow_turb) windows to react faster to
+    quicker moves. Regime labels are computed from ``volatility_blocks``
+    (past-only, from closes) when ``labels`` is not supplied, or taken from the
+    caller-supplied ``labels`` list (one per bar of ``closes``) — this second
+    form lets ``stress_segments`` route signals by the same labels that define
+    the segments instead of re-classifying each segment slice on its own. Bars
+    before ``window`` are 'insufficient' and emit a neutral signal.
+
+    This is a principled, fixed a-priori design, not tuned to OOS results. The
+    test it serves: the base MA(20/60) is REGIME_DEPENDENT on AMZN and JPM
+    because their edge lived in the 2009-2013 turbulent block. If that edge is
+    genuinely volatility-regime-contingent and harvestable, a regime-adaptive
+    implementation should pass the regime-stability gate (REGIME_STABLE). If it
+    stays REGIME_DEPENDENT (or becomes CONSISTENT_WITH_NOISE), the edge is
+    period-specific and cannot be separated by a volatility-regime classifier.
+    """
+    if labels is None:
+        labels = volatility_blocks(closes, n_blocks=4, window=window)
+    n = len(closes)
+    signals: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    for i in range(n):
+        lab = labels[i]
+        if lab == "insufficient":
+            continue
+        fast, slow = (fast_turb, slow_turb) if lab == "turbulent" else (fast_calm, slow_calm)
+        if i >= slow - 1:
+            fm = float(np.mean(closes[i - fast + 1 : i + 1]))
+            sm = float(np.mean(closes[i - slow + 1 : i + 1]))
+            signals[i] = Signal(date=i + 1, weight=1.0 if fm > sm else -1.0)
+    return signals
 
 
 # ==============================================================================
