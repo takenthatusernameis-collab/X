@@ -1233,6 +1233,171 @@ def csrs_null_spread_daily_returns(tickers, lookback=20, top_k=3, bottom_k=3,
     return daily_pnl
 
 
+# ==============================================================================
+# Cross-sectional momentum signal class helpers
+# ==============================================================================
+
+def cs_momentum_spread_daily_returns(tickers, lookback=63, top_k=3, bottom_k=3):
+    """Cross-sectional momentum spread: daily P&L of a rank-based portfolio
+    built from the cross section of collected tickers.
+
+    At each date t >= lookback: compute each ticker's lookback return
+    (closes[i-lookback : i+1], past-only); rank tickers descending; long the
+    top_k, short the bottom_k with equal capital per leg; hold one day;
+    daily rebalance. The spread P&L at bar t equals the mean of the
+    long-legs' next-day simple returns minus the mean of the short-legs'
+    next-day simple returns. Bars before lookback, and days with fewer than
+    2*k tickers available, are neutral (P&L = 0).
+
+    This is the cross-sectional (portfolio-level) analog of the momentum
+    signal class (go long the previous N-day return), extended from a
+    per-asset bet to a rank-based cross-sectional spread. It is
+    conceptually distinct from the cross-sectional relative-strength class:
+    it uses the longer, classical momentum lookback (63 bars = 13 weeks)
+    rather than 20. No look-ahead: every input at bar t uses closes only up
+    to and including t; the realized P&L is the return realized between bar t
+    and bar t+1.
+
+    Args:
+        tickers: dict ticker -> BarSequence of adjusted closes (all tickers
+            share the same date grid).
+        lookback: lookback window in bars for the cumulative return.
+        top_k, bottom_k: leg sizes.
+
+    Returns:
+        np.ndarray of daily spread P&L (simple returns), one entry per bar
+        (0.0 where no trade is possible).
+    """
+    min_len = min(len(tb) for tb in tickers.values())
+    daily_pnl = np.zeros(min_len, dtype=np.float64)
+    for i in range(lookback, min_len - 1):
+        # truncate all series to the fully overlapping window so the spread
+        # is computed on the same date grid for every ticker; each ticker
+        # contributes a lookback return only where it has both the lookback
+        # window and the next-day close (past-only).
+        closes = {t: tb.closes_array()[:min_len] for t, tb in tickers.items()}
+        rets = {t: float(closes[t][i] / closes[t][i - lookback] - 1)
+                for t in closes}
+        sorted_tickers = sorted(rets, key=lambda t: rets[t], reverse=True)
+        longs = sorted_tickers[:top_k]
+        shorts = sorted_tickers[-bottom_k:]
+        if len(longs) < top_k or len(shorts) < bottom_k:
+            continue
+        long_ret = float(np.mean(
+            [closes[t][i + 1] / closes[t][i] - 1 for t in longs]))
+        short_ret = float(np.mean(
+            [closes[t][i + 1] / closes[t][i] - 1 for t in shorts]))
+        daily_pnl[i] = long_ret - short_ret
+    return daily_pnl
+
+
+def cs_momentum_null_spread_daily_returns(tickers, lookback=63, top_k=3,
+                                          bottom_k=3, seed=42):
+    """Coin-flip null of the cross-sectional momentum spread.
+
+    Ranks are computed identically (past-only); the long/short assignment is
+    randomized: a deterministic coin flip per bar decides whether the
+    rank-ordered legs are held long (as in cs_momentum_spread_daily_returns)
+    or shorted. This preserves the spread's magnitude/structure while removing
+    its information content.
+
+    Args:
+        tickers: dict ticker -> BarSequence.
+        lookback, top_k, bottom_k: as in cs_momentum_spread_daily_returns.
+        seed: deterministic RNG seed for the coin flips.
+
+    Returns:
+        np.ndarray of daily P&L (one entry per bar).
+    """
+    rng = np.random.default_rng(seed)
+    min_len = min(len(tb) for tb in tickers.values())
+    daily_pnl = np.zeros(min_len, dtype=np.float64)
+    for i in range(lookback, min_len - 1):
+        closes = {t: tb.closes_array()[:min_len] for t, tb in tickers.items()}
+        rets = {t: float(closes[t][i] / closes[t][i - lookback] - 1)
+                for t in closes}
+        sorted_tickers = sorted(rets, key=lambda t: rets[t], reverse=True)
+        longs = sorted_tickers[:top_k]
+        shorts = sorted_tickers[-bottom_k:]
+        if len(longs) < top_k or len(shorts) < bottom_k:
+            continue
+        leg_ret = lambda t: float(closes[t][i + 1] / closes[t][i] - 1)
+        spread = np.mean([leg_ret(t) for t in longs]) - np.mean([leg_ret(t) for t in shorts])
+        daily_pnl[i] = spread if rng.random() < 0.5 else -spread
+    return daily_pnl
+
+
+def cs_momentum_spread_family(family, lookback, top_k, bottom_k):
+    """Compute the cross-sectional momentum spread daily P&L across a
+    synthetic family of BarSequence assets (same pattern as
+    cs_momentum_spread_daily_returns but over a family instead of a dict of
+    tickers).
+
+    Args:
+        family: list of BarSequence, one per asset (same length).
+        lookback, top_k, bottom_k: as in cs_momentum_spread_daily_returns.
+
+    Returns:
+        np.ndarray of daily spread P&L.
+    """
+    first_len = len(family[0])
+    daily_pnl = np.zeros(first_len, dtype=np.float64)
+    for i in range(lookback, first_len - 1):
+        rets = {}
+        for a, asset in enumerate(family):
+            c = asset.closes_array()
+            rets[a] = float(np.log(c[i]) - np.log(c[i - lookback]))
+        sorted_assets = sorted(rets, key=lambda a: rets[a], reverse=True)
+        longs = sorted_assets[:top_k]
+        shorts = sorted_assets[-bottom_k:]
+        if len(longs) < top_k or len(shorts) < bottom_k:
+            continue
+        leg_ret = lambda a: float(np.log(family[a].closes_array()[i + 1])
+                                  - np.log(family[a].closes_array()[i]))
+        long_ret = float(np.mean([leg_ret(a) for a in longs]))
+        short_ret = float(np.mean([leg_ret(a) for a in shorts]))
+        daily_pnl[i] = long_ret - short_ret
+    return daily_pnl
+
+
+def cs_momentum_null_spread_family(family, lookback, top_k, bottom_k,
+                                   seed=42):
+    """Coin-flip null of the cross-sectional momentum spread over a synthetic
+    family of assets.
+
+    Ranks are computed identically (past-only); the long/short assignment is
+    randomized by a deterministic per-bar coin flip, preserving the spread's
+    magnitude/structure while destroying its information content.
+
+    Args:
+        family: list of BarSequence, one per asset (same length).
+        lookback, top_k, bottom_k: as in cs_momentum_spread_family.
+        seed: deterministic RNG seed for the coin flips.
+
+    Returns:
+        np.ndarray of daily P&L (one entry per bar).
+    """
+    rng = np.random.default_rng(seed)
+    first_len = len(family[0])
+    daily_pnl = np.zeros(first_len, dtype=np.float64)
+    for i in range(lookback, first_len - 1):
+        rets = {}
+        for a, asset in enumerate(family):
+            c = asset.closes_array()
+            rets[a] = float(np.log(c[i]) - np.log(c[i - lookback]))
+        sorted_assets = sorted(rets, key=lambda a: rets[a], reverse=True)
+        longs = sorted_assets[:top_k]
+        shorts = sorted_assets[-bottom_k:]
+        if len(longs) < top_k or len(shorts) < bottom_k:
+            continue
+        leg_ret = lambda a: float(np.log(family[a].closes_array()[i + 1])
+                                  - np.log(family[a].closes_array()[i]))
+        spread = np.mean([leg_ret(a) for a in longs]) \
+                 - np.mean([leg_ret(a) for a in shorts])
+        daily_pnl[i] = spread if rng.random() < 0.5 else -spread
+    return daily_pnl
+
+
 def build_synthetic_spread_asset(daily_pnl, start_price=100.0):
     """Build a BarSequence whose close path equals the cumulative equity of a
     spread P&L series, with a constant-long signal suitable for the engine.
