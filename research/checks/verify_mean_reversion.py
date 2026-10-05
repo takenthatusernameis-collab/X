@@ -118,7 +118,7 @@ def base_ma_segment_median(ticker, s, e, train, test, warm, overlap):
     closes = bars.closes_array()
     n = len(closes)
     sgn = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
-    for i in range(19, n):
+    for i in range(59, n):
         fm = np.mean(closes[i - 19 : i + 1])
         sm = np.mean(closes[i - 59 : i + 1])
         sgn[i] = bt.Signal(date=i + 1, weight=1.0 if fm > sm else -1.0)
@@ -191,6 +191,7 @@ def main():
         closes = bars.closes_array()
         labels = vol_blocks(closes, N_BLOCKS, WINDOW)
         runs = segments_from_labels(labels, MIN_SEGMENT_BARS)
+        lbls = [lab for lab, _, _ in runs]
         medians = [round(segment_median(ticker, s, e, TRAIN, TEST, WARM, OVERLAP)[0], 3)
                    for lab, s, e in runs]
         pub = artifact["universe"]["per_asset"][ticker]["medians"]
@@ -209,6 +210,10 @@ def main():
         status = "MATCH" if medians == pub and lbls == pub_lbls else "MISMATCH"
         if status != "MATCH":
             all_ok = False
+            print("  [DEBUG] ticker={}: len(runs)={} lbls={}".format(ticker, len(runs), lbls))
+            print("  [DEBUG] ticker={}: pub_lbls={}".format(ticker, pub_lbls))
+            print("  [DEBUG] ticker={}: len(medians)={} medians={}".format(ticker, len(medians), medians))
+            print("  [DEBUG] ticker={}: pub_medians={}".format(ticker, pub))
         verdict_status = "MATCH" if regen_verdict == artifact["universe"]["per_asset"][ticker]["verdict"] else "MISMATCH"
         if verdict_status != "MATCH":
             all_ok = False

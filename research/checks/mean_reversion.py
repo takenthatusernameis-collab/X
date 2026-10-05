@@ -183,8 +183,9 @@ def main() -> int:
         bt.check_signal_integrity(signals, [b.date for b in bars], warmup=0)
         res = bt.run_bars(list(bars), signals, cfg0)
         bt.check_equity_matches_fills(res.equity_curve, res.trades, closes, 1e6)
+        total_return = (res.equity_curve[-1] - cfg0.initial_capital) / cfg0.initial_capital
         print(f"  {ticker}: {bars.n_bars} bars, reversal signals {len(signals)}, "
-              f"leakage [PASS], total_return {res.metrics['total_return']:+.3f}")
+              f"leakage [PASS], total_return {total_return:+.3f}")
     tickers = {t: bt.load_ticker(t)[0] for t in target}
 
     print("\n=== 4. Mean-reversion vs base MA(20/60) on REGIME_DEPENDENT assets ===")
@@ -221,7 +222,7 @@ def main() -> int:
         tickers=tickers_univ,
         signals_fn=lambda c, **kw: bt.mean_reversion_signals(c, lookback=LOOKBACK),
         regime_labels_fn=lambda c: bt.volatility_blocks(c, n_blocks=N_BLOCKS, window=WINDOW),
-        baseline=[("lookback", LOOKBACK)],
+        baseline=(("lookback", LOOKBACK),),
         param_grid=[{"lookback": LOOKBACK}],
         train_window=TRAIN,
         test_window=TEST,
@@ -241,7 +242,7 @@ def main() -> int:
     print("  candidate medians: {}".format(pers["medians"]))
     print("  baseline (lookback=5): {:+.3f}".format(pers["baseline_median"]))
     print("  coin-flip null baseline: {:+.3f}".format(pers["noise_median"]))
-    print("  baseline vs null (sample-calibrated tol {::.4f}): {}"
+    print("  baseline vs null (sample-calibrated tol {:.4f}): {}"
           .format(pers["effective_tolerance"], pers["compare_noise_default"]))
     print("  baseline vs null (fixed tol 0.05): {}"
           .format(pers["compare_noise_fixed"]))

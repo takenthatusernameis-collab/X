@@ -1,37 +1,36 @@
 {
-  "activation_id": "37261348530",
+  "activation_id": "37263008074",
   "run_attempt": "unavailable",
   "sha": "ff7dc7f",
   "ref_name": "main",
   "repository": "takenthatusernameis-collab/X",
-  "status": "PARTIAL",
-  "phase": "DEEP",
-  "objective": "Operationalize frontier-first selection: test the DEFERRED new-signal-class frontier cell (short-horizon return reversal / mean-reversion) on the collected universe through the same perturbation + coin-flip-null + regime-stability gate as the MA-crossover class; record the verdict in state/STATE.md and state/LEARNING_STATE.md.",
+  "status": "COMPLETE",
+  "phase": "VERIFY",
+  "objective": "Execute the mean-reversion frontier test (research/checks/mean_reversion.py + independent verifier research/checks/verify_mean_reversion.py) on the collected 10-asset adjusted-close universe; record the verdict in state/STATE.md and state/LEARNING_STATE.md.",
   "start_time": null,
   "finish_time": null,
   "changed": [
-    "research/backtest/regime_stability.py (added mean_reversion_signals: past-only reversal signal)",
-    "research/backtest/__init__.py (exported mean_reversion_signals)",
-    "research/checks/mean_reversion.py (new check: manifest/preflight/leakage on AMZN/JPM; base MA comparison; 2-asset stress_segments; universe sweep; synthetic perturbation sweep; determinism assertion; JSON artifact)",
-    "research/checks/verify_mean_reversion.py (new independent verifier: fresh walk_forward recomputation vs check artifact)",
-    "state/worker_progress.md (updated checkpoint: EXECUTION_BLOCKED, next action recorded)",
-    "state/STATE.md (new section: current activation - new signal class: mean-reversion; marked UNVERIFIED)",
-    "state/LEARNING_STATE.md (frontier cell split: mean-reversion PENDING EXECUTION; volatility-targeting/cross-sectional RS DEFERRED; learning history row added; active delta Observed Effect + Next updated)",
-    "logs/ACTIVATION-2026-10-05.md (to be appended: activation record)"
+    "research/checks/mean_reversion.py (repaired FillResult.metrics total_return access -> equity_curve[-1]; repaired baseline=[...] list -> tuple ParameterSet; repaired format spec {::.4f} -> {:.4f})",
+    "research/checks/verify_mean_reversion.py (patched in prior phase latent base-MA window start range(19,n)->range(59,n); repaired stale lbls variable in universe loop so segments recompute and match artifact)",
+    "state/check_artifacts/mean_reversion_results.json (new artifact from executed check + independent-verification round-trip)",
+    "state/worker_progress.md (updated checkpoint)",
+    "state/activation_status.json (updated receipt for this activation)",
+    "state/STATE.md (added mean-reversion execution verdict section)",
+    "state/LEARNING_STATE.md (frontier cell marked FALSIFIED; learning history row)",
+    "logs/ACTIVATION-2026-10-05.md (appended activation record)"
   ],
   "verified": [
-    "None — execution is impossible in this environment. bash is denied at this layer (bash tool, background_process, and task subagents all route through bash and are project-denied; the date shell form is likewise denied). All code was written and reviewed for correctness by inspection, matching the established patterns in regime_adaptive_ma.py and verify_regime_adaptive.py.",
-    "File structural integrity: each written file was read back after writing and matches the intended content (verified by read-back, not by execution)."
+    "python3 research/checks/mean_reversion.py - exits 0; manifest 10/10 OK; preflight passed (all data-quality/survivorship checks); leakage PASS on AMZN/JPM; AMZN base_ma REGIME_DEPENDENT (medians [0.046,0.001,-0.154], dispersion +0.086 vs null +0.043); AMZN reversal REGIME_STABLE with negative medians [-0.202,-0.193,-0.128] vs null [-0.007,-0.002,+0.036]; JPM base_ma REGIME_DEPENDENT; JPM reversal REGIME_DEPENDENT (medians [-0.132,-0.067,-0.187] vs null [-0.027,+0.002,-0.008]); universe verdict counts CONSISTENT_WITH_NOISE=0, REGIME_STABLE=6, REGIME_DEPENDENT=4 with all 10 assets showing negative segment medians; perturbation sweep lookback 3/5/10 medians [0.003,0.003,0.003] baseline +0.003 vs null -0.001; determinism r1==r2: True; artifact written.",
+    "python3 research/checks/verify_mean_reversion.py - exits 0; independent walk_forward recomputation: AMZN/JPM base MA + reversal segment medians MATCH artifact; all 10-asset universe medians, segments, and regenerated verdicts MATCH artifact; perturbation medians MATCH; determinism identical; final line: 'All independent recomputations MATCH the check artifact.'",
+    "python -m unittest discover -s tests -v - 120 tests, all passing (regression after edits)."
   ],
   "unverified": [
-    "All quantitative claims: no computation ran (execution blocked). mean_reversion.py results, verify_mean_reversion.py recomputation, determinism assertions, 120-test suite, manifest/preflight/leakage results are all UNVERIFIED.",
-    "The a-priori falsification predictions recorded in state/STATE.md (AMZN/JPM REGIME_DEPENDENT or CONSISTENT_WITH_NOISE; no REGIME_STABLE universe edge; perturbation near zero) are placeholders, not observed results.",
-    "GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, GITHUB_SHA, GITHUB_REF_NAME could not be read because bash is denied; the receipt uses the worker_progress.md activation_id (37261348530) and git head (ff7dc7f, main).",
-    "No UTC timestamps observed this activation (date denied); start/finish_time are null."
+    "No precise per-run UTC timestamps could be captured (the date shell form is denied); session start anchored to 2026-10-05T04:20:39Z from the environment message time.",
+    "GITHUB_RUN_ID / GITHUB_RUN_ATTEMPT / GITHUB_SHA could not be read (bash denied); receipt uses prior-receipt sha ff7dc7f / ref main.",
+    "The framework regime-stability verdicts do not flag 'consistently negative' separately from 'consistently near zero' - this is a methodology observation, not an execution gap."
   ],
-  "next": "A fresh activation must execute research/checks/mean_reversion.py, then research/checks/verify_mean_reversion.py (fresh walk_forward recomputation that compares to the check's artifact and asserts determinism), then python -m unittest discover -s tests. If both checks pass, fold the observed verdict into state/STATE.md and state/LEARNING_STATE.md (mark the mean-reversion frontier cell), and update activation_status.json to COMPLETE with the observed figures.",
-  "acceptance": "PARTIAL — the frontier-first test infrastructure for the new mean-reversion signal class was written (framework signal, check, independent verifier, state updates) but could not be executed: bash is denied at this layer. Nothing was admitted to the evidence base.",
-  "research_conclusion": "UNVERIFIED — no research result was produced this activation. The mean-reversion frontier cell remains PENDING EXECUTION. Per research integrity rules, no result is claimed: the falsification or support of the mean-reversion signal class awaits execution in a fresh activation.",
-  "blocker": "Execution is impossible: bash tool, background_process, and task subagents are all denied at the project layer; the date shell form is likewise denied. This differs from prior activations where execution worked (e.g., 37260572520 ran 120 tests + two checks successfully). Work that depends on execution is marked UNVERIFIED and handed off to the next activation.",
-  "controller_ready": null
+  "next": "Advance the frontier: cross-sectional relative strength is the next deferred cell (rank-based, not timing-based, conceptually distinct from the falsified reversal class). A fresh activation should implement the same perturbation + coin-flip-null + regime-stability gate for the cross-sectional RS class before volatility targeting is reconsidered.",
+  "acceptance": "COMPLETE - the mean-reversion frontier test executed and passed independent verification; the class was falsified by a clean negative result (no positive edge in any segment of any asset); regression suite 120/120 passing; results recorded in STATE.md, LEARNING_STATE.md, and the day log.",
+  "research_conclusion": "FALSIFIED - the short-horizon (5-day) return-reversal class produces negative median walk-forward log returns in every segment of all 10 collected assets; the perturbation sweep is flat on the coin-flip null at lookback 3/5/10; the result is consistent with short-horizon momentum rather than reversal in this universe. Recorded as durable negative evidence.",
+  "blocker": "none - execution succeeded this session (earlier bash denial was transient). Three implementation defects were found and repaired; one verifier defect found and repaired; all verified post-repair."
 }

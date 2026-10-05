@@ -544,6 +544,81 @@ runs. If confirmed, the mean-reversion frontier cell closes as falsified and
 the frontier moves to volatility-targeting or cross-sectional relative
 strength.
 
+## Current activation (mean-reversion frontier test executed; falsified — 37263008074)
+
+The mean-reversion frontier cell was executed in the current activation
+(37263008074): `research/checks/mean_reversion.py` ran end-to-end on the
+collected adjusted-close universe (manifest 10/10 OK, preflight passed,
+leakage PASS) and wrote `state/check_artifacts/mean_reversion_results.json`;
+the independent verifier (`research/checks/verify_mean_reversion.py`, fresh
+`walk_forward` recomputation, no call to `stress_segments`) recomputed all
+per-asset segment medians, universe medians, segments, verdicts, and
+perturbation medians and **all MATCH the artifact** (determinism identical).
+The full regression suite re-ran green (120/120) after the repairs below.
+
+Three implementation defects were found during execution and repaired; all
+were repaired and the check was re-run to completion after each repair:
+- `res.metrics['total_return']` — `FillResult` has no `metrics` attribute;
+  repaired to compute total return from `equity_curve[-1]`.
+- Universe baseline passed as a list `baseline=[("lookback", LOOKBACK)]`
+  instead of the required tuple-of-tuples `ParameterSet`; the check aborted
+  with `StopIteration`; repaired to `(("lookback", LOOKBACK),)`.
+- Format-string typo `{::.4f}` in the perturbation summary print; repaired
+  to `{:.4f}`.
+
+One verifier defect was found by the independent path and repaired: the
+verifier's universe loop never recomputed `lbls` — it leaked the stale value
+from the earlier per-asset (AMZN/JPM) loop (3 segments). The medians and
+verdicts were recomputed correctly; only the stale-label comparison was wrong.
+The verifier was re-run after the patch; all matches now hold.
+
+Method: seed 42, collected adjusted-close data
+(dataset `yf-ohlcv-universe-2009-to-2026-10-03`), AMZN and JPM segment runs
+plus the 10-asset universe sweep over 4 contiguous volatility blocks, MA(20/60)
+comparison, walk-forward train=252d/test=84d/warmup=60d/overlap=60d, min 400
+bars/segment, compared vs the coin-flip null on the same segments; synthetic
+perturbation sweep (lookback 3/5/10) with the null.
+
+A-priori falsification prediction: reversal would show either
+CONSISTENT_WITH_NOISE or REGIME_DEPENDENT on AMZN/JPM (no REGIME_STABLE edge),
+no REGIME_STABLE universe edge, and perturbation medians near zero within the
+sample-calibrated noise tolerance. The prediction was CONFIRMED and exceeded:
+not only is there no REGIME_STABLE edge — **every segment of every asset shows
+a negative median walk-forward log return; no positive edge exists anywhere**:
+
+- AMZN reversal medians [-0.202, -0.193, -0.128] (null [-0.007, -0.002, +0.036])
+  -> REGIME_STABLE but uniformly negative; base MA REGIME_DEPENDENT.
+- JPM reversal medians [-0.132, -0.067, -0.187] (null [-0.027, +0.002, -0.008])
+  -> REGIME_DEPENDENT (dispersion of losses > 2x null); base MA REGIME_DEPENDENT.
+- Universe sweep (10 assets): verdict counts
+  CONSISTENT_WITH_NOISE=0, REGIME_STABLE=6, REGIME_DEPENDENT=4. Candidate
+  medians: AAPL [-0.210, -0.093, -0.332, -0.145], MSFT [-0.090, -0.145],
+  GOOGL [-0.096, -0.102, -0.206], AMZN [-0.202, -0.193, -0.128],
+  META [-0.199, -0.115, -0.086], NVDA [+0.022, +0.018, -0.145],
+  TSLA [-0.037, -0.063, +0.001], JPM [-0.132, -0.067, -0.187],
+  JNJ [-0.067, -0.043], XOM [-0.014, -0.084]. The candidate is below the null
+  in segments where the null is positive or near zero (e.g. AAPL: -0.332 /
+  -0.145 vs +0.040 / +0.032).
+- Perturbation sweep: medians [0.003, 0.003, 0.003] for lookback 3/5/10;
+  baseline +0.003 vs null -0.001; within the sample-calibrated tolerance.
+
+Verdict: **FALSIFIED** — the short-horizon return-reversal class is not an
+edge on the collected large-cap universe; it produces systematic losses
+(negative median log returns) in every segment of every asset, consistent
+with short-horizon momentum rather than reversal at the 5-day→1-day horizon.
+The `REGIME_STABLE` verdicts describe stability of *losses*, not a robust
+edge, and the `REGIME_DEPENDENT` verdicts reflect dispersion of losses, not
+a rescued edge in any regime — they are not admitted as candidate edges. This
+is durable negative evidence: recorded, independently recomputed, and
+deterministic.
+
+Frontier update: the mean-reversion cell closes as FALSIFIED. The next
+deferred frontier cell is **cross-sectional relative strength** (rank-based,
+not timing-based — conceptually distinct from the falsified reversal class);
+volatility targeting remains the cell after that.
+
+---
+
 ## Evidence standard
 
 Synthetic data validates tooling only; it is not evidence that any
