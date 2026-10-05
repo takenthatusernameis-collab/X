@@ -26,7 +26,6 @@ import sys
 from datetime import datetime, timedelta, timezone, date
 from pathlib import Path
 
-import numpy as np
 
 COLLECTION_ROOT = Path(__file__).resolve().parent
 RAW_DIR = COLLECTION_ROOT / "raw"
@@ -71,12 +70,12 @@ def load_csv(path):
             closes.append(float(parts[4]))
             volumes.append(float(parts[6]))
     return {
-        "dates": np.asarray(dates, dtype=object),
-        "opens": np.asarray(opens, dtype=np.float64),
-        "highs": np.asarray(highs, dtype=np.float64),
-        "lows": np.asarray(lows, dtype=np.float64),
-        "closes": np.asarray(closes, dtype=np.float64),
-        "volumes": np.asarray(volumes, dtype=np.float64),
+        "dates": dates,
+        "opens": opens,
+        "highs": highs,
+        "lows": lows,
+        "closes": closes,
+        "volumes": volumes,
     }
 
 
@@ -312,32 +311,41 @@ def main():
 
     # 5. OHLC cross-consistency
     for ticker, data in tickers.items():
-        ok = np.all(data["lows"] <= np.minimum(data["opens"], data["closes"])) and \
-             np.all(np.maximum(data["opens"], data["closes"]) <= data["highs"])
+        bad_bars = sum(
+            not (low <= min(open_, close) and max(open_, close) <= high)
+            for low, open_, close, high in zip(
+                data["lows"], data["opens"], data["closes"], data["highs"]
+            )
+        )
+        ok = bad_bars == 0
         report(
             f"5. OHLC cross-consistency ({ticker})",
-            bool(ok),
-            "low <= open/close <= high on all bars" if ok else f"{int(~ok.sum())} inconsistent bars",
+            ok,
+            "low <= open/close <= high on all bars" if ok else f"{bad_bars} inconsistent bars",
         )
 
     # 6. Volume non-negative and finite
     for ticker, data in tickers.items():
-        ok = np.all(data["volumes"] >= 0) and np.isfinite(data["volumes"]).all()
+        import math
+        bad_volumes = sum(
+            not (float(v) >= 0 and math.isfinite(float(v)))
+            for v in data["volumes"]
+        )
+        ok = bad_volumes == 0
         report(
             f"6. Volume non-negative finite ({ticker})",
-            bool(ok),
-            "all volume fields valid" if ok else f"{int((~(data['volumes'] >= 0) | ~np.isfinite(data['volumes'])).sum())} invalid",
+            ok,
+            "all volume fields valid" if ok else f"{bad_volumes} invalid",
         )
 
     # 7. Price positivity and no zero-price bars
     for ticker, data in tickers.items():
-        close_pos = np.all(data["closes"] > 0)
-        no_zero = not np.any(data["closes"] == 0)
-        ok = close_pos and no_zero
+        bad_closes = sum(float(v) <= 0 for v in data["closes"])
+        ok = bad_closes == 0
         report(
             f"7. Price positivity ({ticker})",
-            bool(ok),
-            "all closes positive, no zero-price bars" if ok else f"{int((~close_pos | ~no_zero).sum())} bad closes",
+            ok,
+            "all closes positive, no zero-price bars" if ok else f"{bad_closes} bad closes",
         )
 
     # 10. Known gaps audit: every documented gap must be genuinely absent from
