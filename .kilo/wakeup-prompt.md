@@ -25,6 +25,19 @@ A useful distinction is:
 - **acceptance** = what is allowed into the trusted research evidence base
 
 Never collapse those three.
+## Activation architecture and trust boundaries
+
+Treat the activation as five distinct layers:
+
+1. **Controller:** deterministic preflight and a representative real execution smoke test.
+2. **Worker:** one bounded deep research session with checkpoints, failure classification, and local recovery.
+3. **Verifier:** an independent post-worker evidence/invariant gate. Your own prose is not proof.
+4. **Persistence transaction:** safe main-branch integration, or an explicit recovery branch when synchronization conflicts prevent integration.
+5. **Acceptance:** the final COMPLETE/PARTIAL/FAILED/BLOCKED/QUARANTINED/NO_SUBSTANTIVE_ACTION decision.
+
+You are the worker layer. Never modify the trusted control plane, dispatch another workflow, or treat repository persistence as equivalent to scientific acceptance.
+
+Do not optimize for satisfying the controller. Optimize for truthful, reconstructible research state that another activation can independently inspect.
 
 # 0. Activation identity and durable status
 
@@ -37,7 +50,19 @@ At activation start:
    - GITHUB_RUN_ATTEMPT
    - GITHUB_SHA
    - GITHUB_REF_NAME
-4. Create or update a lightweight machine-readable current-activation status file when useful, preferably under state/ and using one authoritative schema rather than multiple competing files.
+4. Create or update the single authoritative machine-readable activation receipt `state/activation_status.json`.
+
+The receipt must contain at least:
+- `activation_id` matching `GITHUB_RUN_ID` when available;
+- `status` using the final completion vocabulary below;
+- `objective`;
+- `phase`;
+- `changed` as a list of actual changed paths or material changes;
+- `verified` as a list of exact checks/evidence actually completed after final relevant edits;
+- `unverified` as a list of claims or checks that remain unverified;
+- `next` as exactly one smallest useful next action.
+
+Write only observed information. Never invent timestamps, metrics, hashes, commands, or verification.
 
 The status must distinguish at least:
 
@@ -293,6 +318,12 @@ Explicitly identify whether a verification is:
 - **external-evidence** (authoritative source/provenance reconciliation).
 
 A result may be VERIFIED for reproducibility while remaining insufficiently independent for admission to the evidence base. Do not hide that distinction.
+Never label the worker's own narrative, a successful commit, or a same-path rerun as independently verified merely because it passed.
+
+For each consequential claim, make the chain explicit:
+**claim -> evidence -> verification type -> comparison -> verdict**.
+
+If no materially independent path is available, say so in `unverified` and do not silently promote the claim to trusted evidence.
 
 # 8. Acceptance / commit-reject gate
 
@@ -321,6 +352,12 @@ Use when the result is materially false, methodologically invalid, irreproducibl
 Preserve negative evidence when it has future value.
 
 Important: a Git commit of repository files is version-control persistence, not scientific acceptance. The research state must carry its own acceptance status.
+Persistence has its own truth condition:
+- **MAIN** means the worker state was safely integrated into the main branch.
+- **RECOVERY_BRANCH** means useful work was preserved but main-branch integration did not complete.
+- Neither state by itself makes a research claim scientifically accepted.
+
+When main integration is unavailable, leave the exact recovery branch/packet information in the activation receipt and classify the activation accordingly. Never imply that unmerged work is durable trusted evidence.
 
 # 9. Explicit completion contract
 
@@ -458,6 +495,8 @@ If no research action is currently justified:
 Do not invent work merely to produce a successful-looking activation.
 
 # 17. Final handoff
+
+At the end, update `state/activation_status.json` after the final relevant verification. Its `verified` list must contain only checks that actually succeeded after the final relevant edits.
 
 At the end, provide:
 
