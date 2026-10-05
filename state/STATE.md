@@ -706,6 +706,67 @@ these are candidates for deeper regime-aware re-specification (e.g. a regime
 filter or regime-dependent sizing), not for admission to the evidence base in
 their current form.
 
+## Current activation (per-asset t-statistic over the collected universe)
+
+Extended the fold-level statistical analysis from the single-asset
+`research/checks/verify_aapl_stats.py` into a reusable per-asset checker,
+`research/checks/universe_stats.py`. For each collected ticker the MA(20/60)
+crossover is walk-forward validated (train=252d, test=84d, warmup=60d,
+overlap=60d) and the OOS fold log-return distribution is summarized with a
+t-statistic against H0: mean log fold return = 0, the degrees of freedom, and
+a 95% Wald confidence interval. This is a complementary lens to the
+coin-flip null in `research/backtest/universe.py`: the t-test judges whether
+the mean fold return is distinguishable from zero at the observed sample
+size, while the null judges whether the signal carries any price-related
+information at all; the two can and do differ (AAPL is t-significant yet
+within the framework's coin-flip noise band).
+
+Also added to the checker: a cross-asset significance summary that reports
+how many of the 10 per-asset t-tests are nominally significant at 5% and how
+many survive a conservative Bonferroni family-wise correction
+(alpha / 10 = 0.005), since the same walk-forward parameters and folds are
+used for every ticker. The checker asserts its own byte-identical
+reproducibility across independent re-runs.
+
+Result (seed 42, 10 collected tickers; MA(20/60), train=252d/test=84d,
+warmup=60d/overlap=60d):
+
+| Ticker | n_folds | mean log ret | median | t_stat | 95% CI | sig_5pct |
+|---|---|---|---|---|---|---|
+| AAPL | 170 | +0.0309 | +0.0242 | +2.75 | [+0.0089, +0.0529] | yes |
+| MSFT | 170 | -0.0200 | +0.0142 | -1.48 | [-0.0466, +0.0065] | no |
+| GOOGL | 170 | -0.0042 | +0.0091 | -0.36 | [-0.0273, +0.0188] | no |
+| AMZN | 170 | -0.0378 | +0.0188 | -1.82 | [-0.0787, +0.0030] | no |
+| META | 135 | +0.0309 | +0.0515 | +2.64 | [+0.0079, +0.0539] | yes |
+| NVDA | 170 | -0.3002 | +0.0291 | -1.30 | [-0.7515, +0.1512] | no |
+| TSLA | 154 | -1.1604 | -0.0452 | -2.68 | [-2.0097, -0.3112] | yes |
+| JPM | 170 | +0.0073 | +0.0077 | +0.64 | [-0.0150, +0.0297] | no |
+| JNJ | 170 | -0.0167 | -0.0150 | -2.04 | [-0.0328, -0.0006] | yes |
+| XOM | 170 | -0.0126 | -0.0207 | -1.14 | [-0.0345, +0.0092] | no |
+
+- AAPL cross-checks exactly against the independent diagnostic:
+  170 folds, mean +0.0309, median +0.0242, std +0.1463, 101/170 positive,
+  t=2.75 (df=169), 95% CI [0.0089, 0.0529].
+- Cross-asset summary: 4 / 10 nominally significant at 5% (AAPL +, META +,
+  TSLA -, JNJ -); 0 / 10 survive the Bonferroni family-wise correction at
+  alpha 0.005. Nothing is a robust cross-asset feature under the
+  multiple-testing-aware criterion.
+- The two nominally-positive assets (AAPL, META) carry positive mean fold
+  returns consistent with the prior AAPL walk-forward finding; META has
+  fewer folds (135) because its series starts later (2012-05-18).
+- TSLA's significance is tail-driven rather than a stable edge: mean log
+  return -1.1604 vs median -0.0452, std 5.377, CI [-2.01, -0.31] — an
+  extreme negative tail dominates the mean; the CI is correspondingly wide.
+  Recorded as a negative/quality finding, not an edge.
+- The t-test answers and the coin-flip null answers diverge by design for
+  this candidate (AAPL significant by t-test, within the noise band by the
+  null), confirming the documented complementary role of the two checks.
+
+Assessment: no MA-crossover edge survives a family-wise correction across
+the collected universe; the per-asset significant results are consistent
+with the established finding that the AAPL MA crossover is exploratory,
+within noise, and not admitted to the evidence base.
+
 ## Next activation
 
 1. Regression discipline maintained: `python -m unittest discover -s tests -v`
