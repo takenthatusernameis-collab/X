@@ -695,7 +695,78 @@ jobs:
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
           VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
         run: |
-          set -euo pipefail
+          echo "::group::REPORT KILO OUTCOME DEBUG — run metadata"
+          printf 'GITHUB_RUN_ID=%s\n' "${GITHUB_RUN_ID:-unknown}"
+          printf 'GITHUB_RUN_ATTEMPT=%s\n' "${GITHUB_RUN_ATTEMPT:-unknown}"
+          printf 'GITHUB_REF_NAME=%s\n' "${GITHUB_REF_NAME:-unknown}"
+          printf 'GITHUB_SHA=%s\n' "${GITHUB_SHA:-unknown}"
+          printf 'GITHUB_EVENT_NAME=%s\n' "${GITHUB_EVENT_NAME:-unknown}"
+          printf 'GITHUB_WORKFLOW=%s\n' "${GITHUB_WORKFLOW:-unknown}"
+          echo "::endgroup::"
+
+          echo "::group::REPORT KILO OUTCOME DEBUG — exact decision inputs"
+          printf 'PREFLIGHT_OUTCOME=%q\n' "${PREFLIGHT_OUTCOME:-<unset>}"
+          printf 'KILO_SMOKE_OUTCOME=%q\n' "${KILO_SMOKE_OUTCOME:-<unset>}"
+          printf 'KILO_OUTCOME=%q\n' "${KILO_OUTCOME:-<unset>}"
+          printf 'VERIFY_OUTCOME=%q\n' "${VERIFY_OUTCOME:-<unset>}"
+          printf 'KILO_LIVENESS_STATUS=%q\n' "${KILO_LIVENESS_STATUS:-<unset>}"
+          printf 'KILO_LIVENESS_REASON=%q\n' "${KILO_LIVENESS_REASON:-<unset>}"
+          printf 'PERSISTENCE_STATUS=%q\n' "${PERSISTENCE_STATUS:-<unset>}"
+          printf 'PERSISTENCE_RECOVERY_BRANCH=%q\n' "${PERSISTENCE_RECOVERY_BRANCH:-<unset>}"
+          echo "::endgroup::"
+
+          echo "::group::REPORT KILO OUTCOME DEBUG — classifier integrity and cross-check"
+          test -f .github/scripts/report_kilo_outcome.py
+          sha256sum .github/scripts/report_kilo_outcome.py
+          python3 -m py_compile .github/scripts/report_kilo_outcome.py
+          python3 .github/scripts/report_kilo_outcome.py --self-test
+          set +e
+          CLASSIFIER_OUTPUT="$(python3 .github/scripts/report_kilo_outcome.py \
+            --preflight "${PREFLIGHT_OUTCOME:-}" \
+            --smoke "${KILO_SMOKE_OUTCOME:-}" \
+            --worker "${KILO_OUTCOME:-}" \
+            --verify "${VERIFY_OUTCOME:-}" \
+            --liveness "${KILO_LIVENESS_STATUS:-}" \
+            --persistence "${PERSISTENCE_STATUS:-}" 2>&1)"
+          CLASSIFIER_RC=$?
+          set -e
+          printf '%s\n' "$CLASSIFIER_OUTPUT"
+          printf 'CLASSIFIER_RC=%s\n' "$CLASSIFIER_RC"
+          echo "The shell decision path below remains authoritative; this scripted result is a diagnostic consistency check."
+          echo "::endgroup::"
+
+          echo "::group::REPORT KILO OUTCOME DEBUG — repository/persistence evidence"
+          git rev-parse --short=12 HEAD
+          git status --short
+          echo "--- unstaged names ---"
+          git diff --name-status
+          echo "--- staged names ---"
+          git diff --cached --name-status
+          echo "--- recent commits ---"
+          git log -5 --format='%h %ct %s'
+          for debug_path in state/worker_progress.md state/worker_receipt.json state/activation_receipt.json reports logs; do
+            if [ -e "$debug_path" ]; then
+              stat -c '%n | type=%F | bytes=%s | mode=%a | mtime=%y' "$debug_path"
+            else
+              echo "ABSENT | $debug_path"
+            fi
+          done
+          echo "::endgroup::"
+
+          echo "::group::REPORT KILO OUTCOME DEBUG — terminal-state matrix"
+          case "${PERSISTENCE_STATUS:-FAILED}" in
+            MAIN|RECOVERY_BRANCH|NO_CHANGES|FAILED) echo "Persistence token recognized: ${PERSISTENCE_STATUS:-FAILED}" ;;
+            *) echo "UNRECOGNIZED persistence token: ${PERSISTENCE_STATUS:-<unset>}" ;;
+          esac
+          case "${KILO_LIVENESS_STATUS:-unknown}" in
+            STALLED|COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT|COMPLETED_WITH_SEMANTIC_CHECKPOINTS|unknown) echo "Liveness token: ${KILO_LIVENESS_STATUS:-unknown}" ;;
+            *) echo "UNRECOGNIZED liveness token: ${KILO_LIVENESS_STATUS:-<unset>}" ;;
+          esac
+          echo "::endgroup::"
+
+          echo "::group::REPORT KILO OUTCOME — authoritative shell classification begins"
+          echo "The existing fail-closed decision logic follows unchanged."
+          echo "::endgroup::"
           echo "Research preflight: ${PREFLIGHT_OUTCOME:-unknown}"
           echo "Kilo execution smoke: ${KILO_SMOKE_OUTCOME:-unknown}"
           echo "Kilo worker: ${KILO_OUTCOME:-unknown}"
