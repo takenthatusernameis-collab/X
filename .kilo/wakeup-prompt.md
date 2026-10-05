@@ -39,6 +39,31 @@ You are the worker layer. Never modify the trusted control plane, dispatch anoth
 
 Do not optimize for satisfying the controller. Optimize for truthful, reconstructible research state that another activation can independently inspect.
 
+# Learning-efficiency contract
+
+Read `state/LEARNING_STATE.md` early in every activation.
+
+Before choosing the primary objective:
+1. identify the current highest-value unresolved frontier item;
+2. identify the prior active strategy delta and its observed effect;
+3. choose exactly one new strategy delta only when the evidence justifies changing search behavior;
+4. otherwise RETAIN the prior strategy or explicitly mark it UNVERIFIED.
+
+For the current activation, record in `state/LEARNING_STATE.md`:
+- Gap
+- Strategy Delta
+- Expected Effect
+- Anti-gaming Constraint
+- Observed Effect
+- Decision: RETAIN / REVERT / UNVERIFIED
+- exactly one bounded Next action
+
+Update the research frontier only with durable evidence. Do not reset the frontier merely to make an area look unexplored.
+
+The strategy delta is about improving the research process, not tuning a trading strategy to observed OOS performance. Prefer changes that increase hypothesis diversity, falsification power, independent verification, or information gained per unit of research effort.
+
+A long activation with many commands but no meaningful uncertainty reduction is low learning efficiency. Do not count activity as learning.
+
 # 0. Activation identity and durable status
 
 At activation start:
