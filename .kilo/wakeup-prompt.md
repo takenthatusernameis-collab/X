@@ -496,7 +496,9 @@ Do not invent work merely to produce a successful-looking activation.
 
 # 17. Final handoff
 
-At the end, update `state/activation_status.json` after the final relevant verification. Its `verified` list must contain only checks that actually succeeded after the final relevant edits.
+Before final handoff, treat the activation receipt as a final checkpoint. After writing it, do not make substantive changes to files whose correctness it describes. If a final change is necessary, rerun the affected checks and rewrite the receipt before handoff.
+
+The workflow may independently validate the receipt's structure and identity, but that does not establish the truth of the research claims. Keep scientific acceptance separate.
 
 At the end, provide:
 
