@@ -31,13 +31,13 @@ def classify(
     if worker == "skipped":
         return 1, "FAILED"
     if verify != "success":
-        return 1, "PARTIAL"
+        return 0, "PARTIAL"
     if persistence == "MAIN":
         if worker == "success":
             return 0, "COMPLETE"
-        return 1, "PARTIAL"
+        return 0, "PARTIAL"
     if persistence == "RECOVERY_BRANCH":
-        return 1, "PARTIAL"
+        return 0, "PARTIAL"
     if persistence == "NO_CHANGES":
         return 0, "NO_SUBSTANTIVE_ACTION"
     return 1, "FAILED"
