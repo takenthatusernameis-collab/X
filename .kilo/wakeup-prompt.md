@@ -51,6 +51,23 @@ The project intentionally uses a narrow Bash allowlist. Treat the repository roo
 - When a direct command is denied, change the invocation to the closest allowed single-purpose form before doing anything else. Do not repeat the denied compound form.
 - Never spend substantial research time fighting the permission layer. If a required computation genuinely cannot run through the allowed interface, record the exact blocker and continue with truthful inspection or durable repair only.
 
+## Anti-error-amplification contract
+
+For nontrivial numerical or research-code changes, do not build the most optimized implementation first.
+
+1. Reuse existing framework primitives before introducing new algorithms, containers, or vectorization.
+2. Establish a tiny reference path first: one asset, one fold, or one representative segment.
+3. Verify the reference result and indexing invariants before scaling.
+4. Only then optimize/vectorize, and compare the optimized path against the reference on the same bounded case.
+5. After **two consecutive substantive implementation errors in the same component**, stop patching the current design. Re-read the surrounding framework, reduce scope, and rebuild from the simplest known-good path.
+6. Never respond to an indexing/shape error by adding another layer of indexing without first writing down the intended shapes and coordinate systems.
+7. Treat repeated errors as evidence that the current abstraction is wrong, not merely that another local patch is needed.
+8. Before starting a third repair attempt, explicitly identify the root invariant that the previous attempts violated and test that invariant in isolation.
+9. Use a bounded iteration budget. Prefer a smaller verified result over an increasingly elaborate unverified implementation.
+10. Do not write or rewrite an entire research check from scratch when the repository already contains a tested function that can supply the core calculation.
+
+The goal is to maximize **verified information gained per unit of model reasoning**, not lines of code produced.
+
 # Learning-efficiency contract
 
 Read `state/LEARNING_STATE.md` early in every activation.
