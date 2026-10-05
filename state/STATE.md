@@ -823,39 +823,98 @@ and an independent recomputation script
 filtered variant via `walk_forward` directly: all four recomputed figures
 match the deep-dive medians exactly and are deterministic across reruns.
 
+## Current activation (regime-adaptive MA crossover falsification - AMZN/JPM + universe)
+
+Tested the falsifiable hypothesis that a regime-adaptive MA crossover (fast
+10/30 in turbulent segments, standard 20/60 in calm segments, regime labels
+from a past-only volatility classifier) rescues a REGIME_STABLE edge where the
+base MA(20/60) is REGIME_DEPENDENT. This closes the pending item from the
+previous receipt (activation 37257258857) and tests the "regime-contingent edge"
+hypothesis head-on.
+
+Hypothesis: if the 2009-2013 MA edge is genuinely volatility-regime-contingent
+and harvestable, a regime-adaptive implementation should pass the regime-
+stability gate (REGIME_STABLE). Falsification prediction: the adaptive variant
+remains REGIME_DEPENDENT or becomes CONSISTENT_WITH_NOISE, because a past-only
+volatility classifier labels both the 2009-2013 and 2022-2026 turbulent regimes
+identically and therefore cannot separate the good turbulent period from the
+bad turbulent period.
+
+Method: seed 42, collected adjusted-close data (dataset
+`yf-ohlcv-universe-2009-to-2026-10-03`; manifest checksums 10/10 OK; data
+preflight PASSED - all 57 checks incl. known-gaps audit; leakage review PASS on
+AMZN and JPM). For AMZN and JPM three variants on identical segments,
+train=252d / test=84d / warmup=60d / overlap=60d, walk-forward per segment,
+compared vs coin-flip null: base MA(20/60), regime-adaptive MA, and the
+turbulent-only filtered variant from the prior deep-dive. The adaptive variant
+was also swept across the full 10-asset collected universe via
+`stress_segments_across_tickers` (`regime_adaptive_ma_signals`).
+
+Result (2 assets; segments = turbulent 2009-03-31..2013-06-10 / calm
+2013-06-11..2022-04-20 / turbulent 2022-04-21..2026-10-01):
+
+  Asset   variant        medians          dispersion   verdict
+  AMZN    base_ma        [0.046,0.001,-0.154]  +0.086  REGIME_DEPENDENT
+  AMZN    adaptive       [-0.028,0.001,+0.015]  +0.018  CONSISTENT_WITH_NOISE
+  AMZN    turbulent_only [0.046,0.000,-0.154]  +0.086  REGIME_DEPENDENT
+  JPM     base_ma        [0.109,-0.006,+0.033]  +0.047  REGIME_DEPENDENT
+  JPM     adaptive       [0.069,-0.006,-0.001]  +0.034  REGIME_DEPENDENT
+  JPM     turbulent_only [0.109,0.000,+0.033]  +0.045  REGIME_DEPENDENT
+
+Universe (adaptive variant, all 10 collected tickers):
+  CONSISTENT_WITH_NOISE=5, REGIME_STABLE=4, REGIME_DEPENDENT=1 (JPM only).
+
+Per-asset adaptive detail (universe): AAPL REGIME_STABLE (+0.024 dispersion),
+MSFT CONSISTENT_WITH_NOISE, GOOGL REGIME_STABLE, AMZN CONSISTENT_WITH_NOISE,
+META CONSISTENT_WITH_NOISE, NVDA REGIME_STABLE, TSLA REGIME_STABLE, JPM
+REGIME_DEPENDENT (+0.056), JNJ CONSISTENT_WITH_NOISE, XOM CONSISTENT_WITH_NOISE.
+
+Assessment (exploratory; not admitted to the evidence base): the adaptive MA
+does not rescue the edge. On AMZN the adaptation kills the edge entirely
+(adaptive medians near zero in all segments, CONSISTENT_WITH_NOISE) — the
+"turbulent=fast, calm=standard" rule does not isolate a regime-contingent
+return stream; on JPM the adaptive variant stays REGIME_DEPENDENT with the
+swing intact, so volatility-based timing does not remove the dependence. Both
+hold under the same coin-flip null used for the base variant, so the verdicts
+are directly comparable.
+
+Conclusion: the hypothesis that a past-only volatility-regime classifier can
+separate the 2009-2013 edge from the 2022-2026 regime is FALSIFIED for the MA
+crossover. The 2009-2013 edge is period-specific (post-crisis recovery
+conditions), not volatility-regime-contingent in a harvestable way; a
+regime-aware implementation does not make it robust. The MA crossover remains
+rejected from the evidence base. This falsification strengthens the prior
+negative findings (AAPL within the sample-calibrated noise tolerance; canonical
+(20,60) not a peak in any of the 10 assets; no edge surviving Bonferroni
+correction across the universe; only sparse per-asset significance).
+
+Verification (two materially independent paths that agree exactly):
+- Worker path: `research/checks/regime_adaptive_ma.py` executed end-to-end
+  (manifest 10/10 OK, preflight PASSED, leakage PASS, internal determinism
+  assertion `r1 == r2`).
+- Independent path: `research/checks/verify_regime_adaptive.py` recomputes all
+  six runs (AMZN/JPM x base/adaptive/turbulent_only) through a fresh
+  `walk_forward` implementation rather than `stress_segments`: all six
+  recomputed medians MATCH the published figures to 3 decimals with identical
+  segment labels, and all six runs are deterministic across independent reruns.
+- Verdict: VERIFIED. The falsification is corroborated by an independent
+  recomputation path, not only by the worker's own output.
+
 ## Next activation
 
-1. Regression discipline maintained: `python -m unittest discover -s tests -v`
-   (120 OK) plus the synthetic examples and the real-data single-asset
-   examples re-run after any research/code change.
-2. Determinism of the new universe example — **complete and verified**:
-   `check_determinism_universe.py` asserts `examples/regime_stability_universe.py`
-   produces byte-identical output across independent reruns
-   (sha256 `8d4ccf20190448823be1d7b7b7b732bf0ce122aee5fef810514fafa491f969873a`).
-3. Optional: extend `research/checks/verify_aapl_stats.py` to a per-asset
-   t-statistic over the collected universe, and/or fold a per-asset
-   fold-return summary into `RegimeUniverseSummary` output.
-4. Optional: deep-dive on the REGIME_DEPENDENT assets (AMZN, JPM) —
-    characterize which regime mix drives the swing (block-by-block breakdown)
-    and test a regime-filtered variant — **done (this activation)**: see the
-    "Current activation (regime-dependence deep-dive of AMZN and JPM)" section.
-    Verdict: both assets are regime-dependent because their edge is
-    concentrated in one historical regime mix (2009-2013); a regime-filtered
-    variant does not remove the dependence. Not admitted to the evidence base.
-
-
-1. Run the new `TestStressSegments` suite (in `tests/test_regime_stability.py`)
-   — **complete and verified**: all 10 new tests pass; the full suite now runs
-   at 106 tests, all passing (see activation logs for this run).
-2. Run `stress_segments` on a second ticker (NVDA, the only marginally
-   significant asset in the universe sweep) and compare AAPL vs NVDA
-   verdicts — **complete and verified**: AAPL verdict REGIME_STABLE, NVDA
-   verdict CONSISTENT_WITH_NOISE; the AAPL mild edge does not generalize to
-   NVDA, reinforcing the decision to reject the MA crossover from the evidence
-   base.
-3. Optional: fold-level significance test on the AAPL candidate's walk-forward
-   (t-statistic / CI) — already exists as `research/checks/verify_aapl_stats.py`
-   for AAPL; could be extended to a per-asset t-statistic over the collected
-   universe.
-4. Optional: run regime-stability on the full collected universe with a
-   reusable real-data regime family defined in `regime_stability.py`.
+1. Regression discipline: `python -m unittest discover -s tests -v` (120 OK)
+    plus real-data examples re-run after any research/code change — **complete
+    and verified**.
+2. With items 1-4 of prior activations complete, the MA-crossover hypothesis
+    space on the collected universe is exhausted: perturbation (canonical
+    (20,60) not a peak in any asset), coin-flip null (AAPL/META within
+    tolerance), regime stability (mixed; AMZN/JPM REGIME_DEPENDENT; generalized
+    by the adaptive-variant test), asset-universe (5/10 CONSISTENT_WITH_NOISE,
+    4/10 REGIME_STABLE, 1/10 REGIME_DEPENDENT), fold-level significance
+    (0/10 surviving Bonferroni). No further MA-crossover variants are warranted
+    without a new hypothesis.
+3. The highest-value unresolved frontier (see `state/LEARNING_STATE.md`) is a
+    new signal class — e.g. mean-reversion / volatility-targeting /
+    cross-sectional relative strength on the collected universe — which the
+    framework can evaluate through the same perturbation + null + regime-
+    stability gate before any positive claim.
