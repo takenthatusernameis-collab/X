@@ -569,38 +569,39 @@ jobs:
             ':(glob)**/*.pyc' \
             ':(glob)**/*.py.c' 2>/dev/null || true
 
+          # Only substantive worker changes receive a new activation identity.
+          # Truly empty activations remain NO_CHANGES rather than producing
+          # metadata-only commits.
           if git diff --cached --quiet; then
             echo "No safe repository changes to persist."
             echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
             exit 0
           fi
 
-          # If there is substantive worker work, stamp the controller-owned
-          # activation identity even when the worker did not touch the receipt.
-          # An actually empty activation stays a true NO_CHANGES run.
-          if ! git diff --cached --quiet; then
-            python3 - <<'PY'
-            import json
-            import os
-            import subprocess
-            from pathlib import Path
+          # Controller-owned identity is authoritative. The worker may write the
+          # substantive receipt fields, but stale run/ref metadata must not block
+          # otherwise valid research persistence.
+          python3 - <<'PY'
+          import json
+          import os
+          import subprocess
+          from pathlib import Path
 
-            p = Path("state/activation_status.json")
-            d = json.loads(p.read_text(encoding="utf-8"))
-            d["activation_id"] = os.environ["GITHUB_RUN_ID"]
-            d["run_attempt"] = os.environ.get("GITHUB_RUN_ATTEMPT", "1")
-            d["sha"] = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-            d["ref_name"] = os.environ["GITHUB_REF_NAME"]
-            d["repository"] = os.environ["GITHUB_REPOSITORY"]
-            p.write_text(json.dumps(d, indent=2) + "\n", encoding="utf-8")
-            print(
-                "Controller-stamped activation identity: "
-                f"id={d['activation_id']} attempt={d['run_attempt']} "
-                f"sha={d['sha']} ref={d['ref_name']}"
-            )
-            PY
-            git add state/activation_status.json
-          fi
+          p = Path("state/activation_status.json")
+          d = json.loads(p.read_text(encoding="utf-8"))
+          d["activation_id"] = os.environ["GITHUB_RUN_ID"]
+          d["run_attempt"] = os.environ.get("GITHUB_RUN_ATTEMPT", "1")
+          d["sha"] = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          d["ref_name"] = os.environ["GITHUB_REF_NAME"]
+          d["repository"] = os.environ["GITHUB_REPOSITORY"]
+          p.write_text(json.dumps(d, indent=2) + "\n", encoding="utf-8")
+          print(
+              "Controller-stamped activation identity: "
+              f"id={d['activation_id']} attempt={d['run_attempt']} "
+              f"sha={d['sha']} ref={d['ref_name']}"
+          )
+          PY
+          git add state/activation_status.json
 
           if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)
             echo "Protected paths unexpectedly staged:"
@@ -646,6 +647,12 @@ jobs:
               raise SystemExit("receipt objective/phase/next must be non-empty strings")
           print("Activation receipt schema and run identity independently validated.")
           PY
+
+          if git diff --cached --quiet; then
+            echo "No safe repository changes to persist."
+            echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
+            exit 0
+          fi
 
           git config user.name "kilo-research-enterprise"
           git config user.email "kilo-research-enterprise@users.noreply.github.com"
