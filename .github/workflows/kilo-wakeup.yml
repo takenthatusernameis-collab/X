@@ -741,10 +741,13 @@ jobs:
           git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
           git reset -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
 
-          # Controller-owned identity is authoritative. Only stamp a receipt when
-          # the worker actually changed it; otherwise an idle activation remains a
-          # true no-change activation rather than generating metadata-only commits.
-          if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
+          # Capture whether the worker produced any repository change BEFORE
+          # touching controller-owned metadata. The old implementation checked
+          # status after reset, which could miss the worker delta and leave a stale
+          # activation_id in state/activation_status.json.
+          worker_changes="$(git status --porcelain --untracked-files=all)"
+
+          if [ -n "$worker_changes" ]; then
             python3 -c 'import json,os,subprocess; from pathlib import Path; p=Path("state/activation_status.json"); d=json.loads(p.read_text(encoding="utf-8")); d["activation_id"]=os.environ["GITHUB_RUN_ID"]; d["run_attempt"]=os.environ.get("GITHUB_RUN_ATTEMPT","1"); d["sha"]=subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(); d["ref_name"]=os.environ["GITHUB_REF_NAME"]; d["repository"]=os.environ["GITHUB_REPOSITORY"]; p.write_text(json.dumps(d,indent=2)+"\n",encoding="utf-8"); print(f"Controller-stamped activation identity: id={d['activation_id']} attempt={d['run_attempt']} sha={d['sha']} ref={d['ref_name']}")'
           fi
 
