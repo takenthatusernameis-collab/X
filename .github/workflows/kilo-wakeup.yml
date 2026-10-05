@@ -4,9 +4,10 @@ on:
   schedule:
     - cron: "2-57/5 * * * *"
   workflow_dispatch:
+  workflow_call:
 
 concurrency:
-  group: kilo-research-enterprise
+  group: kilo-research-enterprise-v2
   cancel-in-progress: false
 
 permissions:
@@ -244,8 +245,36 @@ jobs:
           print(f"Trusted Kilo configuration validated for {model['id']}.")
           PY
 
+      - name: Smoke-test real Kilo execution path
+        id: kilo_smoke
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+
+          rm -rf /tmp/kilo-smoke
+          mkdir -p /tmp/kilo-smoke
+          cat > /tmp/kilo-smoke/prompt.txt <<'EOF'
+Use the shell/tool capability available to you to create exactly one file:
+  /tmp/kilo-smoke/sentinel.txt
+Its complete contents must be exactly:
+SMOKE_OK
+
+Do not modify the Git repository. After creating the file, verify its contents and stop.
+EOF
+
+          cd /tmp/kilo-smoke
+          kilo run --model openai-compatible/free-kilo --auto "$(cat /tmp/kilo-smoke/prompt.txt)" > /tmp/kilo-smoke.log 2>&1
+          status=$?
+          cat /tmp/kilo-smoke.log
+          test "$status" -eq 0
+          test -s /tmp/kilo-smoke/sentinel.txt
+          test "$(cat /tmp/kilo-smoke/sentinel.txt)" = "SMOKE_OK"
+
+          echo "Representative Kilo execution-path smoke test passed."
+
       - name: Run Kilo
         id: kilo
+        if: steps.kilo_smoke.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 340
         env:
@@ -275,8 +304,18 @@ jobs:
 
           exit "$status"
 
-      - name: Persist safe repository changes
-        if: always()
+      - name: Independently verify activation evidence
+        id: verify
+        if: always() && steps.kilo.outcome != 'skipped'
+        continue-on-error: true
+        env:
+          GITHUB_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          git diff --check
+
+          if git diff --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)        if: always()
         env:
           GITHUB_TOKEN: ${{ github.token }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
@@ -346,13 +385,52 @@ jobs:
       - name: Report Kilo outcome
         if: always()
         env:
+          SMOKE_OUTCOME: ${{ steps.kilo_smoke.outcome }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
+          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
+          PERSISTENCE_STATUS: ${{ env.PERSISTENCE_STATUS }}
+          PERSISTENCE_RECOVERY_BRANCH: ${{ env.PERSISTENCE_RECOVERY_BRANCH }}
         run: |
-          if [ "$KILO_OUTCOME" = "success" ]; then
-            echo "Kilo activation completed successfully."
-          elif [ "$KILO_OUTCOME" = "skipped" ]; then
-            echo "Kilo activation was skipped."
-          else
-            echo "Kilo activation ended with outcome: $KILO_OUTCOME"
+          set -euo pipefail
+
+          echo "Smoke outcome: ${SMOKE_OUTCOME:-unknown}"
+          echo "Kilo worker outcome: ${KILO_OUTCOME:-unknown}"
+          echo "Independent evidence gate: ${VERIFY_OUTCOME:-unknown}"
+          echo "Persistence status: ${PERSISTENCE_STATUS:-unknown}"
+
+          if [ "${SMOKE_OUTCOME:-}" != "success" ]; then
+            echo "FAILED: representative Kilo execution smoke test did not pass; deep research was gated."
             exit 1
           fi
+
+          if [ "${KILO_OUTCOME:-}" = "skipped" ]; then
+            echo "FAILED: Kilo deep session was skipped."
+            exit 1
+          fi
+
+          if [ "${VERIFY_OUTCOME:-}" != "success" ]; then
+            echo "PARTIAL/FAILED: independent repository/evidence verification did not pass."
+            exit 1
+          fi
+
+          case "${PERSISTENCE_STATUS:-FAILED}" in
+            MAIN)
+              if [ "${KILO_OUTCOME:-}" = "success" ]; then
+                echo "COMPLETE: worker execution, independent evidence gate, and main-branch persistence all succeeded."
+              else
+                echo "PARTIAL: useful worker work persisted, but the raw Kilo session ended non-zero."
+                exit 1
+              fi
+              ;;
+            RECOVERY_BRANCH)
+              echo "PARTIAL: worker work was preserved on ${PERSISTENCE_RECOVERY_BRANCH:-a recovery branch}, but not integrated into main."
+              exit 1
+              ;;
+            NO_CHANGES)
+              echo "NO_SUBSTANTIVE_ACTION or read-only activation: no repository changes required persistence."
+              ;;
+            *)
+              echo "FAILED: repository persistence did not reach a trustworthy terminal state."
+              exit 1
+              ;;
+          esac
