@@ -492,6 +492,58 @@ Note: `hash(str(...))` values are process-dependent under Python's default
 string-hash randomization (PYTHONHASHSEED). The deterministic invariant is
 field-level equality of the re-runs (and byte-identical output), not the
 printed hash; recorded hash values should be treated as process-local.
+## Current activation (new signal class: mean-reversion on collected universe)
+
+Tested the DEFERRED frontier cell from `state/LEARNING_STATE.md` — a new
+signal class (short-horizon return reversal) — on the collected adjusted-close
+universe through the same perturbation + coin-flip-null + regime-stability
+gate as the MA-crossover class. This is a fresh frontier cell, selected
+frontier-first instead of a queued follow-on, per the learning-efficiency
+contract.
+
+CRITICAL: execution is impossible in this environment. Bash is denied at this
+layer (the `bash` tool, `background_process`, and task subagents all route
+through bash and are project-denied; the `date` shell form is likewise
+denied). All quantitative claims below are therefore **UNVERIFIED** — the code
+was written and reviewed for correctness by inspection, but no computation ran.
+Nothing in this section is admitted to the evidence base. The next activation
+must run `research/checks/mean_reversion.py` and then
+`research/checks/verify_mean_reversion.py` before any figure here becomes
+durable.
+
+- Added `research/backtest/regime_stability.py::mean_reversion_signals`:
+  past-only short-horizon reversal signal (short the previous `lookback`-day
+  return, hold 1 day, daily rebalanced), same contract and style as
+  `ma_crossover_signals`; exported via `research/backtest/__init__.py`.
+- Added `research/checks/mean_reversion.py`: manifest integrity + data preflight
+  + leakage review on AMZN/JPM; base MA(20/60) comparison and reversal(lookback=5)
+  on AMZN/JPM via `stress_segments` over the 4 volatility blocks; universe sweep
+  via `stress_segments_across_tickers`; synthetic perturbation sweep
+  (lookback 3/5/10) with coin-flip null; internal determinism assertion; JSON
+  artifact written to `state/check_artifacts/mean_reversion_results.json`.
+- Added `research/checks/verify_mean_reversion.py`: independent verification —
+  fresh `walk_forward` recomputation of segment medians, universe medians and
+  perturbation medians (not `stress_segments`), loads the check artifact and
+  compares all values, asserts determinism of the verification path.
+
+Method (planned for execution): seed 42, collected adjusted-close data (dataset
+`yf-ohlcv-universe-2009-to-2026-10-03`; manifest checksums, preflight gate,
+leakage review); AMZN and JPM (the REGIME_DEPENDENT assets from the MA crossover
+universe run), 4 contiguous volatility blocks, MA(20/60) vs reversal(lookback=5),
+walk-forward train=252d/test=84d/warmup=60d/overlap=60d, min 400 bars/segment,
+compared vs coin-flip null on the same segments; then universe sweep across all
+10 tickers; synthetic perturbation sweep.
+
+A-priori falsification predictions (NOT observed): the reversal edge, if it
+exists, is expected to be REGIME_DEPENDENT or CONSISTENT_WITH_NOISE on AMZN/JPM
+(no REGIME_STABLE edge for a mechanical short-horizon rule on large caps),
+universe sweep showing no REGIME_STABLE edge, and perturbation medians near
+zero within the sample-calibrated noise tolerance. These predictions are
+placeholders until execution; they will be confirmed or refuted when the check
+runs. If confirmed, the mean-reversion frontier cell closes as falsified and
+the frontier moves to volatility-targeting or cross-sectional relative
+strength.
+
 ## Evidence standard
 
 Synthetic data validates tooling only; it is not evidence that any

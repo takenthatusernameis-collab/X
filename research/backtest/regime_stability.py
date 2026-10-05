@@ -823,6 +823,35 @@ def ma_crossover_signals(
     return out
 
 
+def mean_reversion_signals(
+    closes: NDArray,
+    lookback: int = 5,
+) -> List[Signal]:
+    """Past-only short-horizon return-reversal signal (new signal class).
+
+    Short the previous ``lookback``-day return and hold for one day: if the
+    last ``lookback`` days were up, go short; if they were down, go long.
+    Neutral before the ``lookback`` window. Daily rebalancing (a fresh
+    signal at every bar) — the standard 1-day-ahead reversal implementation.
+
+    This is the enterprise's new-signal-class test candidate: mean
+    reversion on large-cap US equities, the conceptual opposite of the
+    trend-following MA crossover tested previously. Like the MA crossover,
+    it is judged through the same perturbation / coin-flip-null /
+    regime-stability gates before any positive claim is considered.
+
+    No look-ahead: each signal uses only closes up to and including its own
+    bar.
+    """
+    n = len(closes)
+    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    lookback = int(lookback)
+    for i in range(lookback, n):
+        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+        out[i] = Signal(date=i + 1, weight=-1.0 if ret > 0 else 1.0)
+    return out
+
+
 def regime_adaptive_ma_signals(
     closes: NDArray,
     fast_calm: int = 20,

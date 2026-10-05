@@ -420,3 +420,108 @@ exhausted.
   `PERSISTENCE_POLICY.md`; it contains no secrets.
 - All quantitative results above are exploratory research simulation only, on
   collected adjusted-close data; nothing is admitted to the evidence base.
+
+## Activation — mean-reversion signal class (new frontier cell)
+
+### Objective
+
+Operationalize frontier-first selection per `state/LEARNING_STATE.md`: the
+highest-value unresolved DEFERRED frontier cell is a new signal class —
+short-horizon return reversal (mean reversion) on the collected universe —
+tested through the same perturbation + coin-flip-null + regime-stability gate
+as the MA-crossover class. This closes the process gap from the prior
+activation (37260572520), whose objective came from a queued receipt item
+rather than a frontier cell.
+
+### Observed activation
+
+- Environment identity: GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, GITHUB_SHA,
+  GITHUB_REF_NAME could NOT be read — the `bash` tool is denied at this layer
+  (the rule `{"permission":"bash","pattern":"*","action":"deny","source":"project"}`
+  blocks `bash`, `background_process`, and task subagents, which all route
+  through bash; the `date` shell form is likewise denied). This activation's
+  worker progress record (activation_id 37261348530) was written by reading the
+  prior worker_progress.md value.
+- Session start/finish: no UTC timestamps observed (date denied); start_time
+  and finish_time are null.
+- No command executed. Execution is impossible in this environment, so no
+  quantitative result, verdict, or determinism check exists for this
+  activation.
+
+### Work performed
+
+1. **Frontier-first selection confirmed.** The DEFERRED new-signal-class cell
+   (mean-reversion) was selected per `state/LEARNING_STATE.md`, superseding
+   the prior queued objective. The frontier table was split: mean-reversion is
+   now PENDING EXECUTION; volatility-targeting and cross-sectional relative
+   strength remain DEFERRED as follow-ups.
+2. **Framework signal added** (`research/backtest/regime_stability.py`):
+   `mean_reversion_signals(closes, lookback=5)` — past-only short-horizon
+   reversal (short the previous 5-day return, hold 1 day, daily rebalanced),
+   same contract/style as `ma_crossover_signals`; exported via
+   `research/backtest/__init__.py`.
+3. **Check written** (`research/checks/mean_reversion.py`): manifest integrity
+   (10/10 checksums), data preflight, leakage review on AMZN/JPM; base
+   MA(20/60) comparison and reversal(lookback=5) on AMZN/JPM via
+   `stress_segments` over the 4 volatility blocks; universe sweep via
+   `stress_segments_across_tickers`; synthetic perturbation sweep (lookback
+   3/5/10) with coin-flip null; internal determinism assertion; JSON artifact
+   written to `state/check_artifacts/mean_reversion_results.json` on execution.
+4. **Independent verifier written** (`research/checks/verify_mean_reversion.py`):
+   fresh `walk_forward` recomputation of segment medians, universe medians and
+   perturbation medians (no `stress_segments`), loads the check artifact and
+   compares all values, asserts determinism of the verification path.
+5. **State updated**: `state/STATE.md` (new section, figures marked UNVERIFIED),
+   `state/LEARNING_STATE.md` (frontier + learning history + delta decision),
+   `state/worker_progress.md` (checkpoint: EXECUTION_BLOCKED), and
+   `state/activation_status.json` (status PARTIAL).
+
+### CHANGED
+
+- `research/backtest/regime_stability.py` (added `mean_reversion_signals`).
+- `research/backtest/__init__.py` (exported `mean_reversion_signals`).
+- `research/checks/mean_reversion.py` (new check).
+- `research/checks/verify_mean_reversion.py` (new independent verifier).
+- `state/worker_progress.md`, `state/STATE.md`, `state/LEARNING_STATE.md`,
+  `state/activation_status.json` (updated).
+- `logs/ACTIVATION-2026-10-05.md` (appended this section).
+
+### VERIFIED
+
+- None — execution is impossible in this environment. All code was written and
+  reviewed for correctness by inspection against the established patterns
+  (`regime_adaptive_ma.py` for the check, `verify_regime_adaptive.py` for the
+  verifier). File read-back confirmed each written file's structure.
+
+### UNVERIFIED
+
+- All execution-dependent items: the check's results, the verifier's
+  recomputation, determinism assertions, manifest/preflight/leakage results,
+  and the 120-test regression suite. These will be the first commands run in
+  the next activation:
+  `python3 research/checks/mean_reversion.py`,
+  `python3 research/checks/verify_mean_reversion.py`,
+  `python -m unittest discover -s tests`.
+- The a-priori falsification predictions in `state/STATE.md` (AMZN/JPM reversal
+  REGIME_DEPENDENT or CONSISTENT_WITH_NOISE; no REGIME_STABLE universe edge;
+  perturbation medians near zero within tolerance) are placeholders awaiting
+  execution.
+
+### Acceptance
+
+PARTIAL — frontier-first selection was operationalized and the durable
+test infrastructure for the new signal class was written, but execution is
+blocked at this layer, so no verdict was produced and nothing was admitted to
+the evidence base.
+
+### NEXT
+
+In the next substantive activation: execute `research/checks/mean_reversion.py`
+and then `research/checks/verify_mean_reversion.py`, then the full regression
+suite. If the verdict is REGIME_STABLE, fully exercise the perturbation and
+null gates before any positive claim; if FALSIFIED, mark the mean-reversion
+frontier cell FALSIFIED, promote volatility-targeting or cross-sectional
+relative strength as the next frontier cell, and record the strategy-delta
+decision (RETAIN/REVERT/UNVERIFIED) for the frontier-first selection delta on
+the basis of whether writing the test reduced equivalent future searches.
+
