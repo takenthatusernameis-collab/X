@@ -22,6 +22,11 @@ def classify(
     if liveness == "STALLED":
         return 1, "FAILED"
     if liveness == "COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT":
+        # A missing live checkpoint is a process-quality defect, not proof that
+        # the research activation failed. Independent verification below can
+        # upgrade the activation to a verified PARTIAL outcome.
+        if verify == "success" and persistence == "MAIN" and worker == "success":
+            return 1, "PARTIAL"
         return 1, "FAILED"
     if worker == "skipped":
         return 1, "FAILED"
@@ -48,6 +53,7 @@ def self_test() -> int:
     assert classify(**common, verify="success", worker="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (1, "PARTIAL")
     assert classify(**common, verify="success", worker="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="RECOVERY_BRANCH") == (1, "PARTIAL")
     assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="NO_CHANGES") == (0, "NO_SUBSTANTIVE_ACTION")
+    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_POSTWORKER_VERIFICATION", persistence="MAIN") == (0, "COMPLETE")
     assert classify(**common, verify="success", worker="skipped", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (1, "FAILED")
     assert classify(**common, worker="success", verify="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (1, "PARTIAL")
     assert classify(**common, verify="success", worker="success", liveness="STALLED", persistence="MAIN") == (1, "FAILED")
