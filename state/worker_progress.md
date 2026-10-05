@@ -1,9 +1,17 @@
 # Worker Progress
 
-activation_id: 37318950814
-phase: VERIFY
-status: MOMENTUM_CLASS_EXECUTED
-last_verified_milestone: momentum_signals framework export added and verified; momentum check ran end-to-end on the collected universe (manifest 10/10 OK, preflight passed, leakage PASS, 4-segment regime gate, 10-asset universe sweep, synthetic perturbation sweep, determinism); independent verifier MATCH on all primary path values; determinism r1==r2; 134/134 regression tests pass post-edit. Artifact written to state/check_artifacts/momentum_results.json.
-next_bounded_action: fold the momentum verdict into state/STATE.md and state/LEARNING_STATE.md, update the activation receipt, and close the momentum frontier cell (expected: SUPPORTED — the first non-falsified result of this series, with a caveat that the synthetic perturbation sweep baseline matches the null because the synthetic generator lacks momentum structure).
+activation_id: 37319421072
+phase: PREFLIGHT
+status: IN_PROGRESS
+last_verified_milestone: smoke test PASSED; 134/134 regression tests OK; fresh momentum artifact to be written
+next_bounded_action: rerun research/checks/momentum.py (fresh artifact) and research/checks/verify_momentum.py (independent recomputation); compare fresh artifact to prior artifact (37318950814)
+
+NOTE: this is a long-running check (~10 min+): 10-ticker universe walk-forward on 4 regime blocks + synthetic perturbation.
+
+Objective (this activation): independently reproduce the momentum frontier result
+from activation 37318950814 — the only remaining frontier cell — by rerunning the
+momentum check and its independent verifier on the collected universe, comparing the
+fresh artifact against the prior one, and then deciding whether momentum is admitted
+to the evidence base or extended (parameter sweep on real data) before admission.
 
 This file is a liveness contract. Update it only after a real research-state transition or verified milestone.
