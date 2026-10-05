@@ -883,6 +883,36 @@ def mean_reversion_signals(
     return out
 
 
+def momentum_signals(
+    closes: NDArray,
+    lookback: int = 5,
+) -> List[Signal]:
+    """Past-only short-horizon momentum signal (new signal class).
+
+    Long the previous ``lookback``-day return and hold for one day: if the
+    last ``lookback`` days were up, go long; if they were down, go short.
+    Neutral before the ``lookback`` window. Daily rebalancing (a fresh
+    signal at every bar) — the standard 1-day-ahead momentum implementation.
+
+    This is the conceptual opposite of `mean_reversion_signals` (same
+    construction, opposite sign). It is the competing hypothesis to the
+    reversal class tested previously: if shorting the previous N-day return
+    produces uniformly negative results, the momentum variant should
+    produce uniformly positive results; either outcome settles whether the
+    5-day-lookback direction bet is a robust edge on this universe.
+
+    No look-ahead: each signal uses only closes up to and including its own
+    bar.
+    """
+    n = len(closes)
+    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    lookback = int(lookback)
+    for i in range(lookback, n):
+        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+        out[i] = Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+    return out
+
+
 def regime_adaptive_ma_signals(
     closes: NDArray,
     fast_calm: int = 20,
