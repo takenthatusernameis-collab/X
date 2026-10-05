@@ -51,6 +51,14 @@ OUTLIER_TOL = 0.05
 """Tolerance in log-return units for judging whether a scenario's result
 deviates from the noise benchmark (the framework's null hypothesis)."""
 
+REGIME_STABLE_LOSS = "REGIME_STABLE_LOSS"
+"""Verdict for a candidate whose results are consistently negative across
+all scenarios: stable losses, not an edge. The medians are uniformly below
+zero but the cross-scenario swing does not exceed twice the null
+dispersion, i.e. the losses are regime-stable rather than regime-dependent.
+This verdict must be read alongside the medians: it records stability of
+losses, not a robust edge."""
+
 
 @dataclass(frozen=True)
 class RegimeScenario:
@@ -162,7 +170,14 @@ def always_long_signal(closes: NDArray, fast: int, slow: int) -> List[Signal]:
 
 @dataclass(frozen=True)
 class RegimeScenarioResult:
-    """Results for one regime scenario."""
+    """Results for one regime scenario.
+
+    The overall verdict of the surrounding regime-stability run is one of
+    CONSISTENT_WITH_NOISE, REGIME_DEPENDENT, REGIME_STABLE, or
+    REGIME_STABLE_LOSS (a candidate whose medians are uniformly negative
+    across scenarios but whose cross-scenario swing stays within twice the
+    null dispersion).
+    """
     name: str
     param_sets: List[ParameterSet]
     baseline_param_set: ParameterSet
@@ -253,7 +268,7 @@ class RegimeStressResult:
     scenarios: List[RegimeScenarioResult]
     param_sets: List[ParameterSet]
     baseline_param_set: ParameterSet
-    overall_verdict: str  # REGIME_STABLE / REGIME_DEPENDENT / CONSISTENT_WITH_NOISE
+    overall_verdict: str  # REGIME_STABLE / REGIME_STABLE_LOSS / REGIME_DEPENDENT / CONSISTENT_WITH_NOISE
     candidate_dispersion: float  # std of candidate medians across scenarios
     null_dispersion: float       # std of noise medians across scenarios
     n_folds: int
@@ -317,9 +332,11 @@ class RegimeStressResult:
         lines.append(
             "Interpretation: REGIME_STABLE means the candidate behaves the same "
             "way in every regime mix (same edge, or no edge, everywhere). "
-            "REGIME_DEPENDENT means the candidate's results vary strongly across "
-            "regimes relative to the noise benchmark (fits one regime, fails in "
-            "others). CONSISTENT_WITH_NOISE means the candidate is "
+            "REGIME_STABLE_LOSS means the candidate loses money in every regime "
+            "mix (stable losses, not an edge). REGIME_DEPENDENT means the "
+            "candidate's results vary strongly across regimes relative to the "
+            "noise benchmark (fits one regime, fails in others). "
+            "CONSISTENT_WITH_NOISE means the candidate is "
             "indistinguishable from the coin-flip null in every scenario."
         )
         return "\n".join(lines)
@@ -507,6 +524,13 @@ def regime_stress(
         # coin-flip null would: the candidate fits particular regime mixes
         # rather than being robust to the data-generating process.
         verdict = "REGIME_DEPENDENT"
+    elif all(m < 0 for m in candidate_medians):
+        # Every scenario shows a negative median but the cross-scenario swing
+        # stays within twice the null dispersion: the candidate loses money
+        # consistently across regimes. This is REGIME_STABLE_LOSS — stability
+        # of losses, not a robust edge — and it must be read alongside the
+        # medians rather than treated as an edge.
+        verdict = REGIME_STABLE_LOSS
     else:
         verdict = "REGIME_STABLE"
 
@@ -719,6 +743,13 @@ def stress_segments(
         verdict = "CONSISTENT_WITH_NOISE"
     elif candidate_dispersion > 2.0 * null_dispersion:
         verdict = "REGIME_DEPENDENT"
+    elif all(m < 0 for m in candidate_medians):
+        # Every segment shows a negative median but the cross-segment swing
+        # stays within twice the null dispersion: the candidate loses money
+        # consistently across regimes. This is REGIME_STABLE_LOSS — stability
+        # of losses, not a robust edge — and it must be read alongside the
+        # medians rather than treated as an edge.
+        verdict = REGIME_STABLE_LOSS
     else:
         verdict = "REGIME_STABLE"
 
@@ -924,6 +955,7 @@ class RegimeUniverseSummary:
         counts: Dict[str, int] = {
             "CONSISTENT_WITH_NOISE": 0,
             "REGIME_STABLE": 0,
+            "REGIME_STABLE_LOSS": 0,
             "REGIME_DEPENDENT": 0,
         }
         for res in self.assets.values():
@@ -953,10 +985,12 @@ class RegimeUniverseSummary:
         lines.append("")
         lines.append(
             "Interpretation: REGIME_STABLE = the candidate behaves the same way "
-            "(same edge or no edge) across regimes; REGIME_DEPENDENT = results "
-            "swing strongly across regimes relative to the coin-flip null "
-            "(fits one regime); CONSISTENT_WITH_NOISE = indistinguishable from "
-            "noise in every segment."
+            "(same edge or no edge) across regimes; REGIME_STABLE_LOSS = the "
+            "candidate loses money in every regime mix (stable losses, not an "
+            "edge, and the verdict must be read alongside the medians); "
+            "REGIME_DEPENDENT = results swing strongly across regimes relative "
+            "to the coin-flip null (fits one regime); CONSISTENT_WITH_NOISE = "
+            "indistinguishable from noise in every segment."
         )
         return "\n".join(lines)
 
@@ -1241,4 +1275,164 @@ def csrs_spread_family(family, lookback, top_k, bottom_k):
         long_ret = float(np.mean([leg_ret(a) for a in longs]))
         short_ret = float(np.mean([leg_ret(a) for a in shorts]))
         daily_pnl[i] = long_ret - short_ret
+    return daily_pnl
+
+
+# ==============================================================================
+# Volatility-targeting signal class helpers
+# ==============================================================================
+
+def vol_rank_spread_daily_returns(tickers, lookback=60, top_k=3, bottom_k=3):
+    """Volatility-targeting spread: daily P&L of a long-low-vol / short-high-vol
+    portfolio built from ranks across the collected universe.
+
+    At each date t >= lookback: compute each ticker's trailing-`lookback`-day
+    realized volatility (closes[i-lookback : i], past-only); rank tickers
+    descending by volatility; long the bottom_k (lowest-volatility) tickers,
+    short the top_k (highest-volatility) tickers with equal capital per leg;
+    hold one day; daily rebalance. The spread P&L at bar t equals the mean of
+    the long-legs' next-day simple returns minus the mean of the short-legs'
+    next-day simple returns. Bars before lookback, and days with fewer than
+    2*k tickers available, are neutral (P&L = 0).
+
+    This is the volatility-targeting / low-vol premium signal class on the
+    collected universe: rank by past volatility, long bottom-k / short top-k,
+    hold 1 day. Past-only by construction.
+
+    No look-ahead: every input at bar t uses closes only up to and
+    including t; the realized P&L is the return realized between bar t
+    and bar t+1.
+
+    Args:
+        tickers: dict ticker -> BarSequence of adjusted closes (all tickers
+            share the same date grid).
+        lookback: lookback window in bars for realized volatility.
+        top_k, bottom_k: leg sizes.
+
+    Returns:
+        np.ndarray of daily spread P&L (simple returns), one entry per bar
+        (0.0 where no trade is possible).
+    """
+    min_len = min(len(tb) for tb in tickers.values())
+    daily_pnl = np.zeros(min_len, dtype=np.float64)
+    for i in range(lookback, min_len - 1):
+        closes = {t: tb.closes_array()[:min_len] for t, tb in tickers.items()}
+        vols = {t: float(np.std(np.log(closes[t][i - lookback : i]), ddof=1))
+                for t in closes}
+        sorted_tickers = sorted(vols, key=lambda t: vols[t], reverse=True)
+        longs = sorted_tickers[-bottom_k:]   # lowest-volatility leg
+        shorts = sorted_tickers[:top_k]      # highest-volatility leg
+        if len(longs) < bottom_k or len(shorts) < top_k:
+            continue
+        long_ret = float(np.mean(
+            [closes[t][i + 1] / closes[t][i] - 1 for t in longs]))
+        short_ret = float(np.mean(
+            [closes[t][i + 1] / closes[t][i] - 1 for t in shorts]))
+        daily_pnl[i] = long_ret - short_ret
+    return daily_pnl
+
+
+def vol_rank_spread_family(family, lookback, top_k, bottom_k):
+    """Compute the volatility-targeting spread daily P&L across a synthetic
+    family of BarSequence assets (same pattern as vol_rank_spread_daily_returns
+    but over a family instead of a dict of tickers).
+
+    Args:
+        family: list of BarSequence, one per asset (same length).
+        lookback, top_k, bottom_k: as in vol_rank_spread_daily_returns.
+
+    Returns:
+        np.ndarray of daily spread P&L.
+    """
+    first_len = len(family[0])
+    daily_pnl = np.zeros(first_len, dtype=np.float64)
+    for i in range(lookback, first_len - 1):
+        vols = {}
+        for a, asset in enumerate(family):
+            c = asset.closes_array()
+            vols[a] = float(np.std(c[i - lookback : i], ddof=1))
+        sorted_assets = sorted(vols, key=lambda a: vols[a], reverse=True)
+        longs = sorted_assets[-bottom_k:]
+        shorts = sorted_assets[:top_k]
+        if len(longs) < bottom_k or len(shorts) < top_k:
+            continue
+        leg_ret = lambda a: float(np.log(family[a].closes_array()[i + 1])
+                                  - np.log(family[a].closes_array()[i]))
+        long_ret = float(np.mean([leg_ret(a) for a in longs]))
+        short_ret = float(np.mean([leg_ret(a) for a in shorts]))
+        daily_pnl[i] = long_ret - short_ret
+    return daily_pnl
+
+
+def vol_rank_null_spread_daily_returns(tickers, lookback=60, top_k=3, bottom_k=3,
+                                       seed=42):
+    """Coin-flip null of the volatility-targeting spread.
+
+    Ranks are computed identically (past-only); the long/short assignment is
+    randomized: a deterministic coin flip per bar decides whether the
+    rank-ordered legs are held (as in vol_rank_spread_daily_returns) or
+    shorted. This preserves the spread's magnitude/structure while removing
+    its information content.
+
+    Args:
+        tickers: dict ticker -> BarSequence.
+        lookback, top_k, bottom_k: as in vol_rank_spread_daily_returns.
+        seed: deterministic RNG seed for the coin flips.
+
+    Returns:
+        np.ndarray of daily P&L (one entry per bar).
+    """
+    rng = np.random.default_rng(seed)
+    min_len = min(len(tb) for tb in tickers.values())
+    daily_pnl = np.zeros(min_len, dtype=np.float64)
+    for i in range(lookback, min_len - 1):
+        closes = {t: tb.closes_array()[:min_len] for t, tb in tickers.items()}
+        vols = {t: float(np.std(np.log(closes[t][i - lookback : i]), ddof=1))
+                for t in closes}
+        sorted_tickers = sorted(vols, key=lambda t: vols[t], reverse=True)
+        longs = sorted_tickers[-bottom_k:]
+        shorts = sorted_tickers[:top_k]
+        if len(longs) < bottom_k or len(shorts) < top_k:
+            continue
+        leg_ret = lambda t: float(closes[t][i + 1] / closes[t][i] - 1)
+        spread = float(np.mean([leg_ret(t) for t in longs])) \
+                 - float(np.mean([leg_ret(t) for t in shorts]))
+        daily_pnl[i] = spread if rng.random() < 0.5 else -spread
+    return daily_pnl
+
+
+def vol_rank_null_spread_family(family, lookback, top_k, bottom_k, seed=42):
+    """Coin-flip null of the volatility-targeting spread over a synthetic
+    family of assets.
+
+    Ranks are computed identically (past-only); the long/short assignment is
+    randomized by a deterministic per-bar coin flip, preserving the spread's
+    magnitude/structure while destroying its information content.
+
+    Args:
+        family: list of BarSequence, one per asset (same length).
+        lookback, top_k, bottom_k: as in vol_rank_spread_family.
+        seed: deterministic RNG seed for the coin flips.
+
+    Returns:
+        np.ndarray of daily P&L (one entry per bar).
+    """
+    rng = np.random.default_rng(seed)
+    first_len = len(family[0])
+    daily_pnl = np.zeros(first_len, dtype=np.float64)
+    for i in range(lookback, first_len - 1):
+        vols = {}
+        for a, asset in enumerate(family):
+            c = asset.closes_array()
+            vols[a] = float(np.std(c[i - lookback : i], ddof=1))
+        sorted_assets = sorted(vols, key=lambda a: vols[a], reverse=True)
+        longs = sorted_assets[-bottom_k:]
+        shorts = sorted_assets[:top_k]
+        if len(longs) < bottom_k or len(shorts) < top_k:
+            continue
+        leg_ret = lambda a: float(np.log(family[a].closes_array()[i + 1])
+                                  - np.log(family[a].closes_array()[i]))
+        spread = np.mean([leg_ret(a) for a in longs]) \
+                 - np.mean([leg_ret(a) for a in shorts])
+        daily_pnl[i] = spread if rng.random() < 0.5 else -spread
     return daily_pnl

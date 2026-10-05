@@ -74,6 +74,10 @@ from .regime_stability import (
     csrs_null_spread_family,
     build_synthetic_spread_asset,
     csrs_spread_family,
+    vol_rank_spread_daily_returns,
+    vol_rank_spread_family,
+    vol_rank_null_spread_daily_returns,
+    vol_rank_null_spread_family,
 )
 from .universe import (
     ASSET_VERDICT_CONCENTRATED,
@@ -150,4 +154,8 @@ __all__ = [
     "csrs_null_spread_family",
     "build_synthetic_spread_asset",
     "csrs_spread_family",
+    "vol_rank_spread_daily_returns",
+    "vol_rank_spread_family",
+    "vol_rank_null_spread_daily_returns",
+    "vol_rank_null_spread_family",
 ]

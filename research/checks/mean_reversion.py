@@ -5,9 +5,8 @@ on the collected adjusted-close universe and rejected — no parameter set
 peaked at the canonical (20,60) in any asset, the full-sample walk-forward
 sat inside the sample-calibrated coin-flip noise band, only 1/10 assets was
 marginally significant (t-test) and none survived a Bonferroni family-wise
-correction, and the regime-stability verdicts were mixed
-(CONSISTENT_WITH_NOISE=4, REGIME_STABLE=4, REGIME_DEPENDENT=2) rather than
-REGIME_STABLE everywhere. The MA-crossover frontier cell is therefore closed.
+correction, and the regime-stability verdicts were not uniformly positive.
+The MA-crossover frontier cell is therefore closed.
 
 The next frontier cell is a new signal class: mean reversion. Hypothesis:
 short-horizon return reversal (bet against the previous 5-day return,
@@ -21,7 +20,10 @@ post-crisis reversal environment differs structurally from 2022-2026 and a
 This is a principled, fixed a-priori design (short the previous 5-day return;
 hold 1 day; daily rebalance), not tuned to OOS results. The variant is run
 through the SAME `stress_segments` pipeline and coin-flip null as the base
-MA(20/60), so verdicts are directly comparable.
+MA(20/60), so verdicts are directly comparable. The verdict label
+REGIME_STABLE_LOSS (stable losses uniformly below zero, read alongside the
+medians) must be distinguished from REGIME_STABLE (consistent edge or no
+edge) when reading results.
 
 Method: for the two REGIME_DEPENDENT assets from the MA run (AMZN, JPM), run
 both base MA(20/60) and reversal(lookback=5) through `stress_segments` over

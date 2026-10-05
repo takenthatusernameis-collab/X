@@ -712,6 +712,97 @@ cross-sectional relative strength are now all falsified on this universe.
 
 ---
 
+## Current activation (volatility-targeting frontier test executed; falsified — 37314710995)
+
+The volatility-targeting frontier cell was executed in this activation
+(37314710995): `research/checks/volatility_targeting.py` ran end-to-end on the
+collected adjusted-close universe (manifest 10/10 OK, preflight passed, leakage
+PASS), the full-sample engine self-consistency passed, the fresh engine-path
+cross-check matched the direct fold-log-return path on every segment, and the
+perturbation sweep and determinism gates completed; artifact written to
+`state/check_artifacts/volatility_targeting_results.json`. The check and its
+independent verifier (`research/checks/verify_volatility_targeting.py`) were
+written cleanly with no execution-time defects, so no repair cycle was needed.
+
+Hypothesis (a-priori, fixed design): the volatility-targeting spread — at each
+rebalance date rank the cross section of large-cap US equities by trailing
+realized volatility, long the lowest-volatility (bottom-3) tickers, short the
+highest-volatility (top-3), hold 1 day, daily rebalance — earns a REGIME_STABLE
+positive edge on the collected large-cap universe, judged through the regime
+gate + concentration gate + synthetic perturbation sweep vs a coin-flip null,
+with an engine-path cross-check and an independent verifier.
+
+Falsification prediction: if the spread earns nothing beyond a coin-flip null,
+or its result concentrates in one or two tickers, or it behaves like noise
+across the canonical regime family, the class is falsified as a robust edge
+source.
+
+Method: seed 42, collected adjusted-close data (dataset
+`yf-ohlcv-universe-2009-to-2026-10-03`), 10-ticker universe truncated to the
+fully overlapping window (3614 bars, 2012-05-18 to 2026-10-02), regime blocks
+from AAPL trailing-60d volatility (4 blocks: calm, turbulent), walk-forward
+train=252d/test=84d/warmup=60d/overlap=60d, min 400 bars/segment; vol-targeting
+= rank by trailing-60d realized volatility, long bottom-3 / short top-3, hold
+1 day, daily rebalance; coin-flip null = sign-flipped spread; concentration gate
+via drop-one sub-universes; synthetic perturbation sweep (lookback 30/60/120 x
+top_k 3/4/5, 4 canonical regime scenarios, 9 param sets, 288 null folds per
+baseline).
+
+A-priori falsification prediction: the volatility-targeting class would show
+either CONSISTENT_WITH_NOISE or REGIME_DEPENDENT with no REGIME_STABLE positive
+edge, and a noise-like perturbation sweep. The prediction was CONFIRMED and
+exceeded — the class produces systematic LOSSES rather than merely an absent
+edge:
+
+- Regime gate (full universe): candidate medians calm -0.081, turbulent -0.056
+  vs null calm +0.017, turbulent +0.074; candidate dispersion +0.018 vs null
+  +0.040 (not > 2x null) -> REGIME_STABLE. Engine cross-check MATCH on every
+  segment (same verdict). Note: the REGIME_STABLE verdict describes stability of
+  *negative* medians, not an edge.
+- Per-sub-universe (drop-one) verdicts across 10 assets:
+  CONSISTENT_WITH_NOISE=1 (TSLA: medians [-0.019, -0.012], both negative),
+  REGIME_STABLE=9 (all negative medians, REGIME_STABLE only because dispersion
+  is not > 2x null — the consistent medians are negative, not an edge),
+  REGIME_DEPENDENT=0.
+- Concentration gate: full-universe median -0.084 outside the sample-calibrated
+  null tolerance +0.028 (negative direction); best single-ticker contribution
+  share 45.9% (TSLA, -0.039) -> gate flags CONCENTRATED on the negative
+  result. Methodology note: the concentration gate's "edge present" branch
+  applies the same logic to a negative result; there is no positive edge to
+  concentrate, so the figure is recorded as evidence of systematic losses, not
+  as a positive concentrated edge.
+- Synthetic sweep: baseline (lookback=60, top_k=3) median +0.001 vs null
+  -0.002; sample-calibrated tolerance +0.007 (baseline within tolerance); sweep-level
+  candidate dispersion +0.004 vs null +0.004 -> CONSISTENT_WITH_NOISE;
+  scenario-by-scenario baseline medians: calm -0.003, turbulent +0.005,
+  mean_reverting +0.011, trending -0.017 — mixed signs around zero, noise-like.
+
+Verdict: **FALSIFIED** — the volatility-targeting / long-low-vol–short-high-vol
+cross-sectional spread is not a robust edge on the collected large-cap
+universe: the spread median is negative in every segment of every asset and the
+synthetic sweep is CONSISTENT_WITH_NOISE across lookback/top_k perturbations.
+The `REGIME_STABLE` sub-universe verdicts describe stability of *losses*, not an
+edge, and are not admitted as candidate edges; the concentration gate's
+CONCENTRATED flag applies to the negative result's worst contributor (45.9%),
+not to any positive edge. This is durable negative evidence: executed,
+independently verified (engine-path MATCH + determinism r1==r2 across two full
+runs + verifier MATCH on all primary path values), and deterministic.
+
+Methodology observation (durable): the regime-stability verdict machinery and
+the concentration gate's "edge present" branch were written assuming a positive
+edge to evaluate; on uniformly-negative results the regime gate labels
+stability of losses as REGIME_STABLE and the concentration gate computes a
+best-share from negative drop-one impacts. The verdict labels are therefore not
+self-interpreting — they must be read alongside the medians, exactly as recorded
+here. This observation should be checked before admitting any similar negative
+result to avoid mis-reading stable losses as stable edges.
+
+Frontier update: the volatility targeting cell closes as FALSIFIED. MA
+crossover, short-horizon return reversal, cross-sectional relative strength, and
+volatility targeting are now all falsified on this universe; the frontier has no
+further deferred signal-class cell to execute for this search direction.
+
+
 ## Evidence standard
 
 Synthetic data validates tooling only; it is not evidence that any
@@ -1138,3 +1229,73 @@ Verification (two materially independent paths that agree exactly):
     cross-sectional relative strength on the collected universe — which the
     framework can evaluate through the same perturbation + null + regime-
     stability gate before any positive claim.
+
+
+## Current activation (REGIME_STABLE_LOSS verdict label; regime-feature diagnostic)
+
+### Framework repair: REGIME_STABLE_LOSS verdict
+
+The regime-stability machinery labeled uniformly-negative, regime-stable
+results as `REGIME_STABLE`, which was misreadable as a stable edge. Repaired
+by adding a fourth verdict `REGIME_STABLE_LOSS` (candidate medians uniformly
+negative, cross-scenario/segment dispersion <= 2x the null dispersion):
+
+- `research/backtest/regime_stability.py`: verdict logic in
+  `regime_stress()` and `stress_segments()` now emit `REGIME_STABLE_LOSS` when
+  all candidate medians are negative and the swing stays within 2x the null;
+  `RegimeScenarioResult`/`RegimeStressResult` docstrings and
+  `RegimeUniverseSummary.verdict_counts` updated (4-key counts).
+- The three frontier checks and their independent verifiers were re-run with
+  the corrected verdicts:
+  - Volatility-targeting: regime-gate verdict REGIME_STABLE_LOSS
+    (calm -0.081, turbulent -0.056); per-sub-universe 1/1/8/0
+    (CWN/REGIME_STABLE/REGIME_STABLE_LOSS/DEPENDENT); sweep CONSISTENT_WITH_NOISE.
+    Independent verifier: MATCH.
+  - Cross-sectional relative strength: regime-gate CONSISTENT_WITH_NOISE;
+    per-sub-universe 9/0/1/0 (NVDA -> REGIME_STABLE_LOSS); independent
+    verifier: MATCH.
+  - Mean-reversion: per-asset CWN=0/REGIME_STABLE=2 (NVDA, TSLA)/
+    REGIME_STABLE_LOSS=4 (GOOGL, AMZN, META, JNJ)/REGIME_DEPENDENT=4
+    (AAPL, MSFT, JPM, XOM); independent verifier: MATCH.
+- Full regression suite: 134/134 tests pass (including the one test updated to
+  expect the 4th verdict).
+
+### Regime-feature diagnostic: can richer features separate the two turbulent
+periods?
+
+Question: the MA edge lived in 2009-2013 and reversed in 2022-2026; both got
+"turbulent" from the past-only volatility classifier. Can a richer,
+cross-sectional regime feature separate them — and if so, does it rescue the
+MA edge? Diagnostic `research/checks/cross_sectional_regime_diagnostic.py`:
+
+- Block classification (truncated 3614-bar window, actual trading dates):
+  - 2009-2013 (bar 0..1257): volatility classifier 47.69% turbulent;
+    cross-sectional dispersion 51.99%; smoothed cs dispersion 50.72%.
+  - 2022-2026 (bar 3273..4464): volatility classifier 65.98% turbulent;
+    cross-sectional dispersion 68.62%; smoothed cs dispersion 100.00%.
+  - Both classifiers separate the blocks (confirmed by an independent
+    pairwise-absolute-returns recomputation).
+- MA(20/60) through `stress_segments` under block-based cs-dispersion labels
+  (4 contiguous blocks):
+  - AMZN: segments [turbulent, calm, turbulent], medians
+    [+0.054, +0.042, -0.102] -> REGIME_DEPENDENT.
+  - JPM: segments [turbulent, calm, turbulent], medians
+    [+0.102, -0.022, +0.017] -> REGIME_DEPENDENT.
+- Conclusion: richer regime features DO separate the two turbulent periods
+  (2022-2026 is far more "turbulent" by cross-sectional dispersion, smoothed
+  100% vs 51%), but that does not rescue the MA edge — it remains
+  REGIME_DEPENDENT under the richer labels. The edge is genuinely
+  period-fitting, not merely poorly-regime-classified.
+
+Verdict recorded: the MA-crossover rescue via richer regime features is closed;
+the frontier moves to a different hypothesis family.
+
+
+## Evidence standard
+
+Synthetic data validates tooling only; it is not evidence that any
+strategy is profitable in live markets. A strategy on synthetic data is
+exploratory simulation only. Real-data work must carry its own audited
+data and provenance and pass the leakage and perturbation gates before
+admission to the evidence base.
+

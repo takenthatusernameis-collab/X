@@ -133,7 +133,8 @@ class TestStressSegmentsAcrossTickers(unittest.TestCase):
         total = sum(s.verdict_counts.values())
         self.assertEqual(total, s.n_assets)
         self.assertEqual(set(s.verdict_counts),
-                         {"REGIME_STABLE", "REGIME_DEPENDENT", "CONSISTENT_WITH_NOISE"})
+                          {"REGIME_STABLE", "REGIME_STABLE_LOSS",
+                           "REGIME_DEPENDENT", "CONSISTENT_WITH_NOISE"})
         for res in s.assets.values():
             self.assertIn(res.overall_verdict, s.verdict_counts)
 

@@ -80,7 +80,7 @@ independent re-runs.
 - **AAPL cross-checks exactly** against the earlier independent diagnostic
   (`research/checks/verify_aapl_stats.py`): 170 folds, mean +0.0309, median
   +0.0242, std +0.1463, 101/170 positive, t=2.75 (df=169), 95% CI
-  [0.0089, 0.0529]. The two independent implementations agree.
+  [0.0089, +0.0529]. The two independent implementations agree.
 - **TSLA's significance is tail-driven, not a stable edge**: mean log return
   -1.1604 vs median -0.0452, std 5.377, CI [-2.01, -0.31]. An extreme
   negative tail dominates the mean and the CI is correspondingly wide. This
@@ -116,7 +116,7 @@ activation" list retains item 4 (REGIME_DEPENDENT deep-dive on AMZN, JPM).
   printed; `r1 == r2: True` on the determinism re-run.
 - Cross-check: the AAPL row from `universe_stats.py` matches the earlier
   `verify_aapl_stats.py` figures (folds=170, mean +0.0309, median +0.0242,
-  std +0.1463, t=2.75, df=169, CI [0.0089, 0.0529]).
+  std +0.1463, t=2.75, df=169, CI [0.0089, +0.0529]).
 
 ## UNVERIFIED
 
@@ -141,16 +141,16 @@ activation" list retains item 4 (REGIME_DEPENDENT deep-dive on AMZN, JPM).
 ## NEXT
 
 1. (Recommended) Regression discipline maintained: after any research/code
-   change, re-run the full suite plus the examples; for this change:
-   `python -m unittest discover -s tests -v` (120 OK) and
-   `python3 research/checks/universe_stats.py` (determinism asserted internally).
+    change, re-run the full suite plus the examples; for this change:
+    `python -m unittest discover -s tests -v` (120 OK) and
+    `python3 research/checks/universe_stats.py` (determinism asserted internally).
 2. Optional follow-on #4 from STATE.md: deep-dive on the REGIME_DEPENDENT
-   assets (AMZN, JPM) — block-by-block breakdown of which regime mix drives
-   the swing and a regime-filtered variant — the natural complement to this
-   fold-level significance view.
+    assets (AMZN, JPM) — block-by-block breakdown of which regime mix drives
+    the swing and a regime-filtered variant — the natural complement to this
+    fold-level significance view.
 3. Optionally fold the per-asset fold-return summary into
-    `RegimeUniverseSummary` output so regime-stability runs report fold
-    statistics alongside verdicts (item 3b from the prior activation).
+      `RegimeUniverseSummary` output so regime-stability runs report fold
+      statistics alongside verdicts (item 3b from the prior activation).
 
 ## Activation — 02:21 UTC (regime-dependence deep-dive of AMZN and JPM)
 
@@ -173,45 +173,45 @@ active only in turbulent segments). This is next-activation item 4 from
 ### Work performed
 
 1. Smoke test (representative path): `python3 examples/regime_stability_universe.py`
-   executed end-to-end (manifest checksums, preflight, leakage review, regime
-   classification, universe-level `stress_segments_across_tickers`). Results
-   reproduce the documented universe figures exactly: AMZN
-   medians [+0.046, +0.001, -0.154] REGIME_DEPENDENT, JPM
-   [+0.109, -0.006, +0.033] REGIME_DEPENDENT.
+    executed end-to-end (manifest checksums, preflight, leakage review, regime
+    classification, universe-level `stress_segments_across_tickers`). Results
+    reproduce the documented universe figures exactly: AMZN
+    medians [+0.046, +0.001, -0.154] REGIME_DEPENDENT, JPM
+    [+0.109, -0.006, +0.033] REGIME_DEPENDENT.
 
 2. Created `research/checks/regime_dependent_deep_dive.py`: block-by-block
-   breakdown (segment dates/length/vol, candidate vs null median, folds,
-   fold mean) plus the regime-filtered variant through the same
-   `stress_segments` pipeline. Includes an internal independent recomputation
-   of each segment median via `run_bars`, an assertion that segment count from
-   the label scan matches the scenario count, internal determinism assertion,
-   manifest integrity + preflight + leakage review.
+    breakdown (segment dates/length/vol, candidate vs null median, folds,
+    fold mean) plus the regime-filtered variant through the same
+    `stress_segments` pipeline. Includes an internal independent recomputation
+    of each segment median via `run_bars`, an assertion that segment count from
+    the label scan matches the scenario count, internal determinism assertion,
+    manifest integrity + preflight + leakage review.
 
 3. Executed the deep-dive:
-   - AMZN: [turbulent 2009-03-31..2013-06-10 (pos edge +0.046, 19/28 folds),
-     calm 2013-06-11..2022-04-20 (no edge +0.001), turbulent 2022-04-21..2026-
-     10-01 (neg edge -0.154)] -> REGIME_DEPENDENT (dispersion +0.086 vs 2x
-     null +0.043).
-   - JPM: same three segments [pos edge +0.109 (21/28), no edge -0.006, no
-     edge +0.033] -> REGIME_DEPENDENT (dispersion +0.047 vs 2x null +0.024).
-   - Regime-filtered variant (signals only in turbulent segments):
-     AMZN still REGIME_DEPENDENT (dispersion +0.0859 vs 2x null +0.0854) —
-     the swing sits entirely within the turbulent regime (+0.046 in 2009-2013,
-     -0.154 in 2022-2026); JPM still REGIME_DEPENDENT (dispersion +0.0455
-     vs 2x null +0.0051, ~9x the null).
+    - AMZN: [turbulent 2009-03-31..2013-06-10 (pos edge +0.046, 19/28 folds),
+      calm 2013-06-11..2022-04-20 (no edge +0.001), turbulent 2022-04-21..2026-
+      10-01 (neg edge -0.154)] -> REGIME_DEPENDENT (dispersion +0.086 vs 2x
+      null +0.043).
+    - JPM: same three segments [pos edge +0.109 (21/28), no edge -0.006, no
+      edge +0.033] -> REGIME_DEPENDENT (dispersion +0.047 vs 2x null +0.024).
+    - Regime-filtered variant (signals only in turbulent segments):
+      AMZN still REGIME_DEPENDENT (dispersion +0.0859 vs 2x null +0.0854) —
+      the swing sits entirely within the turbulent regime (+0.046 in 2009-2013,
+      -0.154 in 2022-2026); JPM still REGIME_DEPENDENT (dispersion +0.0455
+      vs 2x null +0.0051, ~9x the null).
 
 4. Independent verification: `research/checks/verify_dd_independent.py`
-   (fresh implementation via `walk_forward`, not `stress_segments`) recomputed
-   all four runs (AMZN/JPM base + filtered). All recomputed medians MATCH the
-   deep-dive figures exactly (to 3 decimals) and all four runs are deterministic
-   across independent reruns.
+    (fresh implementation via `walk_forward`, not `stress_segments`) recomputed
+    all four runs (AMZN/JPM base + filtered). All recomputed medians MATCH the
+    deep-dive figures exactly (to 3 decimals) and all four runs are deterministic
+    across independent reruns.
 
 5. Negative conclusion recorded: the regime filter does not rescue the MA
-   crossover; the apparent edge is concentrated in one historical regime mix
-   (2009-2013 post-crisis recovery) and reverses/disappears later. Both assets
-   remain REGIME_DEPENDENT even for the filtered variant. This is regime-
-   specific fitting, not a persistent regime-contingent edge. The MA crossover
-   is reinforced as exploratory, not admitted to the evidence base.
+    crossover; the apparent edge is concentrated in one historical regime mix
+    (2009-2013 post-crisis recovery) and reverses/disappears later. Both assets
+    remain REGIME_DEPENDENT even for the filtered variant. This is regime-
+    specific fitting, not a persistent regime-contingent edge. The MA crossover
+    is reinforced as exploratory, not admitted to the evidence base.
 
 ### CHANGED
 
@@ -360,36 +360,36 @@ operationalize the frontier-first learning contract (`state/LEARNING_STATE.md`).
 ### CHANGED
 
 - `state/STATE.md` — new "Current activation (regime-adaptive MA crossover
-  falsification - AMZN/JPM + universe)" section; Next activation list
-  consolidated (items 1-4 marked complete; frontier exhausted for MA-crossover
-  hypotheses).
+   falsification - AMZN/JPM + universe)" section; Next activation list
+   consolidated (items 1-4 marked complete; frontier exhausted for MA-crossover
+   hypotheses).
 - `state/LEARNING_STATE.md` — populated research frontier (8 hypothesis cells),
-  learning history table, active strategy delta updated to UNVERIFIED with a
-  concrete next action.
+   learning history table, active strategy delta updated to UNVERIFIED with a
+   concrete next action.
 - `state/worker_progress.md` — checkpoint updated (DEEP phase -> verified
-  milestone; independent VERIFIED via two paths).
+   milestone; independent VERIFIED via two paths).
 - `logs/ACTIVATION-2026-10-05.md` — appended 03:45 UTC section.
 - `read_env.py` — new helper (GitHub identity + current UTC time) for this
-  bash-restricted environment.
+   bash-restricted environment.
 
 ### VERIFIED (exact commands/tests that succeeded)
 
 - `python3 research/data/preflight.py` — PREFLIGHT PASSED (57 checks).
 - `python3 research/checks/regime_adaptive_ma.py` — exits 0; AMZN adaptive
-  -> CONSISTENT_WITH_NOISE, JPM adaptive -> REGIME_DEPENDENT; universe
-  CWN=5/REGIME_STABLE=4/REGIME_DEPENDENT=1 (JPM); `r1 == r2`.
+   -> CONSISTENT_WITH_NOISE, JPM adaptive -> REGIME_DEPENDENT; universe
+   CWN=5/REGIME_STABLE=4/REGIME_DEPENDENT=1 (JPM); `r1 == r2`.
 - `python3 research/checks/verify_regime_adaptive.py` — exits 0; all six
-  recomputed medians MATCH published figures to 3 decimals (fresh `walk_forward`
-  path); all six deterministic.
+   recomputed medians MATCH published figures to 3 decimals (fresh `walk_forward`
+   path); all six deterministic.
 - `python -m unittest discover -s tests` (post-change) — **120 tests, all
-  passing** (16.497s).
+   passing** (16.497s).
 - `python3 validate_receipt.py` — structure OK (17 keys).
 
 ### UNVERIFIED
 
 - None material. Timestamps start 2026-10-05T03:45:40Z and finish
-  2026-10-05T03:49:47Z both observed via `python3 read_env.py`; the `date`
-  shell form is denied in this environment.
+   2026-10-05T03:49:47Z both observed via `python3 read_env.py`; the `date`
+   shell form is denied in this environment.
 
 ### Acceptance
 
@@ -416,10 +416,10 @@ exhausted.
 ### RISKS / notes
 
 - No protected/control-plane files were modified; no credentials or secrets
-  accessed or persisted. `read_env.py` is a scratch helper permitted by
-  `PERSISTENCE_POLICY.md`; it contains no secrets.
+   accessed or persisted. `read_env.py` is a scratch helper permitted by
+   `PERSISTENCE_POLICY.md`; it contains no secrets.
 - All quantitative results above are exploratory research simulation only, on
-  collected adjusted-close data; nothing is admitted to the evidence base.
+   collected adjusted-close data; nothing is admitted to the evidence base.
 
 ## Activation — mean-reversion signal class (new frontier cell)
 
@@ -436,17 +436,17 @@ rather than a frontier cell.
 ### Observed activation
 
 - Environment identity: GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, GITHUB_SHA,
-  GITHUB_REF_NAME could NOT be read — the `bash` tool is denied at this layer
-  (the rule `{"permission":"bash","pattern":"*","action":"deny","source":"project"}`
-  blocks `bash`, `background_process`, and task subagents, which all route
-  through bash; the `date` shell form is likewise denied). This activation's
-  worker progress record (activation_id 37261348530) was written by reading the
-  prior worker_progress.md value.
+   GITHUB_REF_NAME could NOT be read — the `bash` tool is denied at this layer
+   (the rule `{"permission":"bash","pattern":"*","action":"deny","source":"project"}`
+   blocks `bash`, `background_process`, and task subagents, which all route
+   through bash; the `date` shell form is likewise denied). This activation's
+   worker progress record (activation_id 37261348530) was written by reading the
+   prior worker_progress.md value.
 - Session start/finish: no UTC timestamps observed (date denied); start_time
-  and finish_time are null.
+   and finish_time are null.
 - No command executed. Execution is impossible in this environment, so no
-  quantitative result, verdict, or determinism check exists for this
-  activation.
+   quantitative result, verdict, or determinism check exists for this
+   activation.
 
 ### Work performed
 
@@ -597,4 +597,72 @@ The short-horizon return-reversal class is **FALSIFIED** on the collected large-
 
 The mean-reversion frontier cell is closed as FALSIFIED with the observed negative evidence. The next deferred frontier cell is **cross-sectional relative strength** — a rank-based, not timing-based, signal class (conceptually distinct from the falsified reversal class); the next activation should run it through the same perturbation + coin-flip-null + regime-stability gate before volatility targeting is reconsidered.
 
+## Activation — 13:20 UTC (volatility-targeting frontier cell executed; falsified — 37314710995)
 
+### Objective
+
+Execute the volatility-targeting frontier cell from `state/LEARNING_STATE.md` on the collected adjusted-close universe: add the volatility-targeting (long-low-vol / short-high-vol) spread helpers to the framework, write `research/checks/volatility_targeting.py`, independently verify with `research/checks/verify_volatility_targeting.py`, and fold the verdict into `state/STATE.md`, `state/LEARNING_STATE.md`, and `state/activation_status.json`. This is the fourth new-signal-class cell selected via the frontier-first learning contract.
+
+### Observed activation
+
+- Environment identity: GITHUB_RUN_ID=37314710995, RUN_ATTEMPT=1, SHA=42926fbe3d3f8b95d5c8672edf146dcc98ced087, REF_NAME=main (confirmed via `git log -1 --format="%H"`; the `date` shell form is denied).
+- Session start: 2026-10-05T13:10:59Z (observed via environment message time). Finish not captured precisely because the `date` shell form is denied.
+- The `bash` tool is project-wide denied (only `python3 *`, `python -m unittest *`, `python -m compileall *`, `git *`, `ls *`, `cat *`, `grep *`, and read/edit forms are allowed); all computation ran through `python3 <script>.py`.
+
+### Work performed
+
+1. **Preflight.** Manifest integrity: 10/10 checksums OK. `research/data/preflight.py`: PREFLIGHT PASSED (all 57 checks incl. known-gaps audit). Regression baseline: `python -m unittest discover -s tests -v` = **134 tests, all passing**.
+2. **Smoke test (representative path).** `state/smoke_volatility_targeting.py`: synthetic family (10 assets, 800 bars, seed 42) — spread/null magnitude-structure match True; spread and null identical in magnitude; determinism True; synthetic-equity OOS total return +0.0686 equals spread compounded return +0.0686; artifact round-trip OK; **SMOKE TEST PASSED**.
+3. **Framework additions.** `research/backtest/regime_stability.py` gained: `vol_rank_spread_daily_returns`, `vol_rank_spread_family`, `vol_rank_null_spread_daily_returns`, `vol_rank_null_spread_family` (rank by trailing-60d realized volatility, long bottom-3 lowest-vol / short top-3 highest-vol, hold 1 day, daily rebalance; coin-flip sign null); exported via `research/backtest/__init__.py`.
+4. **Check written and executed.** `research/checks/volatility_targeting.py` ran end-to-end: manifest 10/10 OK; preflight PASSED; leakage PASS on the full universe; full-sample engine self-consistent (PASS); regime gate (4 AAPL volatility blocks): candidate medians calm -0.081, turbulent -0.056 vs null calm +0.017, turbulent +0.074; engine-path cross-check (fresh walk_forward per fold, constant-share signals): MATCH on every segment vs the direct fold-log-return path; per-ticker regime gate (drop-one sub-universes): CONSISTENT_WITH_NOISE=1 (TSLA, both segments negative), REGIME_STABLE=9 (all negative medians), REGIME_DEPENDENT=0; concentration gate: full-universe median -0.084 vs null tolerance +0.028; best-ticker share 45.9% on the negative result; synthetic perturbation sweep (lookback 30/60/120 x top_k 3/4/5, 4 canonical regimes): baseline (lookback=60) +0.001 vs null -0.002, within sample-calibrated tolerance +0.007; sweep-level CONSISTENT_WITH_NOISE; determinism r1==r2; artifact written to `state/check_artifacts/volatility_targeting_results.json`.
+5. **Independent verification.** `research/checks/verify_volatility_targeting.py` (fresh `volatility_blocks`, fresh vol-rank spread implemented from raw tickers, fresh coin-flip sign null, independent fold-log-return aggregation): MATCH on segment labels, candidate medians (-0.08142, -0.05553), null medians (+0.01703, +0.07407), per-asset verdict counts (CWN=1, STABLE=9, DEPENDENT=0), concentration median (-0.0843) and null tolerance (+0.0277); **INDEPENDENT VERIFICATION: MATCH**. During verification a scalar-index defect in the fresh spread was found and repaired, then the verifier was re-run and all values matched.
+6. **State updated:** `state/worker_progress.md`, `state/activation_status.json` (new receipt), `state/STATE.md` (new "Current activation" section), `state/LEARNING_STATE.md` (frontier row -> FALSIFIED; active delta Observed Effect/Decision/Next updated; learning history row added), and this log file.
+
+### Observed results (seed 42, walk-forward train=252d/test=84d/warmup=60d/overlap=60d, 4 volatility blocks, min 400 bars/segment, compared vs coin-flip null)
+
+- **Regime gate (full universe):** candidate medians calm -0.081, turbulent -0.056 vs null calm +0.017, turbulent +0.074; candidate dispersion +0.018 vs null +0.040 (< 2x null) -> REGIME_STABLE. Engine cross-check MATCH on both segments (same verdict).
+- **Per sub-universe (drop-one) verdicts across 10 assets:** CONSISTENT_WITH_NOISE=1 (TSLA: medians [-0.019, -0.012], both negative), REGIME_STABLE=9 (uniformly negative medians — REGIME_STABLE because dispersion is not > 2x null, not an edge), REGIME_DEPENDENT=0. **No positive edge exists in any segment of any asset.**
+- **Concentration gate:** full-universe median -0.084 outside null tolerance +0.028 (negative direction); best single-ticker contribution share 45.9% (TSLA, -0.039) -> gate flags CONCENTRATED on the negative result (no positive edge to concentrate).
+- **Synthetic sweep:** baseline (lookback=60, top_k=3) median +0.001 vs null -0.002; sample-calibrated tolerance +0.007 -> baseline within tolerance; sweep-level candidate dispersion +0.004 vs null +0.004 -> CONSISTENT_WITH_NOISE; overall sweep verdict CONSISTENT_WITH_NOISE.
+
+### Research conclusion
+
+The volatility-targeting (rank by trailing realized volatility, long lowest-vol 3 / short highest-vol 3, hold 1 day) class is **FALSIFIED** on the collected large-cap universe: the spread median is negative in every segment of every asset and the synthetic sweep is CONSISTENT_WITH_NOISE across lookback/top_k perturbations. The `REGIME_STABLE` verdicts describe stability of *losses*, not an edge; the concentration gate's `CONCENTRATED` flag applies to the negative result's worst contributor (45.9%), not to any positive edge. No positive edge exists anywhere. This closes the fourth tested signal class on this universe; the frontier has no further deferred signal-class cell. The durable methodology observation: the regime-stability verdict machinery and the concentration gate's "edge present" branch were written assuming a positive edge, so on uniformly-negative results the verdict labels must be read alongside the medians (this observation is recorded in STATE.md and LEARNING_STATE.md and should be checked before admitting any similar negative result).
+
+### CHANGED
+
+- `research/backtest/regime_stability.py` (added volatility-targeting helpers: `vol_rank_spread_daily_returns`, `vol_rank_spread_family`, `vol_rank_null_spread_daily_returns`, `vol_rank_null_spread_family`).
+- `research/backtest/__init__.py` (exported the four `vol_rank_*` functions).
+- `research/checks/volatility_targeting.py` (new check; ran end-to-end with manifest 10/10 OK, preflight PASSED, leakage PASS, engine-path MATCH on every segment, sweep CONSISTENT_WITH_NOISE, determinism asserted).
+- `research/checks/verify_volatility_targeting.py` (new independent verifier; scalar-index defect found and repaired during execution; MATCH on all primary path values).
+- `state/smoke_volatility_targeting.py` (new smoke test; SMOKE TEST PASSED).
+- `state/check_artifacts/volatility_targeting_results.json` (new artifact).
+- `state/worker_progress.md`, `state/activation_status.json`, `state/STATE.md`, `state/LEARNING_STATE.md`, `logs/ACTIVATION-2026-10-05.md` (updated).
+
+### VERIFIED (exact commands that succeeded after final edits)
+
+- `python3 research/checks/volatility_targeting.py` — exits 0; manifest 10/10 OK; preflight PASSED (57 checks); leakage PASS; full-sample engine self-consistent: PASS; regime gate: medians calm -0.081 / turbulent -0.056 vs null calm +0.017 / turbulent +0.074; engine-path cross-check MATCH on every segment; sweep CONSISTENT_WITH_NOISE; determinism asserted; artifact written.
+- `python3 research/checks/verify_volatility_targeting.py` — exits 0; MATCH on segment labels, candidate medians, null medians, per-asset verdict counts, concentration median and null tolerance; "INDEPENDENT VERIFICATION: MATCH".
+- `python3 state/smoke_volatility_targeting.py` — SMOKE TEST PASSED (spread/null magnitude match; determinism; synthetic-equity self-consistency; artifact round-trip).
+- `python -m unittest discover -s tests -v` — **134 tests, all passing** (12.075s) after all code edits; unchanged suite, no regressions from the new check/verifier.
+
+### UNVERIFIED
+
+- No precise per-run UTC timestamps (the `date` shell form is denied); session start anchored to 2026-10-05T13:10:59Z from the environment message time.
+- The regime-stability verdict machinery labels uniformly-negative medians as REGIME_STABLE (dispersion +0.018 < 2x null +0.040) rather than a distinct "stable losses" label — recorded as a methodology observation; verdicts are read alongside the medians.
+- The concentration gate's "edge present" branch applies to a negative result (best-ticker share 45.9% of the negative result) -> CONCENTRATED; no positive edge exists to concentrate, so the figure is recorded as evidence of systematic losses.
+- A per-asset t-statistic / Bonferroni summary analogous to `research/checks/universe_stats.py` for the volatility-targeting spread was not computed; the coin-flip null + dispersion gates already close the cell.
+
+### Acceptance
+
+COMPLETE — the volatility-targeting frontier test executed end-to-end and passed independent verification (engine-path MATCH on every segment; independent verifier MATCH on all primary path values; determinism r1==r2; regression 134/134); the class was falsified by a clean negative result (negative spread median in every segment of every asset; synthetic sweep CONSISTENT_WITH_NOISE; no positive edge anywhere) and recorded in `state/STATE.md`, `state/LEARNING_STATE.md`, `state/activation_status.json`, and this log.
+
+### NEXT
+
+All four tested signal classes on the collected universe (MA crossover, short-horizon reversal, cross-sectional relative strength, volatility targeting) are now falsified with clean negative evidence and independent verification. The highest-value next action is to record the methodology observation (verdict machinery and concentration gate must be read alongside medians for uniformly-negative results) and decide the next hypothesis family — e.g. richer regime features beyond past-only volatility (cross-sectional/macro/liquidity), or a different asset/data regime — rather than adding another equivalent signal class.
+
+### RISKS / notes
+
+- No protected/control-plane files were modified; no credentials or secrets accessed or persisted.
+- All quantitative results above are exploratory research simulation only, on collected adjusted-close data; nothing is admitted to the evidence base.
+- The concentration gate's CONCENTRATED verdict on a negative result is a gate-logic artifact, not evidence of a concentrated positive edge; recorded as systematic losses.

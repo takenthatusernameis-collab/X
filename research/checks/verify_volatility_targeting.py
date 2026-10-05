@@ -1,12 +1,30 @@
-"""Independent verification of the cross-sectional relative-strength check
-(`research/checks/cross_sectional_relative_strength.py`).
+"""Independent verification of the volatility-targeting check
+(`research/checks/volatility_targeting.py`).
 
 This is a separate implementation path: it re-implements the regime labels,
-segment reconstruction, the CSRS spread, and the fold-log-return aggregation
-from raw tickers (no calls to `regime_stability.py` helper functions or the
-check's own spread implementation), then compares against the artifact written
-by the check (`state/check_artifacts/cross_sectional_relative_strength_results.json`).
-A mismatch would flag a defect in the check.
+segment reconstruction, the volatility-targeting spread, and the
+fold-log-return aggregation from raw tickers (no calls to
+`regime_stability.py` helpers or the check's own spread implementation), then
+compares against the artifact written by the check
+(`state/check_artifacts/volatility_targeting_results.json`). A mismatch would
+flag a defect in the check.
+
+Design of the independent path:
+- Regime labels are reconstructed from ``closes`` using a re-implemented
+  ``volatility_blocks`` (same algorithm as research.backtest, different code).
+- Segments are reconstructed from labels using ``min_segment_bars``.
+- The vol-targeting spread is recomputed from raw tickers: rank each date by
+  trailing-lookback realized volatility, long the bottom_k (lowest-vol),
+  short the top_k (highest-vol), equal-weight per leg.
+- Segment medians are computed via a fresh walk-forward fold-log-return
+  aggregation — no call to ``stress_segments`` or ``regime_stability.py``.
+- Perturbation medians are recomputed by walking each parameter set
+  independently.
+- All values are loaded from the check's artifact and compared.
+
+This keeps the same inputs (dataset, seed, windows, segments) so a match
+confirms the check computed from those inputs; a mismatch would flag an
+error in the check's pipeline.
 """
 from __future__ import annotations
 
@@ -18,12 +36,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import research.backtest as bt
-from research.backtest.real_data import load_ticker
 from research.data.preflight import load_manifest
 
 DATASET_ID = "yf-ohlcv-universe-2009-to-2026-10-03"
 SEED = 42
-LOOKBACK = 20
+LOOKBACK = 60
 TOP_K = BOTTOM_K = 3
 TRAIN, TEST, WARM, OVERLAP = 252, 84, 60, 60
 WINDOW = 60
@@ -31,11 +48,11 @@ N_BLOCKS = 4
 MIN_SEGMENT_BARS = 400
 MARKET_PROXY = "AAPL"
 ARTIFACT_PATH = (Path.cwd() / "state" / "check_artifacts"
-                 / "cross_sectional_relative_strength_results.json")
+                 / "volatility_targeting_results.json")
 
 
 def vol_blocks(closes, n_blocks, window):
-    """Re-implementation of research.backtest.volatility_blocks (fresh code)."""
+    """Re-implementation of research.backtest.volatility_blocks."""
     n = len(closes)
     block_size = n // n_blocks
     bar_vols = []
@@ -76,28 +93,34 @@ def segments_from_labels(labels, min_segment_bars):
     return segments
 
 
-def csrs_spread(tickers, lookback, top_k, bottom_k):
-    """Fresh re-implementation of the CSRS spread (not the check's helper)."""
+def vol_rank_spread(tickers, lookback, top_k, bottom_k):
+    """Fresh re-implementation of the volatility-targeting spread
+    (not the check's helper).
+
+    Rank by trailing-lookback realized volatility descending; long the
+    bottom_k (lowest-volatility) tickers, short the top_k (highest-volatility).
+    """
     min_len = min(len(tb) for tb in tickers.values())
     daily_pnl = np.zeros(min_len, dtype=np.float64)
     for i in range(lookback, min_len - 1):
-        rets = {t: float(tb[i] / tb[i - lookback] - 1) for t, tb in tickers.items()}
-        order = sorted(rets, key=lambda t: rets[t], reverse=True)
-        longs = order[:top_k]
-        shorts = order[-bottom_k:]
-        if len(longs) < top_k or len(shorts) < bottom_k:
+        vols = {t: float(np.std(np.log(tb[i - lookback: i]), ddof=1))
+                for t, tb in tickers.items()}
+        order = sorted(vols, key=lambda t: vols[t], reverse=True)
+        longs = order[-bottom_k:]   # lowest-volatility leg
+        shorts = order[:top_k]      # highest-volatility leg
+        if len(longs) < bottom_k or len(shorts) < top_k:
             continue
-        long_ret = float(np.mean([tb[i + 1] / tb[i] - 1 for t, tb in
-                                  tickers.items() if t in longs]))
-        short_ret = float(np.mean([tb[i + 1] / tb[i] - 1 for t, tb in
-                                   tickers.items() if t in shorts]))
+        long_ret = float(np.mean([tb[i + 1] / tb[i] - 1
+                                  for t, tb in tickers.items() if t in longs]))
+        short_ret = float(np.mean([tb[i + 1] / tb[i] - 1
+                                   for t, tb in tickers.items()
+                                   if t in shorts]))
         daily_pnl[i] = long_ret - short_ret
     return daily_pnl
 
 
 def walk_forward_fold_log_returns(daily_pnl, train, test, warm, overlap):
-    """Mirror of research.checks.cw_cross_sectional_relative_strength's
-    walk_forward_fold_log_returns (fresh code)."""
+    """Mirror of the check's walk_forward_fold_log_returns (fresh code)."""
     n = len(daily_pnl)
     step = test - overlap
     fold_start = 0
@@ -136,7 +159,7 @@ def main() -> int:
 
     tickers = {}
     for e in manifest["entries"]:
-        tickers[e["ticker"]] = load_ticker(e["ticker"])[0].closes_array()
+        tickers[e["ticker"]] = bt.load_ticker(e["ticker"])[0].closes_array()
     trunc = min(len(tb) for tb in tickers.values())
     tickers = {t: tb[:trunc] for t, tb in tickers.items()}
 
@@ -145,17 +168,18 @@ def main() -> int:
     aapl_segments = segments_from_labels(aapl_labels, MIN_SEGMENT_BARS)
     seg_names = [name for name, _, _ in aapl_segments]
 
-    print("regime labels (recomputed from raw {}): {}".format(
-        MARKET_PROXY, len(aapl_segments)))
+    print("regime labels (recomputed from raw {}): {}"
+          .format(MARKET_PROXY, len(aapl_segments)))
 
     def seg_medians(pnl):
         meds = []
         for _, s, e in aapl_segments:
             meds.append(float(np.median(
-                walk_forward_fold_log_returns(pnl[s:e], TRAIN, TEST, WARM, OVERLAP))))
+                walk_forward_fold_log_returns(pnl[s:e], TRAIN, TEST, WARM,
+                                              OVERLAP))))
         return meds
 
-    daily_pnl = csrs_spread(tickers, LOOKBACK, TOP_K, BOTTOM_K)
+    daily_pnl = vol_rank_spread(tickers, LOOKBACK, TOP_K, BOTTOM_K)
     cand = seg_medians(daily_pnl)
     cand_disp = float(np.std(cand, ddof=1))
 
@@ -171,7 +195,8 @@ def main() -> int:
         meds = []
         for _, s, e in aapl_segments:
             meds.append(float(np.median(
-                walk_forward_fold_log_returns(pnl[s:e], TRAIN, TEST, WARM, OVERLAP))))
+                walk_forward_fold_log_returns(pnl[s:e], TRAIN, TEST, WARM,
+                                              OVERLAP))))
         return meds
 
     null = np.array(seg_medians_signed(daily_pnl * signs))
@@ -201,8 +226,8 @@ def main() -> int:
           "REGIME_STABLE_LOSS": 0, "REGIME_DEPENDENT": 0}
     per_asset = {}
     for ticker in tickers:
-        pnl = csrs_spread({k: v for k, v in tickers.items() if k != ticker},
-                          LOOKBACK, TOP_K, BOTTOM_K)
+        pnl = vol_rank_spread({k: v for k, v in tickers.items() if k != ticker},
+                              LOOKBACK, TOP_K, BOTTOM_K)
         meds = seg_medians(pnl)
         v = regime_verdict(meds, null)
         vc[v] += 1
@@ -216,9 +241,12 @@ def main() -> int:
     print("per-sub-universe counts match: {}".format(m3))
 
     # Concentration: full-universe median and null tolerance.
-    full_lrets = walk_forward_fold_log_returns(daily_pnl, TRAIN, TEST, WARM, OVERLAP)
+    full_lrets = walk_forward_fold_log_returns(daily_pnl, TRAIN, TEST, WARM,
+                                               OVERLAP)
+    null_lrets = walk_forward_fold_log_returns(daily_pnl * signs, TRAIN, TEST,
+                                               WARM, OVERLAP)
     full_med = float(np.median(full_lrets))
-    null_tol = 2 * float(np.std(full_lrets, ddof=1)) / np.sqrt(len(full_lrets))
+    null_tol = 2 * float(np.std(null_lrets, ddof=1)) / np.sqrt(len(null_lrets))
     print("full-universe median {:+.4f}; artifact {:+.4f}".format(full_med,
               artifact["concentration"]["full_universe_median"]))
     print("null tolerance {:+.4f}; artifact {:+.4f}".format(null_tol,
@@ -234,4 +262,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    main()

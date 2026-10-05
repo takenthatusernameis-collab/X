@@ -205,6 +205,10 @@ def main():
             regen_verdict = "CONSISTENT_WITH_NOISE"
         elif cand_disp > 2.0 * null_disp:
             regen_verdict = "REGIME_DEPENDENT"
+        elif all(m < 0 for m in medians):
+            # Uniformly negative medians with a swing within twice the null:
+            # stable losses, not an edge; must be read alongside the medians.
+            regen_verdict = "REGIME_STABLE_LOSS"
         else:
             regen_verdict = "REGIME_STABLE"
         status = "MATCH" if medians == pub and lbls == pub_lbls else "MISMATCH"

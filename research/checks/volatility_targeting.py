@@ -1,42 +1,45 @@
-"""Test the cross-sectional relative-strength (CSRS) signal class on the
-collected adjusted-close universe.
+"""Test the volatility-targeting signal class on the collected adjusted-close
+universe.
 
-Background: the MA-crossover class was exhaustively explored on the collected
-adjusted-close universe and rejected (canonical (20,60) not a peak in any
-asset, walk-forward within the sample-calibrated coin-flip noise band,
+Background: the trend-following MA-crossover class was exhaustively explored on
+the collected adjusted-close universe and rejected (canonical (20,60) not a peak
+in any asset, walk-forward within the sample-calibrated coin-flip noise band,
 0/10 survive Bonferroni, mixed regime-stability verdicts). The short-horizon
-return-reversal class was exhaustively explored and rejected: every segment
-of every asset showed a negative median walk-forward log return; the
-perturbation sweep was flat on the null. Both rejected classes were timing
-signals: a position taken on the basis of one asset's own recent price.
+return-reversal class was exhaustively explored and rejected: every segment of
+every asset showed a negative median walk-forward log return; the perturbation
+sweep was flat on the null. The cross-sectional relative-strength (long winners
+/ short losers by lookback return) class was exhaustively explored and rejected:
+no positive edge exists anywhere on the collected universe.
 
-CSRS is a ranking / sizing class, conceptually distinct from both: at each
-rebalance date it ranks the whole cross section of large-cap US equities by
-their lookback return, goes long the top-k and short the bottom-k, holds for
-one day, and daily rebalances. This is the standard cross-sectional-momentum
-/ relative-strength construction (long winners, short losers — the opposite
-sign of the previously falsified short-horizon reversal).
+All three tested classes have been timing / ranking signals driven by price
+direction or magnitude. Volatility targeting is a fourth class, conceptually
+distinct from the three: at each rebalance date it ranks the whole cross section
+of large-cap US equities by their trailing realized volatility, goes long the
+lowest-volatility tickers and short the highest-volatility tickers, holds for
+one day, and daily rebalances. This is the cross-sectional low-vol premium
+construction. It is judged not against price direction but against the
+market's own volatility distribution.
 
-Hypothesis: the CSRS spread earns a REGIME_STABLE positive edge on the
-collected large-cap universe, i.e. the cross-sectional dispersion in
-short-term returns is predictable in sign and survives across market
-regimes.
+Hypothesis: the volatility-targeting spread earns a REGIME_STABLE positive edge
+on the collected large-cap universe, i.e. the cross-sectional dispersion in
+trailing realized volatility carries predictive sign information that survives
+across market regimes.
 
-Falsification prediction: if the spread earns nothing beyond a coin-flip
-null, or its edge concentrates in one or two tickers, or it behaves like
-noise across the canonical regime family, the class is falsified as a robust
-edge source. The prediction also allows that CSRS could be REGIME_DEPENDENT
-in the same way MA crossover was (fits one regime mix); either outcome is a
-negative conclusion and closes the cell.
+Falsification prediction: if the spread earns nothing beyond a coin-flip null,
+or its (positive or negative) result concentrates in one or two tickers, or it
+behaves like noise across the canonical regime family, the class is falsified as
+a robust edge source. Either outcome is a negative conclusion and closes the
+cell.
 
-Method (fixed a-priori, not tuned to OOS): lookback=20 days; top_k=bottom_k=3
-(top 3 / bottom 3 of the 10-asset universe); hold 1 day, daily rebalance;
-market regime via AAPL's 4 volatility blocks (past-only); walk-forward
-train=252d/test=84d/warmup=60d/overlap=60d; min 400 bars/segment;
-coin-flip null = sign-flipped spread (same ranks, random long/short
-assignment); concentration gate via drop-one sub-universes; synthetic
-perturbation sweep (lookback 10/20/40, top_k 3/4/5) over the canonical
-regime family with a coin-flip null.
+Method (fixed a-priori, not tuned to OOS): lookback=60 days for volatility
+estimation; top_k=bottom_k=3 (bottom 3 / top 3 of the 10-asset universe by
+volatility; long low-vol, short high-vol); hold 1 day, daily rebalance; market
+regime via AAPL's 4 volatility blocks (past-only); walk-forward
+train=252d/test=84d/warmup=60d/overlap=60d; min 400 bars/segment; coin-flip
+null = sign-flipped spread (same ranks, random long/short assignment);
+concentration gate via drop-one sub-universes; synthetic perturbation sweep
+(lookback 30/60/120, top_k 3/4/5) over the canonical regime family with a
+coin-flip null.
 
 The engine path (research.backtest.engine.walk_forward via a synthetic equity
 asset that carries the spread's compounded P&L) and the direct walk-forward
@@ -61,14 +64,14 @@ from research.data.preflight import load_manifest, sha256_file
 
 DATASET_ID = "yf-ohlcv-universe-2009-to-2026-10-03"
 SEED = 42
-LOOKBACK = 20
+LOOKBACK = 60
 TOP_K = BOTTOM_K = 3
 TRAIN, TEST, WARM, OVERLAP = 252, 84, 60, 60
 WINDOW = 60
 N_BLOCKS = 4
 MIN_SEGMENT_BARS = 400
 ARTIFACT_DIR = Path.cwd() / "state" / "check_artifacts"
-ARTIFACT_PATH = ARTIFACT_DIR / "cross_sectional_relative_strength_results.json"
+ARTIFACT_PATH = ARTIFACT_DIR / "volatility_targeting_results.json"
 MARKET_PROXY = "AAPL"
 
 REGIME_VERDICT_NO_EDGE = "CONSISTENT_WITH_NOISE"
@@ -85,6 +88,7 @@ class _TruncatedTicker:
     runs on the same 3614-bar date grid so full-universe and drop-one gates
     use an identical sample.
     """
+
     def __init__(self, bars, n):
         self._bars = bars
         self._n = n
@@ -123,7 +127,7 @@ def walk_forward_fold_log_returns(daily_pnl, train, test, warm, overlap):
             break
         # engine semantics: exclude the first OOS bar's return (already
         # embedded in the starting equity) and compound the last test-1 bars.
-        oos = daily_pnl[fold_end - test + 1:fold_end]
+        oos = daily_pnl[fold_end - test + 1 : fold_end]
         comp = 1.0
         for r in oos:
             comp *= 1.0 + r
@@ -205,7 +209,7 @@ def make_synthetic_family(n_assets=10, drift_offsets=None, scenario=None,
 
 def param_seed_for(params):
     """Deterministic seed from a parameter set (mirrors noise_benchmark)."""
-    return SEED + int(round(sum(float(v) for v in params.values())) * 1000)
+    return SEED + int(round(sum(float(v) for v in params.values()) * 1000))
 
 
 def main() -> int:
@@ -243,18 +247,18 @@ def main() -> int:
           "(anchored by the earliest-listed ticker; full series runs 2009-01-02 "
           "to 2026-10-02, overlapping window 2012-05-18 to 2026-10-02)".format(trunc_len))
 
-    def csrs_spread(t):
-        return bt.csrs_spread_daily_returns(t, LOOKBACK, TOP_K, BOTTOM_K)
+    def vol_rank_spread(t):
+        return bt.vol_rank_spread_daily_returns(t, LOOKBACK, TOP_K, BOTTOM_K)
 
-    def csrs_null(t):
-        return bt.csrs_null_spread_daily_returns(t, LOOKBACK, TOP_K, BOTTOM_K, SEED)
+    def vol_rank_null(t):
+        return bt.vol_rank_null_spread_daily_returns(t, LOOKBACK, TOP_K, BOTTOM_K, SEED)
 
     aapl_closes = tickers[MARKET_PROXY].closes_array()
     aapl_labels = bt.volatility_blocks(aapl_closes, n_blocks=N_BLOCKS, window=WINDOW)
     aapl_segments = make_segments(aapl_labels, MIN_SEGMENT_BARS)
 
-    print("\n=== 3. Leakage review + full-sample CSRS portfolio on the universe ===")
-    daily_pnl_full = csrs_spread(tickers)
+    print("\n=== 3. Leakage review + full-sample volatility-targeting portfolio on the universe ===")
+    daily_pnl_full = vol_rank_spread(tickers)
     synth_full = bt.build_synthetic_spread_asset(daily_pnl_full, start_price=1e6)
     full_equity0 = synth_full.closes_array()[0]
     full_signals = [bt.Signal(date=i + 1, weight=synth_full.closes_array()[i] / full_equity0)
@@ -271,20 +275,20 @@ def main() -> int:
     daily_rets = np.diff(res_full.equity_curve) / res_full.equity_curve[:-1]
     print(f"  full-sample daily log returns: mean {np.mean(daily_rets):+.4f}, "
           f"median {np.median(daily_rets):+.4f}, ann. vol {np.std(daily_rets, ddof=1)*np.sqrt(252):+.3f}")
-    print("  no-look-ahead: spread sign at bar t depends only on closes[:t+1]; "
+    print("  no-look-ahead: spread rank at bar t depends only on closes[:t+1]; "
           "synthetic-equity open/high/low derived from the same-day close only; "
           "neutral bars (before lookback) carry the equity forward.")
 
     # ---------------- 4. Regime-stability gate on real data ----------------
-    print("\n=== 4. Regime-stability gate: CSRS spread across AAPL volatility "
-          "blocks (real data) ===")
+    print("\n=== 4. Regime-stability gate: volatility-targeting spread across AAPL "
+          "volatility blocks (real data) ===")
     print("  Walk-forward train={}d/test={}d/warmup={}d/overlap={}d, min "
           "{} bars/segment; segments from AAPL block-median trailing-"
           "{}d vol vs series-wide median (past-only)\n".format(
           TRAIN, TEST, WARM, OVERLAP, MIN_SEGMENT_BARS, WINDOW))
 
-    daily_pnl = csrs_spread(tickers)
-    daily_pnl_null = csrs_null(tickers)
+    daily_pnl = vol_rank_spread(tickers)
+    daily_pnl_null = vol_rank_null(tickers)
 
     def segment_medians(daily_pnl):
         segs, meds = [], []
@@ -308,8 +312,8 @@ def main() -> int:
     print("  candidate dispersion {:+.3f} vs null dispersion {:+.3f} "
           "(verdict rule: candidate_dispersion > 2x null -> REGIME_DEPENDENT)".format(
           cand_disp, null_disp))
-    csrs_regime_verdict = regime_verdict(cand_medians, null_medians)
-    print("  regime-stability verdict: {}".format(csrs_regime_verdict))
+    vt_regime_verdict = regime_verdict(cand_medians, null_medians)
+    print("  regime-stability verdict: {}".format(vt_regime_verdict))
 
     # ---- engine-path cross-check for the regime gate (independent of the
     #      direct fold-log-return path): recompute via walk_forward on the
@@ -363,15 +367,15 @@ def main() -> int:
     engine_verdict = regime_verdict(engine_medians, engine_null_medians)
     direct_matches_engine = (np.allclose(cand_medians, engine_medians, atol=1e-9)
                              and np.allclose(null_medians, engine_null_medians, atol=1e-9)
-                             and csrs_regime_verdict == engine_verdict)
+                             and vt_regime_verdict == engine_verdict)
     print("  engine-path cross-check (fresh walk_forward per fold, constant-share): "
           "MATCH vs direct fold-log-return path -> {}"
           .format("PASS" if direct_matches_engine else "MISMATCH"))
     if not direct_matches_engine:
         print("  [DEBUG] direct : cand={} null={}".format(cand_medians, null_medians))
-        print("  [DEBUG] engine : cand={} null={}".format(engine_medians, null_medians))
+        print("  [DEBUG] engine : cand={} null={}".format(engine_medians, engine_null_medians))
         print("  [DEBUG] direct_verdict={} engine_verdict={}".format(
-            csrs_regime_verdict, engine_verdict))
+            vt_regime_verdict, engine_verdict))
         sys.exit(1)
     print("  engine path agrees with the direct path: both give verdict "
           "{}".format(engine_verdict))
@@ -384,7 +388,7 @@ def main() -> int:
           .format(", ".join(seg_labels)))
     per_asset_verdicts = {}
     for ticker in tickers:
-        pnl = csrs_spread({k: v for k, v in tickers.items() if k != ticker})
+        pnl = vol_rank_spread({k: v for k, v in tickers.items() if k != ticker})
         segs, meds = segment_medians(pnl)
         v = regime_verdict(meds, null_medians)
         per_asset_verdicts[ticker] = v
@@ -412,7 +416,7 @@ def main() -> int:
           "null tolerance {:+.3f}".format(len(full_lrets), full_median, null_tol))
     drop_medians = {}
     for ticker in tickers:
-        pnl = csrs_spread({k: v for k, v in tickers.items() if k != ticker})
+        pnl = vol_rank_spread({k: v for k, v in tickers.items() if k != ticker})
         drop_medians[ticker] = float(np.median(
             walk_forward_fold_log_returns(pnl, TRAIN, TEST, WARM, OVERLAP)))
     impacts = {t: full_median - m for t, m in drop_medians.items()}
@@ -443,7 +447,7 @@ def main() -> int:
     # ---------------- 7. Synthetic perturbation sweep ----------------
     print("\n=== 7. Synthetic perturbation sweep: lookback x top_k over the "
           "canonical regime family, vs coin-flip null ===")
-    grid_lookbacks = [10, 20, 40]
+    grid_lookbacks = [30, 60, 120]
     grid_top_ks = [3, 4, 5]
     grid_bottom_ks = grid_top_ks
     baseline = (("bottom_k", BOTTOM_K), ("lookback", LOOKBACK), ("top_k", TOP_K))
@@ -463,11 +467,11 @@ def main() -> int:
     for s in scenarios:
         family = make_synthetic_family(n_assets=10, scenario=s, base_seed=SEED + scenarios.index(s))
         for p in sweep_grid:
-            cand_pnl = bt.csrs_spread_family(family, p["lookback"], p["top_k"], p["bottom_k"])
+            cand_pnl = bt.vol_rank_spread_family(family, p["lookback"], p["top_k"], p["bottom_k"])
             cand_lrets = walk_forward_fold_log_returns(cand_pnl, 60, 20, 10, 10)
             candidate_sweep[tuple(sorted(p.items()))].append(float(np.median(cand_lrets)))
-            null_pnl = bt.csrs_null_spread_family(family, p["lookback"], p["top_k"],
-                                                  p["bottom_k"], param_seed_for(p))
+            null_pnl = bt.vol_rank_null_spread_family(family, p["lookback"], p["top_k"],
+                                                      p["bottom_k"], param_seed_for(p))
             null_lrets = walk_forward_fold_log_returns(null_pnl, 60, 20, 10, 10)
             null_sweep[tuple(sorted(p.items()))].append(float(np.median(null_lrets)))
             if (p["lookback"] == LOOKBACK and p["top_k"] == TOP_K
@@ -507,7 +511,7 @@ def main() -> int:
     for dev in sorted(summary_deviation):
         marker = "  <-- baseline" if abs(dev) < 1e-12 else ""
         print("    {:+4.2f}x:  {:+.3f}".format(dev, summary_deviation[dev]) + marker)
-    print("  baseline (lookback=20, top_k=3): median {:+.3f} vs null "
+    print("  baseline (lookback=60, top_k=3): median {:+.3f} vs null "
           "{:+.3f}; sample-calibrated tolerance {:+.3f}, fixed tol 0.05: "
           "baseline_within_tol = {}, fixed_within_tol = {}"
           .format(baseline_median, baseline_null_median, effective_tol,
@@ -531,7 +535,7 @@ def main() -> int:
         fam = make_synthetic_family(n_assets=10, scenario=s, base_seed=SEED + scenarios.index(s))
         for p in sweep_grid:
             if p == dict(baseline):
-                pnl = bt.csrs_spread_family(fam, p["lookback"], p["top_k"], p["bottom_k"])
+                pnl = bt.vol_rank_spread_family(fam, p["lookback"], p["top_k"], p["bottom_k"])
                 lrets = walk_forward_fold_log_returns(pnl, 60, 20, 10, 10)
                 print("    {:14s}: median {:+.3f} ({} folds)".format(
                     s.name, np.median(lrets), len(lrets)))
@@ -551,12 +555,12 @@ def main() -> int:
 
     # ---------------- 8. Determinism ----------------
     print("\n=== 8. Determinism ===")
-    daily_pnl_r2 = csrs_spread(tickers)
-    daily_pnl_null_r2 = csrs_null(tickers)
+    daily_pnl_r2 = vol_rank_spread(tickers)
+    daily_pnl_null_r2 = vol_rank_null(tickers)
     daily_segments_r2 = segment_medians(daily_pnl_r2)
     daily_null_segments_r2 = segment_medians(daily_pnl_null_r2)
-    det_seg = (np.all(np.array(daily_segments_r2[1]) == np.array(cand_medians_r1)) and
-               np.all(np.array(daily_null_segments_r2[1]) == np.array(null_medians_r1)))
+    det_seg = (np.all(np.array(daily_segments_r2[1]) == np.array(cand_medians_r1))
+               and np.all(np.array(daily_null_segments_r2[1]) == np.array(null_medians_r1)))
     print("  spread + null recomputed identically: {}".format(det_seg))
     print("determinism r1 == r2 for all computed arrays: True")
 
@@ -572,7 +576,7 @@ def main() -> int:
         market_proxy=MARKET_PROXY,
         leakage=dict(
             past_only=True,
-            spread_sign_at_bar_t_uses_closes_up_to_t=True,
+            spread_rank_at_bar_t_uses_closes_up_to_t=True,
             synthetic_equity_range_derived_from_same_day_close=True,
             equity_path_self_consistent=res_full is not None and consistent,
         ),
@@ -582,7 +586,7 @@ def main() -> int:
             null_medians=null_medians,
             candidate_dispersion=cand_disp,
             null_dispersion=null_disp,
-            verdict=csrs_regime_verdict,
+            verdict=vt_regime_verdict,
         ),
         per_sub_universe=dict(
             verdict_counts=verdict_counts,
@@ -622,8 +626,8 @@ def main() -> int:
     print("")
     print("artifact written to: {}".format(ARTIFACT_PATH))
     print("NOTE: research/simulation only. No live trading or production "
-          "execution. Cross-sectional relative strength on the collected 10-"
-          "asset universe: exploratory simulation.")
+          "execution. Volatility-targeting on the collected 10-asset universe: "
+          "exploratory simulation.")
     return 0
 
 
