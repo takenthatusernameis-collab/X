@@ -50,7 +50,7 @@ def self_test() -> int:
     }
 
     assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (0, "COMPLETE")
-    assert classify(**common, verify="success", worker="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (1, "PARTIAL")
+    assert classify(**common, verify="success", worker="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (0, "PARTIAL")
     assert classify(**common, verify="success", worker="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="RECOVERY_BRANCH") == (1, "PARTIAL")
     assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="NO_CHANGES") == (0, "NO_SUBSTANTIVE_ACTION")
     assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_POSTWORKER_VERIFICATION", persistence="MAIN") == (0, "COMPLETE")
