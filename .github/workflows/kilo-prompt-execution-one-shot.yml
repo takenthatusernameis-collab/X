@@ -507,14 +507,26 @@ jobs:
         env:
           PREFLIGHT_OUTCOME: ${{ steps.verify_install.outcome }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
+          KILO_LIVENESS_STATUS: ${{ env.KILO_LIVENESS_STATUS }}
+          KILO_LIVENESS_REASON: ${{ env.KILO_LIVENESS_REASON }}
         run: |
           set -euo pipefail
           echo "Smoke/preflight: ${PREFLIGHT_OUTCOME:-unknown}"
           echo "Kilo worker: ${KILO_OUTCOME:-unknown}"
+          echo "Kilo liveness: ${KILO_LIVENESS_STATUS:-unknown}"
+          echo "Kilo liveness reason: ${KILO_LIVENESS_REASON:-unknown}"
           echo "Persistence: ${PERSISTENCE_STATUS:-unknown}"
 
           if [ "${PREFLIGHT_OUTCOME:-}" != "success" ]; then
             echo "FAILED: representative Kilo execution smoke test did not pass; deep research was not trustworthy to start."
+            exit 1
+          fi
+          if [ "${KILO_LIVENESS_STATUS:-}" = "STALLED" ]; then
+            echo "FAILED: worker was terminated by the liveness watchdog after losing both semantic progress and output signals."
+            exit 1
+          fi
+          if [ "${KILO_LIVENESS_STATUS:-}" = "COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT" ]; then
+            echo "FAILED: worker terminated without producing a post-start semantic checkpoint, so meaningful progress could not be established."
             exit 1
           fi
           if [ "${KILO_OUTCOME:-}" = "skipped" ]; then
