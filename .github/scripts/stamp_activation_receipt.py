@@ -16,7 +16,8 @@ def stamp_receipt(
     env: Mapping[str, str] | None = None,
     head_sha: str | None = None,
 ) -> dict:
-    env = env or os.environ
+    if env is None:
+        env = os.environ
     run_id = env.get("GITHUB_RUN_ID")
     ref_name = env.get("GITHUB_REF_NAME")
     repository = env.get("GITHUB_REPOSITORY")
