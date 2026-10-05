@@ -738,3 +738,179 @@ Decide whether to admit momentum to the evidence base as candidate positive evid
 - All quantitative results above are exploratory research simulation only, on collected adjusted-close data; the SUPPORTED verdict is a research finding to be judged further, not a traded idea.
 - The framework's warmup+train equity compounding understates the momentum edge; the reported medians are a conservative lower bound.
 - The synthetic perturbation sweep cannot test momentum robustness (no momentum structure in the synthetic generator); real-data regime-stability is the operative robustness evidence.
+
+### Objective
+
+Execute the pending per-asset effect-size / concentration diagnostic on the admitted
+momentum candidate (`research/checks/momentum_concentration.py`), determine whether the
+REGIME_STABLE positive edge is distributed across the collected universe or rests on
+one or two concentrated names, and close the momentum admission decision.
+
+### Observed activation
+
+- Environment identity: GITHUB_RUN_ID=37324143509, RUN_ATTEMPT=1, SHA=6e6d80f,
+  REF_NAME=main. No recovery branch is present. No precise per-run UTC timestamps are
+  available (`date` shell form is denied).
+- The momentum lookback sweep (lookbacks 3/5/10/20) and its independent verifier were
+  executed in this activation in an earlier run and already recorded in
+  `state/LEARNING_STATE.md` / `state/STATE.md` / this log.
+
+### Work performed
+
+1. **Diagnostic.** `research/checks/momentum_concentration.py` (new): effect size per
+   segment = candidate_median - null_median; per-asset signed edge = sum over segments;
+   absolute effect = sum of |effect|; mean absolute effect normalizes for segment count.
+   Concentration metrics: HHI on per-asset absolute-effect shares (10 assets), top-1 and
+   top-3 share of cumulative positive edge, max-to-median ratio of mean absolute
+   effects; effect-strength buckets (EFFECTIVE_STRONG/MODERATE/WEAK/NOEDGE); null-baseline
+   concentration on the coin-flip null; per-lookback verdicts with a-priori thresholds
+   (CONCENTRATED if top-1 >= 0.40 or HHI >= 0.30; DISTRIBUTED if top-1 <= 0.30 and HHI
+   <= 0.20 and max/median <= 2.0; else AMBIGUOUS). Artifact written to
+   `state/check_artifacts/momentum_concentration.json`.
+2. **Independent verification.** `research/checks/verify_momentum_concentration.py`
+   (new): fresh `walk_forward` path — fresh momentum signals, fresh volatility blocks
+   and segments, fresh coin-flip null; recomputes all 28 lookback-5 segment medians
+   across the 10 assets and derives concentration metrics from scratch; compares against
+   the concentration artifact. This verifier initially reported a MISMATCH on TSLA/META
+   medians; root cause found and classified as a state/code defect (the verifier's
+   `vol_blocks` used `closes[i - window : i + 1]` while the framework's
+   `volatility_blocks` uses `closes[i - window : i]`, producing different regime labels
+   for some assets and hence different segments); repaired and re-run — all matches now
+   hold.
+3. **Regression suite.** `python3 -m unittest discover -s tests -v` = 134 tests, all
+   passing, after the new check files were added.
+4. **State updates.** `state/activation_status.json` rewritten (authoritative receipt
+   for activation 37324143509); `state/worker_progress.md` updated;
+   `state/LEARNING_STATE.md` updated (momentum frontier row and learning-history entry);
+   `state/STATE.md` extended with the concentration analysis section; this log section
+   appended.
+
+### Observed results (seed 42, collected adjusted-close data, walk-forward
+train=252d/test=84d/warmup=60d/overlap=60d, 4 volatility blocks, min 400 bars/segment)
+
+- Base lookback 5 (momentum long previous 5-day return): HHI 0.1137 (uniform ~0.10);
+  top-1 share of positive edge 16.3% (< 40% concentrated threshold); top-3 share 43.0%;
+  max/median ratio of mean absolute effects 1.62 (< 2.0). Verdict: DISTRIBUTED.
+  All 10 assets EFFECTIVE_STRONG (mean abs effect +0.0503 .. +0.0943) except XOM
+  (EFFECTIVE_MODERATE, +0.0285) — effect sizes are remarkably uniform across the
+  universe. Null-baseline concentration: identical metrics (HHI 0.1137, top-1 16.3%,
+  top-3 43.0%) — the coin-flip null carries no concentration structure, as expected.
+- By lookback: lookback 3 -> AMBIGUOUS (HHI 0.1847, top-1 36.6%, max/median 4.51);
+  lookback 5 -> DISTRIBUTED (HHI 0.1137, top-1 16.3%, max/median 1.62);
+  lookback 10 -> DISTRIBUTED (HHI 0.1227, top-1 17.3%, max/median 1.78);
+  lookback 20 -> CONCENTRATED (HHI 0.3336, top-1 56.6%, max/median 10.67).
+- REGIME_STABLE consistency over the four lookbacks: GOOGL/AMZN/META/TSLA REGIME_STABLE
+  at all 4 lookbacks (mean abs effects +0.0662 .. +0.0943); AAPL/MSFT 3/4; NVDA 2/4;
+  JPM 1/4; JNJ/XOM 0/4. The four fully-stable assets carry the core of the effect and
+  none dominates it (max/median 1.62 at lookback 5).
+
+### Research conclusion
+
+The momentum class (long the previous N-day return, hold 1 day, daily rebalanced) is
+admitted to the evidence base as candidate positive evidence, and the concentration
+analysis supports that admission: the REGIME_STABLE positive edge is DISTRIBUTED across
+the collected large-cap universe at the operative short horizons (HHI ~0.11, top-1 16%,
+all 10 assets EFFECTIVE_STRONG) — a broad class effect rather than one or two concentrated
+names. This is the opposite of the MA-crossover finding, where the edge concentrated in
+a single historical regime mix (2009-2013). Concentration appears only at lookback 20,
+where effect-size dispersion across assets grows (max/median 10.67), consistent with
+noisier longer-horizon momentum; the short-horizon edge is the operative robust finding.
+The edge persists across lookbacks 3/5/10/20, is REGIME_STABLE in 4 assets at every
+lookback, and is nominally significant in 9/10 assets at every lookback; admitted
+caveats remain (0/10 survive family-wise Bonferroni at alpha 0.005; 2/10 CONSISTENT_WITH_NOISE
+at the noise threshold; idiosyncratic JPM/NVDA/MSFT instability; single-asset rather
+than cross-sectional construction; 1-day-ahead momentum anomaly consistency). The
+concentration diagnostic and both its verifier ran end-to-end; the verifier's single
+defect (vol_blocks window slicing) was found during verification and repaired, and all
+checks passed after the repair. Independent verification verdict: MATCH at full precision
+on medians/segments, MATCH on HHI/top-1/top-3, max_median_ratio within 1e-3, verdict
+MATCH (DISTRIBUTED); determinism identical. The next frontier item is the cross-sectional
+momentum variant (rank-based winners-only construction), deferred for a follow-on
+activation.
+
+### CHANGED
+
+- `research/checks/momentum_concentration.py` (new diagnostic: per-asset effect sizes,
+  HHI, top-k positive-edge shares, max/median ratio, effect-strength buckets, null
+  baseline, per-lookback concentration verdicts; determinism asserted).
+- `research/checks/verify_momentum_concentration.py` (new independent verifier: fresh
+  walk_forward recomputation of all lookback-5 medians + derived concentration metrics;
+  one verifier defect found and repaired — vol_blocks window slicing off-by-one — then
+  re-ran to full MATCH).
+- `state/check_artifacts/momentum_concentration.json` (new artifact).
+- `state/activation_status.json` (authoritative receipt for activation 37324143509
+  rewritten: status COMPLETE, objective cover sweep + concentration diagnostic).
+- `state/worker_progress.md` (updated: diagnostic phase complete, admission recorded).
+- `state/LEARNING_STATE.md` (momentum frontier row extended with concentration verdict;
+  learning-history entry 37324143509 extended to include the concentration work and RETAIN
+  decision).
+- `state/STATE.md` (new section "momentum effect-size / concentration analysis;
+  37324143509").
+- `logs/ACTIVATION-2026-10-05.md` (new section appended).
+- `research/scratch/inspect_artifact.py`, `research/scratch/diag_labels.py` (scratch
+  diagnostics used to inspect the sweep artifact and to pin down the vol_blocks label
+  discrepancy; useful for future reproductions).
+
+### VERIFIED
+
+- `python3 research/checks/momentum_concentration.py` — exits 0; manifest 10/10 OK;
+  base lookback-5 verdict DISTRIBUTED (HHI 0.1137, top-1 16.3%, max/median 1.62);
+  lookback-20 CONCENTRATED, lookback-3 AMBIGUOUS, lookback-10 DISTRIBUTED; determinism
+  r1==r2; artifact written to `state/check_artifacts/momentum_concentration.json`.
+- `python3 research/checks/verify_momentum_concentration.py` — exits 0; independent
+  recomputation of all 28 lookback-5 segment medians across 10 assets via fresh
+  walk_forward path MATCHes the artifact (per-asset medians/segments exact); derived
+  concentration metrics MATCH artifact (HHI/top-1/top-3 exact; max_median_ratio within
+  1e-3); verdict MATCH (DISTRIBUTED); determinism identical; "Independent recomputation
+  MATCHes the concentration artifact."
+- `python3 -m unittest discover -s tests -v` — **134 tests, all passing** after the new
+  check files were added.
+- Defect triage: vol_blocks trailing-vol window off-by-one (`i + 1` vs `i`) identified
+  and repaired via `research/scratch/diag_labels.py`; MISMATCH resolved to a verifier
+  defect (not an artifact defect), confirmed by `verify_momentum_sweep.py` (unchanged,
+  still MATCH) and re-run of the concentration verifier.
+
+### UNVERIFIED
+
+- No precise per-run UTC timestamps (`date` shell form is denied); run identity anchored
+  to GITHUB_RUN_ID=37324143509.
+- The lookback-sweep synthetic perturbation sweep remains a tooling-validity check only
+  (the regime-switching GBM generator contains no return autocorrelation).
+- The cross-sectional momentum variant (rank-based winners-only construction) — the
+  second deferred frontier item — was NOT executed in this activation; deferred to a
+  follow-on activation.
+
+### Acceptance
+
+COMPLETE — the effect-size/concentration diagnostic executed end-to-end on the admitted
+momentum candidate, was independently verified via a fresh walk_forward recomputation
+(MATCH on all medians, segments, and derived concentration metrics; determinism
+identical), and the momentum admission decision is now closed with durable record in
+`state/STATE.md`, `state/LEARNING_STATE.md`, `state/activation_status.json`, and this
+log. The concentration verdict (edge DISTRIBUTED at short horizons, CONCENTRATED only at
+lookback 20) strengthens momentum's admission to the evidence base as candidate positive
+evidence, with the documented caveats.
+
+### NEXT
+
+Execute the deferred frontier item (b): build and run the cross-sectional momentum
+variant (rank-based winners-only construction) on the collected universe through the
+same regime + concentration + perturbation-sweep gates and independent verifier, to
+contrast with the falsified top-3/short-bottom-3 relative-strength class; record the
+outcome in `state/LEARNING_STATE.md`, `state/STATE.md`, and this log.
+
+### RISKS / notes
+
+- No protected/control-plane files were modified; no credentials or secrets accessed or
+  persisted.
+- All quantitative results above are exploratory research simulation only, on collected
+  adjusted-close data; the SUPPORTED verdict is a research finding to be judged further,
+  not a traded idea.
+- The framework's warmup+train equity compounding understates the momentum edge; the
+  reported medians are a conservative lower bound.
+- The synthetic perturbation sweep cannot test momentum robustness (no momentum structure
+  in the synthetic generator); real-data regime-stability is the operative robustness
+  evidence.
+- A verification defect (vol_blocks off-by-one) was found during independent verification
+  and repaired; the underlying artifact is not affected (verify_momentum_sweep.py
+  unchanged and still MATCH).

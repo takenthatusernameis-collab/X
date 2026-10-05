@@ -132,12 +132,12 @@ def fold_stats_for(closes, lookback, train_window, test_window, warmup,
         "median_log_ret": float(np.median(log)),
         "std_log_ret": float(log.std(ddof=1)),
         "positive_folds": int((log > 0).sum()),
-        "t_statistic": tstat,
+        "t_statistic": float(tstat),
         "df": n - 1,
-        "ci_lo_95": lo,
-        "ci_hi_95": hi,
-        "significance_5pct_nominal": abs(tstat) > 1.96,
-        "significance_5pct_bonferroni": abs(tstat) > 1.96 * np.sqrt(n),
+        "ci_lo_95": float(lo),
+        "ci_hi_95": float(hi),
+        "significance_5pct_nominal": bool(abs(tstat) > 1.96),
+        "significance_5pct_bonferroni": bool(abs(tstat) > 1.96 * np.sqrt(n)),
     }
 
 
@@ -179,7 +179,7 @@ def main() -> int:
               counts.get("CONSISTENT_WITH_NOISE", 0), counts.get("REGIME_DEPENDENT", 0),
               counts.get("REGIME_STABLE_LOSS", 0)))
         print("  {:10s} {:28s} {:12s}".format("asset", "candidate_medians", "verdict"))
-        for ticker, meds, nulls, cd, nd, v in asset_rows:
+        for ticker, segments, meds, nulls, cd, nd, v in asset_rows:
             meds_s = "[" + ",".join(str(m) for m in meds) + "]"
             print("  {:10s} {:28s} {:12s}".format(ticker, meds_s, v))
         print("")
@@ -191,14 +191,14 @@ def main() -> int:
             per_asset=[
                 dict(
                     ticker=ticker,
-                    segments=[s.name for s in r.scenarios],
-                    medians=meds,
+                    segments=segments,
+                    medians=medians,
                     null_medians=nulls,
                     candidate_dispersion=cd,
                     null_dispersion=nd,
                     verdict=v,
                 )
-                for ticker, meds, nulls, cd, nd, v in asset_rows
+                for ticker, segments, medians, nulls, cd, nd, v in asset_rows
             ],
         )
 
@@ -243,12 +243,12 @@ def main() -> int:
                  stats["significance_5pct_nominal"],
                  stats["significance_5pct_bonferroni"]), widths)))
         print()
-        output["fold_stats"] = {
-            "lookback_{}".format(lb): {
-                "n_assets": len(trow[lb]),
-                "rows": list(trow[lb]),
-            } for lb in LOOKBACKS
-        }
+    output["fold_stats"] = {
+        "lookback_{}".format(lb): {
+            "n_assets": len(rows_data),
+            "rows": rows_data,
+        } for lb, rows_data in trow.items()
+    }
 
     # Cross-lookback summary: how many assets keep the REGIME_STABLE edge as
     # lookback grows, and how many survive family-wise significance.
@@ -271,7 +271,7 @@ def main() -> int:
     print()
     output["cross_summary"] = {
         "regime_stable_by_lookback": {
-            "lookback_{}".format(lb): dict(rows[i][2]) for i, lb in enumerate(LOOKBACKS)
+            "lookback_{}".format(lb): rows[i][2] for i, lb in enumerate(LOOKBACKS)
         },
         "nominally_significant_by_lookback": {
             "lookback_{}".format(lb): n for lb, n in zip(LOOKBACKS, nom_significant)
