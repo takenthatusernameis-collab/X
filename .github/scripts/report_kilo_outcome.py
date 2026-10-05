@@ -46,13 +46,13 @@ def self_test() -> int:
     }
 
     assert classify(**common, verify="success", worker="success", persistence="MAIN") == (0, "COMPLETE")
-    assert classify(**common, worker="failure", persistence="MAIN") == (1, "PARTIAL")
-    assert classify(**common, worker="failure", persistence="RECOVERY_BRANCH") == (1, "PARTIAL")
-    assert classify(**common, worker="success", persistence="NO_CHANGES") == (0, "NO_SUBSTANTIVE_ACTION")
-    assert classify(**common, worker="skipped", persistence="MAIN") == (1, "FAILED")
+    assert classify(**common, verify="success", worker="failure", persistence="MAIN") == (1, "PARTIAL")
+    assert classify(**common, verify="success", worker="failure", persistence="RECOVERY_BRANCH") == (1, "PARTIAL")
+    assert classify(**common, verify="success", worker="success", persistence="NO_CHANGES") == (0, "NO_SUBSTANTIVE_ACTION")
+    assert classify(**common, verify="success", worker="skipped", persistence="MAIN") == (1, "FAILED")
     assert classify(**common, worker="success", verify="failure", persistence="MAIN") == (1, "PARTIAL")
-    assert classify(**common, worker="success", liveness="STALLED", persistence="MAIN") == (1, "FAILED")
-    assert classify(**common, worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="MAIN") == (1, "FAILED")
+    assert classify(**common, verify="success", worker="success", liveness="STALLED", persistence="MAIN") == (1, "FAILED")
+    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="MAIN") == (1, "FAILED")
 
     print("Kilo outcome reporter self-test: PASS")
     return 0
