@@ -42,15 +42,14 @@ def self_test() -> int:
     common = {
         "preflight": "success",
         "smoke": "success",
-        "liveness": "COMPLETED_WITH_SEMANTIC_CHECKPOINTS",
     }
 
-    assert classify(**common, verify="success", worker="success", persistence="MAIN") == (0, "COMPLETE")
-    assert classify(**common, verify="success", worker="failure", persistence="MAIN") == (1, "PARTIAL")
-    assert classify(**common, verify="success", worker="failure", persistence="RECOVERY_BRANCH") == (1, "PARTIAL")
-    assert classify(**common, verify="success", worker="success", persistence="NO_CHANGES") == (0, "NO_SUBSTANTIVE_ACTION")
-    assert classify(**common, verify="success", worker="skipped", persistence="MAIN") == (1, "FAILED")
-    assert classify(**common, worker="success", verify="failure", persistence="MAIN") == (1, "PARTIAL")
+    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (0, "COMPLETE")
+    assert classify(**common, verify="success", worker="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (1, "PARTIAL")
+    assert classify(**common, verify="success", worker="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="RECOVERY_BRANCH") == (1, "PARTIAL")
+    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="NO_CHANGES") == (0, "NO_SUBSTANTIVE_ACTION")
+    assert classify(**common, verify="success", worker="skipped", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (1, "FAILED")
+    assert classify(**common, worker="success", verify="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (1, "PARTIAL")
     assert classify(**common, verify="success", worker="success", liveness="STALLED", persistence="MAIN") == (1, "FAILED")
     assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="MAIN") == (1, "FAILED")
 
