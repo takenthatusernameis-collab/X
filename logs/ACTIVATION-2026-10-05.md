@@ -266,3 +266,28 @@ active only in turbulent segments). This is next-activation item 4 from
    iteration, run through the same perturbation / null / regime-stability gate
    before any positive claim.
 
+## 03:11 UTC — Controller architecture correction
+
+### CHANGED
+- Restored a controller-owned research readiness preflight in both X execution workflows.
+- Preflight now gates on clean checkout, trusted files/state, manifest structure, deterministic data-quality preflight, full regression suite, and a bounded real-data end-to-end readiness example.
+- Restored an independent post-worker controller verification gate that reruns the data preflight, full regression suite, and real-data end-to-end example independently of the worker's report.
+- Worker execution now requires both deterministic preflight and the real Kilo smoke test.
+- Existing live Kilo output streaming, semantic checkpoints, liveness watchdog, and recovery-branch persistence remain in the trusted path.
+- Explicitly documented the controller-owned readiness gate in the Kilo worker prompt.
+- Mirrored the architecture into the one-shot executor.
+
+### VERIFIED
+- Both workflow files contain the research preflight gate.
+- Both workflow files contain independent post-worker verification.
+- Both workflow files require preflight + smoke before the worker.
+- Both workflow files retain recovery-branch persistence and live Kilo output.
+- X run #40 was independently inspected: Kilo completed successfully; the activation failed during persistence because a rebase conflicted in `state/STATE.md`.
+
+### UNVERIFIED
+- The restored preflight and post-worker verification have not yet completed on a fresh full activation.
+- X run #9 began on the older workflow revision and therefore does not validate the restored architecture.
+
+### NEXT
+- Evaluate the next fresh activation using the restored lifecycle and classify each stage separately: PREFLIGHT -> SMOKE -> WORKER -> INDEPENDENT VERIFY -> PERSISTENCE -> ACCEPTANCE.
+
