@@ -333,7 +333,7 @@ jobs:
           cat > /tmp/kilo-smoke/prompt.txt <<'EOF'
           Use the available shell/tool capability to create exactly one file:
             /tmp/kilo-smoke/sentinel.txt
-          The complete contents must be exactly SMOKE_OK.
+          The complete contents must be exactly OK.
           Do not modify the Git repository. Verify the file contents and stop.
           EOF
           cd /tmp/kilo-smoke
@@ -342,7 +342,7 @@ jobs:
           cat /tmp/kilo-smoke.log
           test "$status" -eq 0
           test -s /tmp/kilo-smoke/sentinel.txt
-          test "$(cat /tmp/kilo-smoke/sentinel.txt)" = "SMOKE_OK"
+          test "$(cat /tmp/kilo-smoke/sentinel.txt)" = "OK"
           echo "Representative Kilo execution-path smoke test passed."
       - name: Run Kilo
         id: kilo
@@ -537,6 +537,11 @@ jobs:
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
         run: |
           set -euo pipefail
+          if [ "${PREFLIGHT_OUTCOME:-success}" != "success" ] || [ "${KILO_SMOKE_OUTCOME:-success}" != "success" ]; then
+            echo "No worker-integrated repository changes are eligible for persistence after an early controller/preflight failure."
+            echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
+            exit 0
+          fi
           echo "PERSISTENCE_STATUS=FAILED" >> "$GITHUB_ENV"
 
           git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
