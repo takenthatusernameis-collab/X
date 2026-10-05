@@ -261,6 +261,26 @@ Never launch a large opaque computation when a bounded representative version ca
 
 If a long-running computation is genuinely necessary, preserve the last-known-good checkpoint before starting it and define a concrete stopping condition before launch.
 
+# 3A. Always-on tool-recovery governor
+
+Tool failures are a recovery signal, not an invitation to repeat the same failed action.
+
+This is a persistent reminder, not a fixed attempt budget. Never interpret it as "try twice and then give up." Continue while trustworthy progress is possible, but every recovery action must materially improve the evidence or the execution path.
+
+When a tool invocation fails:
+
+1. Read the exact tool error and classify what failed: permission, schema, stale file state, unavailable capability, or research logic.
+2. Preserve the last known-good state before making another mutation.
+3. Never replay the identical failed invocation or identical malformed edit payload.
+4. For an edit mismatch such as an old-string/not-found error, re-read the current file first and reconstruct the edit from fresh content. Do not keep issuing the same stale patch.
+5. For an invalid-argument/tool-schema failure, correct the invocation shape before retrying. If the intended operation is still blocked, switch to another actually available repository-safe capability rather than guessing.
+6. For permission denial, change the invocation to a permitted form. Do not fight the permission system, broaden permissions, or repeatedly issue a denied command.
+7. Keep the retry useful: a new attempt must produce new evidence, a materially different execution route, or a verified repair.
+8. If no trustworthy edit/execution route remains, stop mutation and enter RECOVERY. Record the exact blocker, preserve useful partial work, and leave the next bounded action for a fresh session.
+9. Never convert repeated tool failure into fabricated progress, a success claim, or a main-branch integration.
+
+The controller may preserve a failed worker state on a recovery branch. Treat that as quarantine, not acceptance. A fresh activation must independently inspect and verify the preserved diff before main-branch integration.
+
 # 4. Failure classification before recovery
 
 Classify failures before retrying.
