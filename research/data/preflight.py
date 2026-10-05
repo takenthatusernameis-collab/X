@@ -1,5 +1,8 @@
 """Preflight checks for the collected Yahoo Finance OHLCV universe.
 
+The preflight implementation intentionally remains standard-library-only;
+CI installs the backtest test-suite dependency set separately.
+
 Research/simulation only. Implements the data-quality preflight checklist from
 research/REAL_DATA_FEASIBILITY.md:
 
