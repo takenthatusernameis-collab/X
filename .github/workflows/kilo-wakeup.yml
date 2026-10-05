@@ -678,7 +678,7 @@ jobs:
           exit 0
       - name: Independent post-worker verification
         id: independent_verify
-        if: always() && steps.kilo.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success' && steps.kilo.outcome != 'skipped'
         continue-on-error: true
         timeout-minutes: 15
         run: |
@@ -730,6 +730,61 @@ jobs:
           python3 .github/scripts/reconcile_worker_progress.py
           echo "Worker progress reconciled with authoritative activation receipt."
 
+      - name: Prepare controller recovery handoff
+        id: recovery_handoff
+        if: always() && steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success' && (steps.kilo.outcome != 'success' || steps.independent_verify.outcome != 'success')
+        continue-on-error: true
+        env:
+          KILO_OUTCOME: ${{ steps.kilo.outcome }}
+          VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
+          KILO_LIVENESS_STATUS: ${{ env.KILO_LIVENESS_STATUS }}
+          KILO_LIVENESS_REASON: ${{ env.KILO_LIVENESS_REASON }}
+        run: |
+          set -euo pipefail
+
+          failure_class="UNRESOLVED_EXECUTION_FAILURE"
+          if [ "$KILO_LIVENESS_STATUS" = "STALLED" ]; then
+            failure_class="RESOURCE_OR_LIVENESS_FAILURE"
+          elif grep -Eiq 'invalid request error trace_id:' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'invalid request error trace_id:' /tmp/kilo-retry.log 2>/dev/null; then
+            failure_class="TRANSIENT_GATEWAY"
+          elif grep -Eiq 'permission.*deny|not allowed|specified a rule.*prevents|action.*deny' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'permission.*deny|not allowed|specified a rule.*prevents|action.*deny' /tmp/kilo-retry.log 2>/dev/null; then
+            failure_class="TOOL_INVOCATION_DENIAL"
+          elif grep -Eiq 'oldString|invalid arguments|edit tool' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'oldString|invalid arguments|edit tool' /tmp/kilo-retry.log 2>/dev/null; then
+            failure_class="TOOL_INVOCATION_FAILURE"
+          elif grep -Eiq 'Traceback|AttributeError|NameError|TypeError|SyntaxError' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'Traceback|AttributeError|NameError|TypeError|SyntaxError' /tmp/kilo-retry.log 2>/dev/null; then
+            failure_class="RESEARCH_EXECUTION_FAILURE"
+          fi
+
+          recovery_log="$(mktemp)"
+          {
+            echo
+            echo "## CONTROLLER RECOVERY RECORD"
+            echo
+            echo "- observed_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "- activation_id: $GITHUB_RUN_ID"
+            echo "- run_attempt: $GITHUB_RUN_ATTEMPT"
+            echo "- worker_outcome: $KILO_OUTCOME"
+            echo "- independent_verification: $VERIFY_OUTCOME"
+            echo "- liveness_status: $KILO_LIVENESS_STATUS"
+            echo "- liveness_reason: $KILO_LIVENESS_REASON"
+            echo "- failure_class: $failure_class"
+            echo "- main_integration: PROHIBITED"
+            echo "- recovery_rule: preserve the current repository state on a recovery branch; a fresh activation must independently inspect and verify it before any main-branch integration."
+            echo "- next_action: inspect this recovery record and the exact diff, repair only from verified evidence, rerun the narrow failing check, then rerun the broader verification sequence."
+            echo
+            echo "### Controller-observed failure evidence"
+            for log_file in /tmp/kilo-primary.log /tmp/kilo-retry.log; do
+              if [ -s "$log_file" ]; then
+                echo "--- $log_file (tail) ---"
+                tail -n 30 "$log_file"
+              fi
+            done
+          } > "$recovery_log"
+
+          cat "$recovery_log" >> state/worker_progress.md
+          echo "Controller recovery handoff appended to state/worker_progress.md."
+          echo "RECOVERY_FAILURE_CLASS=$failure_class" >> "$GITHUB_ENV"
+
       - name: Verify and persist safe repository changes
         id: persist
         if: always()
@@ -737,6 +792,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
+          VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
           PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
           KILO_SMOKE_OUTCOME: ${{ steps.kilo_smoke.outcome }}
         run: |
@@ -750,6 +806,16 @@ jobs:
 
           git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
           git reset -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
+
+          # Main-branch admission is deliberately conservative:
+          # worker success alone is insufficient. Independent verification must
+          # also succeed after the final worker edits. Any worker failure or
+          # verification failure is quarantined on a recovery branch.
+          recovery_required=0
+          if [ "$KILO_OUTCOME" != "success" ] || [ "$VERIFY_OUTCOME" != "success" ]; then
+            recovery_required=1
+            echo "::warning::Main integration is prohibited because worker outcome=$KILO_OUTCOME and independent verification=$VERIFY_OUTCOME."
+          fi
 
           # Capture whether the worker produced any repository change BEFORE
           # touching controller-owned metadata. The old implementation checked
@@ -805,6 +871,22 @@ jobs:
 
           git config user.name "kilo-research-enterprise"
           git config user.email "kilo-research-enterprise@users.noreply.github.com"
+
+          if [ "$recovery_required" -eq 1 ]; then
+            git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+            git commit -m "Kilo activation: preserve recovery state"
+            local_commit="$(git rev-parse HEAD)"
+            recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            if git push origin "$local_commit:refs/heads/$recovery_branch"; then
+              echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
+              echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
+              echo "::warning::Unverified or failed worker state preserved only on $recovery_branch; main integration was prohibited."
+              exit 0
+            fi
+            echo "::error::Recovery branch persistence failed; unverified worker state was not integrated."
+            exit 1
+          fi
+
           git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
           git commit -m "Kilo activation: update research state"
           local_commit="$(git rev-parse HEAD)"
@@ -818,11 +900,11 @@ jobs:
           fi
 
           git rebase --abort >/dev/null 2>&1 || true
-          recovery_branch="recovery/kilo-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          git push origin "${local_commit}:refs/heads/${recovery_branch}"
+          recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          git push origin "$local_commit:refs/heads/$recovery_branch"
           echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
-          echo "PERSISTENCE_RECOVERY_BRANCH=${recovery_branch}" >> "$GITHUB_ENV"
-          echo "::warning::Main integration failed; worker commit preserved on ${recovery_branch}."
+          echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
+          echo "::warning::Main integration failed; worker commit preserved on $recovery_branch."
       - name: Deep audit — after Verify and persist safe repository changes
         id: deep_audit_14_verify_and_persist_safe_repository_changes
         if: always()
