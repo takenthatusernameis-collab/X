@@ -1,37 +1,37 @@
 {
-  "activation_id": "37261348530",
-  "run_attempt": "unavailable",
-  "sha": "ff7dc7f",
+  "activation_id": "37263019969",
+  "run_attempt": "1",
+  "sha": "12bd0407c79af4641ac7da817a087cfc020d3197",
   "ref_name": "main",
   "repository": "takenthatusernameis-collab/X",
-  "status": "PARTIAL",
-  "phase": "DEEP",
-  "objective": "Operationalize frontier-first selection: test the DEFERRED new-signal-class frontier cell (short-horizon return reversal / mean-reversion) on the collected universe through the same perturbation + coin-flip-null + regime-stability gate as the MA-crossover class; record the verdict in state/STATE.md and state/LEARNING_STATE.md.",
+  "status": "COMPLETE",
+  "phase": "VERIFY",
+  "objective": "Execute the mean-reversion frontier cell (short-horizon return reversal, lookback=5) through the perturbation + coin-flip-null + regime-stability gate, independently verify it, and fold the verdict into state/STATE.md and state/LEARNING_STATE.md.",
   "start_time": null,
   "finish_time": null,
   "changed": [
-    "research/backtest/regime_stability.py (added mean_reversion_signals: past-only reversal signal)",
-    "research/backtest/__init__.py (exported mean_reversion_signals)",
-    "research/checks/mean_reversion.py (new check: manifest/preflight/leakage on AMZN/JPM; base MA comparison; 2-asset stress_segments; universe sweep; synthetic perturbation sweep; determinism assertion; JSON artifact)",
-    "research/checks/verify_mean_reversion.py (new independent verifier: fresh walk_forward recomputation vs check artifact)",
-    "state/worker_progress.md (updated checkpoint: EXECUTION_BLOCKED, next action recorded)",
-    "state/STATE.md (new section: current activation - new signal class: mean-reversion; marked UNVERIFIED)",
-    "state/LEARNING_STATE.md (frontier cell split: mean-reversion PENDING EXECUTION; volatility-targeting/cross-sectional RS DEFERRED; learning history row added; active delta Observed Effect + Next updated)",
-    "logs/ACTIVATION-2026-10-05.md (to be appended: activation record)"
+    "research/backtest/regime_stability.py (repaired mean_reversion_signals: mean of daily log returns over lookback window instead of mean of log prices; added explanatory comments)",
+    "research/checks/verify_mean_reversion.py (repaired mean_reversion_signals to the same correct formula; fixed perturbation grid to 0.5x/1x/2x around lookback=5; added lbls in universe loop)",
+    "research/checks/mean_reversion.py (fixed FillResult.metrics typo -> equity-derived total_return; fixed baseline tuple shape for universe sweep; fixed format-string typo {:: -> {:)",
+    "state/worker_progress.md (checkpoint updated: failure found/repaired; verified milestones)",
+    "state/STATE.md (replaced UNVERIFIED mean-reversion section with verified results, verdict, and the signal-defect discovery note)",
+    "state/LEARNING_STATE.md (frontier cell FALSIFIED + defect note; strategy delta Decision RETAIN; Next action updated; learning-history row added)",
+    "state/check_artifacts/mean_reversion_results.json (artifact regenerated with the corrected signal; all figures verified)"
   ],
   "verified": [
-    "None — execution is impossible in this environment. bash is denied at this layer (bash tool, background_process, and task subagents all route through bash and are project-denied; the date shell form is likewise denied). All code was written and reviewed for correctness by inspection, matching the established patterns in regime_adaptive_ma.py and verify_regime_adaptive.py.",
-    "File structural integrity: each written file was read back after writing and matches the intended content (verified by read-back, not by execution)."
+    "research/data/preflight.py: 10 manifest checksums OK, PREFLIGHT PASSED (all data-quality + survivorship + known-gaps checks)",
+    "leakage review: AMZN and JPM reversal signals PASS check_signal_integrity and check_equity_matches_fills; full-sample total_return AMZN +0.892, JPM +0.715",
+    "research/checks/mean_reversion.py exits 0: per-asset segment medians (AMZN reversal [0.041,-0.003,-0.052] REGIME_STABLE; JPM reversal [0.038,-0.021,-0.057] REGIME_DEPENDENT; universe CWN=4/REGIME_STABLE=3/REGIME_DEPENDENT=3; perturbation [-0.015,-0.013,-0.005]); determinism r1==r2; artifact written",
+    "research/checks/verify_mean_reversion.py exits 0: independent fresh walk_forward recomputation of AMZN/JPM base + reversal segment medians, all universe medians + verdicts, and perturbation medians MATCH the artifact exactly; determinism r1==r2",
+    "python -m unittest discover -s tests -v: 120 tests, all passing (post-change regression)"
   ],
   "unverified": [
-    "All quantitative claims: no computation ran (execution blocked). mean_reversion.py results, verify_mean_reversion.py recomputation, determinism assertions, 120-test suite, manifest/preflight/leakage results are all UNVERIFIED.",
-    "The a-priori falsification predictions recorded in state/STATE.md (AMZN/JPM REGIME_DEPENDENT or CONSISTENT_WITH_NOISE; no REGIME_STABLE universe edge; perturbation near zero) are placeholders, not observed results.",
-    "GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, GITHUB_SHA, GITHUB_REF_NAME could not be read because bash is denied; the receipt uses the worker_progress.md activation_id (37261348530) and git head (ff7dc7f, main).",
-    "No UTC timestamps observed this activation (date denied); start/finish_time are null."
+    "No UTC timestamps observed (date shell form denied); activation identity from GITHUB_RUN_ID via read_env.py (37263019969, attempt 1, SHA 12bd040..., ref main, UTC 2026-10-05T04:37:49Z)",
+    "No new unit tests were added for the repaired signal (repair verified by integration checks and independent recomputation instead)"
   ],
-  "next": "A fresh activation must execute research/checks/mean_reversion.py, then research/checks/verify_mean_reversion.py (fresh walk_forward recomputation that compares to the check's artifact and asserts determinism), then python -m unittest discover -s tests. If both checks pass, fold the observed verdict into state/STATE.md and state/LEARNING_STATE.md (mark the mean-reversion frontier cell), and update activation_status.json to COMPLETE with the observed figures.",
-  "acceptance": "PARTIAL — the frontier-first test infrastructure for the new mean-reversion signal class was written (framework signal, check, independent verifier, state updates) but could not be executed: bash is denied at this layer. Nothing was admitted to the evidence base.",
-  "research_conclusion": "UNVERIFIED — no research result was produced this activation. The mean-reversion frontier cell remains PENDING EXECUTION. Per research integrity rules, no result is claimed: the falsification or support of the mean-reversion signal class awaits execution in a fresh activation.",
-  "blocker": "Execution is impossible: bash tool, background_process, and task subagents are all denied at the project layer; the date shell form is likewise denied. This differs from prior activations where execution worked (e.g., 37260572520 ran 120 tests + two checks successfully). Work that depends on execution is marked UNVERIFIED and handed off to the next activation.",
-  "controller_ready": null
+  "next": "Promote the DEFERRED sizing/ranking frontier cell (volatility targeting / cross-sectional relative strength) to the active frontier and test it frontier-first through the same gate; if no robust edge is found there, mark the frontier exhausted for mechanical timing/sizing rules and escalate to regime-informative features or process review.",
+  "acceptance": "COMPLETE — the mean-reversion frontier cell was executed, the independent recomputation verified every figure (AMZN/JPM, universe, perturbation), and the verdict (FALSIFIED as a robust edge) is recorded. The pre-existing signal defect was found and repaired before acceptance.",
+  "research_conclusion": "Short-horizon (5-day) return reversal on the collected large-cap universe is not a robust edge: CONSISTENT_WITH_NOISE in 4/10 assets, REGIME_STABLE in 3 (medians within the coin-flip null tolerance), REGIME_DEPENDENT in 3 (AAPL, TSLA, JPM); perturbation medians [-0.015,-0.013,-0.005] within the sample-calibrated noise tolerance. Combined with the exhaustively falsified MA-crossover class, the frontier of mechanical timing/sizing rules on this universe is now closed; the next frontier cell is the sizing/ranking class (volatility targeting / cross-sectional relative strength).",
+  "blocker": null,
+  "notes": "A critical signal-defect was discovered during execution: mean_reversion_signals computed np.mean(np.log(prices)) (mean log price, always positive) instead of the mean of daily log returns, i.e. an effectively always-short position (buggy AMZN full-sample -5.537 vs +1.467 by an independent raw-CSV/numpy recomputation). Both the framework function and the verifier (which had the identical formula) were repaired and re-verified; a clean recomputation-only verifier could not have caught the input defect. All published verdicts use the repaired signal."
 }

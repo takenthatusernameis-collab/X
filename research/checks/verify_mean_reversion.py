@@ -88,12 +88,17 @@ def segments_from_labels(labels, min_segment_bars):
 
 
 def mean_reversion_signals(closes, lookback):
-    """Fresh implementation of the reversal signal (independent code path)."""
+    """Fresh implementation of the reversal signal (independent code path).
+
+    Short the previous ``lookback``-day return: if the last ``lookback`` days
+    were up, go short; if they were down, go long.  The signal is computed from
+    the average of the daily log returns over the lookback window; the sign of
+    the lookback-day return determines the weight."""
     n = len(closes)
     out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
     lookback = int(lookback)
     for i in range(lookback, n):
-        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+        ret = float(np.mean(np.diff(np.log(closes[i - lookback : i + 1]))))
         out[i] = bt.Signal(date=i + 1, weight=-1.0 if ret > 0 else 1.0)
     return out
 
@@ -191,6 +196,7 @@ def main():
         closes = bars.closes_array()
         labels = vol_blocks(closes, N_BLOCKS, WINDOW)
         runs = segments_from_labels(labels, MIN_SEGMENT_BARS)
+        lbls = [lab for lab, _, _ in runs]
         medians = [round(segment_median(ticker, s, e, TRAIN, TEST, WARM, OVERLAP)[0], 3)
                    for lab, s, e in runs]
         pub = artifact["universe"]["per_asset"][ticker]["medians"]
@@ -209,6 +215,8 @@ def main():
         status = "MATCH" if medians == pub and lbls == pub_lbls else "MISMATCH"
         if status != "MATCH":
             all_ok = False
+            print(f"      MEDIAN MISMATCH: recomputed={medians} published={pub}")
+            print(f"      LABELS: recomputed={lbls} published={pub_lbls}")
         verdict_status = "MATCH" if regen_verdict == artifact["universe"]["per_asset"][ticker]["verdict"] else "MISMATCH"
         if verdict_status != "MATCH":
             all_ok = False
@@ -220,9 +228,9 @@ def main():
                   .format(verdict_status))
 
     # Perturbation recomputation (fresh walk_forward loop per param set)
-    print("\n=== Perturbation recomputation (3 / 5 / 10 lookback) ===")
+    print("\n=== Perturbation recomputation (0.5x / 1x / 2x around lookback=5) ===")
     bars = bt.generate_bars(600, seed=SEED)
-    grid = [{"lookback": 3}, {"lookback": 5}, {"lookback": 10}]
+    grid = [{"lookback": k * LOOKBACK} for k in (0.5, 1.0, 2.0)]
     recomputed = []
     for params in grid:
         signals = mean_reversion_signals(bars.closes_array(), params["lookback"])

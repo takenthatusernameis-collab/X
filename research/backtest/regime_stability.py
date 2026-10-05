@@ -847,7 +847,10 @@ def mean_reversion_signals(
     out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
     lookback = int(lookback)
     for i in range(lookback, n):
-        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+        # Average of the ``lookback`` daily log returns over the lookback window.
+        # Sign is the sign of the lookback-day return: >0 if price went up
+        # (short), <0 if price went down (long).
+        ret = float(np.mean(np.diff(np.log(closes[i - lookback : i + 1]))))
         out[i] = Signal(date=i + 1, weight=-1.0 if ret > 0 else 1.0)
     return out
 
