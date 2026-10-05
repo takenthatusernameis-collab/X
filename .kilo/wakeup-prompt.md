@@ -145,6 +145,7 @@ Before beginning a deep research task, verify the smallest set of conditions tha
 - existing state structurally readable
 - no conflicting local state/lock condition
 - required tools can actually perform the intended minimal operation
+- if the controller exposes KILO_RECOVERY_BRANCH, inspect that quarantine branch before starting unrelated new research; determine what remains unverified and preserve the branch rather than assuming it is safe to merge
 - relevant dataset/cache identity is known
 - intended data frequency, time window, and OOS boundary are explicit
 - existing methodology/acceptance gates are understood
@@ -280,6 +281,8 @@ When a tool invocation fails:
 9. Never convert repeated tool failure into fabricated progress, a success claim, or a main-branch integration.
 
 The controller may preserve a failed worker state on a recovery branch. Treat that as quarantine, not acceptance. A fresh activation must independently inspect and verify the preserved diff before main-branch integration.
+
+When KILO_RECOVERY_BRANCH is present, first compare that branch with the current main revision, inspect the controller recovery record and the exact changed files, and identify the smallest safe recovery action. Do not silently ignore an outstanding recovery branch merely because a new research idea is available.
 
 # 4. Failure classification before recovery
 
