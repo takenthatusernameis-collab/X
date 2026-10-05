@@ -25,6 +25,16 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Synchronize activation workspace to latest branch tip
+        run: |
+          set -euo pipefail
+          event_sha="$GITHUB_SHA"
+          git fetch --prune origin "$GITHUB_REF_NAME"
+          latest_branch_sha="$(git rev-parse "refs/remotes/origin/$GITHUB_REF_NAME")"
+          git reset --hard "$latest_branch_sha"
+          echo "Activation event SHA: $event_sha"
+          echo "Synchronized research workspace to origin/$GITHUB_REF_NAME at $latest_branch_sha."
+
       - name: Install Kilo Code CLI
         run: npm install -g @kilocode/cli
 
@@ -264,12 +274,15 @@ jobs:
           set -euo pipefail
 
           echo "=== Research readiness preflight ==="
-          # actions/checkout normally uses detached HEAD; validate the exact checked-out
-          # commit/ref instead of requiring a local branch to be attached.
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          # The activation workspace is intentionally synchronized to the latest branch
+          # tip immediately after checkout so queued activations do not research against
+          # a stale event SHA. GITHUB_SHA remains the triggering event identity.
           git show-ref --verify --quiet "refs/remotes/origin/$GITHUB_REF_NAME"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/remotes/origin/$GITHUB_REF_NAME")"
           test -z "$(git status --porcelain)"
           test ! -e .git/index.lock
+          echo "Activation event SHA: $GITHUB_SHA"
+          echo "Research workspace SHA: $(git rev-parse HEAD)"
 
           for required in             AGENTS.md             ENTERPRISE.md             PERSISTENCE_POLICY.md             .kilo/wakeup-prompt.md             research/METHODOLOGY.md             research/data/manifest.json             research/data/preflight.py             state/STATE.md             state/activation_status.json             logs/README.md; do
             test -s "$required"
