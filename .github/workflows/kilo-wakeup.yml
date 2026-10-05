@@ -288,7 +288,11 @@ jobs:
           PY
 
           echo "Running deterministic real-data preflight..."
-          python3 research/data/preflight.py > /tmp/x-data-preflight.log 2>&1
+          if ! python3 research/data/preflight.py > /tmp/x-data-preflight.log 2>&1; then
+            echo "Deterministic data preflight failed; emitting its full diagnostic:"
+            cat /tmp/x-data-preflight.log
+            exit 1
+          fi
           tail -n 25 /tmp/x-data-preflight.log
           grep -q "PREFLIGHT PASSED" /tmp/x-data-preflight.log
 
