@@ -32,6 +32,19 @@ jobs:
       - name: Verify Kilo installation
         id: verify_install
         run: kilo --version
+
+      - name: Install research Python dependencies
+        id: research_python
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/x-python"
+          "$RUNNER_TEMP/x-python/bin/python" -m pip install --disable-pip-version-check --no-cache-dir -r research/backtest/requirements.txt
+          "$RUNNER_TEMP/x-python/bin/python" - <<'PY'
+          import numpy
+          print(f"Research Python environment ready; NumPy {numpy.__version__}.")
+          PY
+          echo "$RUNNER_TEMP/x-python/bin" >> "$GITHUB_PATH"
       - name: Diagnose Kilo API key
         id: kilo_auth
         continue-on-error: true
@@ -298,7 +311,11 @@ jobs:
           grep -q "PREFLIGHT PASSED" /tmp/x-data-preflight.log
 
           echo "Running complete deterministic regression suite..."
-          python3 -m unittest discover -s tests -v > /tmp/x-regression.log 2>&1
+          if ! python3 -m unittest discover -s tests -v > /tmp/x-regression.log 2>&1; then
+            echo "Deterministic regression suite failed; emitting its diagnostic:"
+            tail -n 120 /tmp/x-regression.log
+            exit 1
+          fi
           tail -n 35 /tmp/x-regression.log
           grep -q "OK" /tmp/x-regression.log
 
@@ -499,7 +516,11 @@ jobs:
           grep -q "PREFLIGHT PASSED" /tmp/x-post-data-preflight.log
 
           echo "Re-running the full deterministic regression suite independently..."
-          python3 -m unittest discover -s tests -v > /tmp/x-post-regression.log 2>&1
+          if ! python3 -m unittest discover -s tests -v > /tmp/x-post-regression.log 2>&1; then
+            echo "Independent deterministic regression suite failed; emitting its diagnostic:"
+            tail -n 120 /tmp/x-post-regression.log
+            exit 1
+          fi
           tail -n 35 /tmp/x-post-regression.log
           grep -q "OK" /tmp/x-post-regression.log
 
