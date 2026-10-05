@@ -273,12 +273,96 @@ jobs:
           KILO_DISABLE_EXTERNAL_SKILLS: "true"
         run: |
           set +e
+          mkdir -p state
+          cat > state/worker_progress.md <<EOF
+          # Worker Progress
+          
+          activation_id: $GITHUB_RUN_ID
+          phase: CONTROLLER_INITIALIZED
+          status: OBSERVATION_ONLY
+          last_verified_milestone: none yet
+          next_bounded_action: begin the declared research objective
+          
+          This file is a liveness contract. Update it only after a real research-state transition or verified milestone.
+          EOF
+          initial_checkpoint_mtime="$(stat -c %Y state/worker_progress.md)"
 
-          # A fresh Kilo session is intentionally retried only for the specific
-          # gateway/provider failure observed in run #35. Other failures remain
-          # hard failures so the workflow cannot hide genuine defects.
-          kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > /tmp/kilo-primary.log 2>&1
+          : > /tmp/kilo-primary.log
+          stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > /tmp/kilo-primary.log 2>&1 &
+          kilo_pid=$!
+
+          stall_seconds=1800
+          interval_seconds=300
+          stale_for=0
+          semantic_progress_seen=0
+          last_signal="controller-initialized"
+
+          while kill -0 "$kilo_pid" 2>/dev/null; do
+            sleep "$interval_seconds"
+
+            if ! kill -0 "$kilo_pid" 2>/dev/null; then
+              break
+            fi
+
+            now="$(date +%s)"
+            checkpoint_mtime="$initial_checkpoint_mtime"
+            if [ -f state/worker_progress.md ]; then
+              checkpoint_mtime="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo "$initial_checkpoint_mtime")"
+            fi
+            output_mtime="$(stat -c %Y /tmp/kilo-primary.log 2>/dev/null || echo "$now")"
+
+            checkpoint_age=$((now - checkpoint_mtime))
+            output_age=$((now - output_mtime))
+
+            if [ "$checkpoint_mtime" -gt "$initial_checkpoint_mtime" ]; then
+              semantic_progress_seen=1
+              stale_for=0
+              last_signal="SEMANTIC_CHECKPOINT"
+            elif [ "$output_age" -le "$interval_seconds" ]; then
+              stale_for=0
+              last_signal="PROCESS_ACTIVITY_ONLY"
+            else
+              stale_for=$((stale_for + interval_seconds))
+              last_signal="NO_RECENT_PROGRESS_SIGNAL"
+            fi
+
+            {
+              echo "### Kilo liveness heartbeat"
+              echo "- observed_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "- process: PID $kilo_pid alive"
+              echo "- semantic_checkpoint_age_seconds: $checkpoint_age"
+              echo "- worker_output_age_seconds: $output_age"
+              echo "- last_signal: $last_signal"
+              echo "- stale_for_seconds: $stale_for"
+              echo "- semantic_progress_seen: $semantic_progress_seen"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            echo "::notice::Kilo liveness: signal=$last_signal checkpoint_age=$checkpoint_age s output_age=$output_age s stale_for=$stale_for s"
+
+            if [ "$stale_for" -ge "$stall_seconds" ]; then
+              echo "::error::Kilo worker appears stalled: no semantic checkpoint or fresh worker output for $stale_for s."
+              echo "KILO_LIVENESS_STATUS=STALLED" >> "$GITHUB_ENV"
+              echo "KILO_LIVENESS_REASON=no semantic checkpoint or fresh worker output for $stale_for s" >> "$GITHUB_ENV"
+              kill -TERM "$kilo_pid" 2>/dev/null || true
+              sleep 10
+              kill -KILL "$kilo_pid" 2>/dev/null || true
+              break
+            fi
+          done
+
+          wait "$kilo_pid"
           status=$?
+
+          if [ "$KILO_LIVENESS_STATUS" != "STALLED" ]; then
+            if [ "$semantic_progress_seen" -eq 1 ]; then
+              echo "KILO_LIVENESS_STATUS=COMPLETED_WITH_SEMANTIC_CHECKPOINTS" >> "$GITHUB_ENV"
+              echo "KILO_LIVENESS_REASON=worker terminated after emitting at least one post-start semantic checkpoint" >> "$GITHUB_ENV"
+            else
+              echo "KILO_LIVENESS_STATUS=COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT" >> "$GITHUB_ENV"
+              echo "KILO_LIVENESS_REASON=worker terminated without a post-start semantic checkpoint" >> "$GITHUB_ENV"
+            fi
+          fi
+
           cat /tmp/kilo-primary.log
 
           if [ "$status" -eq 0 ]; then
@@ -288,7 +372,39 @@ jobs:
           if grep -Eq 'invalid request error trace_id:' /tmp/kilo-primary.log; then
             echo "::warning::Kilo gateway returned a transient invalid-request trace; retrying once with a fresh Kilo session."
             sleep 5
-            kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > /tmp/kilo-retry.log 2>&1
+            : > /tmp/kilo-retry.log
+            stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > /tmp/kilo-retry.log 2>&1 &
+            retry_pid=$!
+            retry_stale=0
+
+            while kill -0 "$retry_pid" 2>/dev/null; do
+              sleep "$interval_seconds"
+              if ! kill -0 "$retry_pid" 2>/dev/null; then
+                break
+              fi
+              now="$(date +%s)"
+              retry_output_mtime="$(stat -c %Y /tmp/kilo-retry.log 2>/dev/null || echo "$now")"
+              retry_output_age=$((now - retry_output_mtime))
+              retry_checkpoint_mtime="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo "$initial_checkpoint_mtime")"
+              retry_checkpoint_age=$((now - retry_checkpoint_mtime))
+              if [ "$retry_checkpoint_mtime" -gt "$initial_checkpoint_mtime" ] || [ "$retry_output_age" -le "$interval_seconds" ]; then
+                retry_stale=0
+              else
+                retry_stale=$((retry_stale + interval_seconds))
+              fi
+              echo "::notice::Kilo retry liveness: checkpoint_age=$retry_checkpoint_age s output_age=$retry_output_age s stale_for=$retry_stale s"
+              if [ "$retry_stale" -ge "$stall_seconds" ]; then
+                echo "::error::Fresh Kilo retry also appears stalled; stopping it after $retry_stale s without progress signal."
+                kill -TERM "$retry_pid" 2>/dev/null || true
+                sleep 10
+                kill -KILL "$retry_pid" 2>/dev/null || true
+                echo "KILO_LIVENESS_STATUS=STALLED" >> "$GITHUB_ENV"
+                echo "KILO_LIVENESS_REASON=fresh retry produced no semantic checkpoint or worker output for $retry_stale s" >> "$GITHUB_ENV"
+                break
+              fi
+            done
+
+            wait "$retry_pid"
             retry_status=$?
             cat /tmp/kilo-retry.log
             exit "$retry_status"
