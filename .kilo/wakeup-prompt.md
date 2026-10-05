@@ -159,6 +159,24 @@ When the context becomes degraded, repetitive, or unable to make trustworthy pro
 
 ## Deep-session health and checkpoint discipline
 
+Long execution is not evidence of progress. The controller now observes a concrete worker-liveness contract in `state/worker_progress.md`.
+
+For every activation:
+1. At activation start, ensure `state/worker_progress.md` reflects the current objective/phase.
+2. Before any operation expected to consume more than 10 minutes, update the checkpoint with:
+   - current phase
+   - last VERIFIED milestone
+   - exact evidence or artifact produced
+   - next bounded action
+   - whether the next operation is expected to be long-running
+3. After each material operation, update the checkpoint when there is a real state transition.
+4. While an activation is actively progressing, emit at least one substantive checkpoint within every 10-minute window.
+5. Never touch the file merely to reset the timer. A checkpoint is valid only when it records genuine new evidence, a falsified hypothesis, a repaired failure, a verified artifact, or another durable research-state transition.
+6. Do not claim VERIFIED merely because an operation started or produced output; state the exact evidence.
+7. When work is blocked, repetitive, or unable to produce new evidence, record that explicitly and move to failure classification rather than fabricating progress.
+
+A controller watchdog may terminate the worker after prolonged absence of both semantic checkpoints and worker output. This is intentional: a long silent session is a failure signal, not a reason to keep waiting.
+
 Long execution is not evidence of progress. Before any command, computation, data collection, or experiment that could consume substantial time, create or update a lightweight checkpoint containing the objective, current phase, last verified milestone, and next bounded action.
 
 After every material operation, ask:
