@@ -569,6 +569,12 @@ jobs:
             ':(glob)**/*.pyc' \
             ':(glob)**/*.py.c' 2>/dev/null || true
 
+          if git diff --cached --quiet; then
+            echo "No safe repository changes to persist."
+            echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
           # If there is substantive worker work, stamp the controller-owned
           # activation identity even when the worker did not touch the receipt.
           # An actually empty activation stays a true NO_CHANGES run.
@@ -640,12 +646,6 @@ jobs:
               raise SystemExit("receipt objective/phase/next must be non-empty strings")
           print("Activation receipt schema and run identity independently validated.")
           PY
-
-          if git diff --cached --quiet; then
-            echo "No safe repository changes to persist."
-            echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
-            exit 0
-          fi
 
           git config user.name "kilo-research-enterprise"
           git config user.email "kilo-research-enterprise@users.noreply.github.com"
