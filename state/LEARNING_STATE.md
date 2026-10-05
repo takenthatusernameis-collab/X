@@ -4,13 +4,13 @@ This is the compact durable learning layer for the autonomous quantitative-resea
 
 ## Active strategy delta
 
-- Gap:
-- Strategy Delta:
-- Expected Effect:
-- Anti-gaming Constraint:
-- Observed Effect:
+- Gap: Research activations have durable conclusions, but prior work did not explicitly convert each activation into a retained/rejected search-policy update or frontier decision.
+- Strategy Delta: Make frontier-first research selection explicit: choose the highest-value unresolved hypothesis/frontier cell before starting substantial work, and record one process-level search change per substantive activation.
+- Expected Effect: Fewer equivalent experiments and more information gained per unit of worker time.
+- Anti-gaming Constraint: Do not tune to OOS results or treat experiment count, positive results, runtime, or commits as learning.
+- Observed Effect: UNVERIFIED — this is the first operational activation of the learning contract.
 - Decision: UNVERIFIED
-- Next:
+- Next: On the next substantive activation, select one unresolved frontier item and complete the strategy-delta receipt before handoff.
 
 ## Research frontier
 
