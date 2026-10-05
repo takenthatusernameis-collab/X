@@ -42,11 +42,10 @@ def self_test() -> int:
     common = {
         "preflight": "success",
         "smoke": "success",
-        "verify": "success",
         "liveness": "COMPLETED_WITH_SEMANTIC_CHECKPOINTS",
     }
 
-    assert classify(**common, worker="success", persistence="MAIN") == (0, "COMPLETE")
+    assert classify(**common, verify="success", worker="success", persistence="MAIN") == (0, "COMPLETE")
     assert classify(**common, worker="failure", persistence="MAIN") == (1, "PARTIAL")
     assert classify(**common, worker="failure", persistence="RECOVERY_BRANCH") == (1, "PARTIAL")
     assert classify(**common, worker="success", persistence="NO_CHANGES") == (0, "NO_SUBSTANTIVE_ACTION")
