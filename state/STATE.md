@@ -619,6 +619,99 @@ volatility targeting remains the cell after that.
 
 ---
 
+## Current activation (cross-sectional relative strength frontier test executed; falsified — 37304873966)
+
+The cross-sectional relative-strength frontier cell was executed in this
+activation (37304873966): `research/checks/cross_sectional_relative_strength.py`
+ran end-to-end on the collected adjusted-close universe (manifest 10/10 OK,
+preflight passed, leakage review), the full-sample engine self-consistency
+passed, the fresh engine-path cross-check matched the direct fold-log-return
+path on every segment, and the perturbation sweep and determinism gates
+completed; artifact written to
+`state/check_artifacts/cross_sectional_relative_strength_results.json`.
+
+During execution four implementation defects were found and repaired, each
+repaired then re-run to completion:
+
+- `research/backtest/regime_stability.py::csrs_spread_family` and
+  `csrs_null_spread_family`: loop `range(lookback, first_len)` indexed
+  `closes[i + 1]` one bar past the series end (IndexError on 800-bar
+  families); repaired to `range(lookback, first_len - 1)`.
+- `csrs_null_spread_family` was not exported from
+  `research/backtest/__init__.py` although the check imports it; repaired the
+  import block and `__all__` (both now list it).
+- The regime-gate engine cross-check used a global-baseline weight with the
+  engine's constant-notional sizing: the engine's equity compounds the spread
+  by simple P&L addition and, with per-fold warmup, its `total_return` did not
+  reproduce the direct fold-log-return path. Repaired to per-fold constant-share
+  signals (weight = synthetic close / close of that fold's first post-warmup
+  bar), which makes the engine's equity compound geometrically from the same
+  baseline the direct path uses; the engine path then matches the direct
+  fold-log-return path bar-for-bar (verified independently, all folds equal).
+- Perturbation sweep: `baseline_dict = dict(baseline)` held only
+  `lookback/top_k` while sweep param sets carry `bottom_k` too, raising
+  `KeyError: 'bottom_k'`; repaired the deviation calculation to divide only
+  over the baseline's own parameters and made all sweep dictionaries keyed by
+  sorted parameter tuples so `param_sets` and `summary_medians` keys align.
+- Determinism section compared the second run's medians against themselves,
+  yielding an ambiguous array-boolean (`ValueError`); repaired to compare run 1
+  against run 2 with `np.all()`.
+
+Method: seed 42, collected adjusted-close data (dataset
+`yf-ohlcv-universe-2009-to-2026-10-03`), 10-ticker universe truncated to the
+fully overlapping window (3614 bars, 2012-05-18 to 2026-10-02), regime blocks
+from AAPL trailing-60d volatility (4 blocks, 2 segments: calm, turbulent),
+walk-forward train=252d/test=84d/warmup=60d/overlap=60d, min 400 bars/segment;
+CSRS = long top-3 / short bottom-3 of the cross section by 20-day lookback
+return, hold 1 day, daily rebalance, neutral before lookback; coin-flip null;
+drop-one sub-universe concentration gate; synthetic perturbation sweep
+(lookback 10/20/40, top_k 3/4/5, 4 canonical regime scenarios, 9 param sets,
+288 null folds per baseline).
+
+A-priori falsification prediction: CSRS would show either
+CONSISTENT_WITH_NOISE or REGIME_DEPENDENT with no REGIME_STABLE positive edge
+on the collected universe, perturbation medians near the coin-flip null, and a
+no-edge concentration verdict. The prediction was CONFIRMED: no positive edge
+exists anywhere on the collected universe — all segment medians are negative
+and within the coin-flip null band:
+
+- Regime gate (full universe): candidate medians calm -0.027, turbulent -0.013
+  vs null calm -0.067, turbulent +0.017; candidate dispersion +0.010 vs null
+  +0.059 (< 2x null) -> CONSISTENT_WITH_NOISE. Engine cross-check MATCH on both
+  segments (same verdict).
+- Per-sub-universe (drop-one) verdicts across 10 assets:
+  CONSISTENT_WITH_NOISE=9, REGIME_STABLE=1 (NVDA: medians
+  [-0.032, -0.055], REGIME_STABLE only because dispersion is not > 2x null —
+  the consistent medians are negative, not a positive edge), REGIME_DEPENDENT=0.
+- Concentration gate: full-universe median -0.013 within null tolerance
+  +0.030 -> NO_EDGE; best single-ticker contribution share +120.9% but no edge
+  to concentrate (concentration rule only applies when an edge is present) ->
+  verdict NO_EDGE.
+- Synthetic sweep: baseline (lookback=20, top_k=3) median -0.001 vs null
+  +0.009; sample-calibrated tolerance +0.007 (baseline outside calibrated
+  tolerance, inside the fixed 0.05 tolerance); all 9 param sets within 0.05 of
+  null; sweep-level candidate dispersion +0.004 vs null +0.004 ->
+  CONSISTENT_WITH_NOISE. Scenario-by-scenario baseline medians: calm +0.000,
+  turbulent +0.013, mean_reverting -0.065, trending -0.002 — the
+  mean-reverting regime carries the largest (negative) spread, consistent with
+  momentum-style legs losing where short-horizon reversals are strong.
+
+Verdict: **FALSIFIED** — the cross-sectional relative-strength / long-winners–
+short-losers class is not a robust edge on the collected large-cap universe:
+the spread median is negative in every segment of every asset and statistically
+indistinguishable from the coin-flip null across the regime family and across
+lookback/top_k perturbations. The `REGIME_STABLE` sub-universe verdict (NVDA)
+records stability of *negative* medians, not an edge, and is not admitted as a
+candidate. This is durable negative evidence: executed, independently verified
+(engine-path MATCH + determinism r1==r2 across two full runs), and deterministic.
+
+Frontier update: the cross-sectional relative strength cell closes as
+FALSIFIED. The frontier moves to volatility targeting (the sizing rule that was
+deferred after the ranking class was tested); mean reversion, MA crossover, and
+cross-sectional relative strength are now all falsified on this universe.
+
+---
+
 ## Evidence standard
 
 Synthetic data validates tooling only; it is not evidence that any

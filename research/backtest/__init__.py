@@ -69,6 +69,11 @@ from .regime_stability import (
     volatility_blocks,
     RegimeUniverseSummary,
     stress_segments_across_tickers,
+    csrs_spread_daily_returns,
+    csrs_null_spread_daily_returns,
+    csrs_null_spread_family,
+    build_synthetic_spread_asset,
+    csrs_spread_family,
 )
 from .universe import (
     ASSET_VERDICT_CONCENTRATED,
@@ -140,4 +145,9 @@ __all__ = [
     "stress_segments_across_tickers",
     "load_ticker",
     "load_universe",
+    "csrs_spread_daily_returns",
+    "csrs_null_spread_daily_returns",
+    "csrs_null_spread_family",
+    "build_synthetic_spread_asset",
+    "csrs_spread_family",
 ]

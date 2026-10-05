@@ -1042,3 +1042,203 @@ def stress_segments_across_tickers(
             min_segment_bars=min_segment_bars,
         )
     return RegimeUniverseSummary(assets=assets, ticker_order=ticker_order)
+
+
+# ==============================================================================
+# Cross-sectional relative strength (CSRS) signal class helpers
+# ==============================================================================
+
+def csrs_spread_daily_returns(tickers, lookback=20, top_k=3, bottom_k=3):
+    """Cross-sectional relative-strength spread: daily P&L of a long/short
+    portfolio built from ranks across the collected universe.
+
+    At each date t >= lookback: compute each ticker's lookback return
+    (closes[i-lookback : i+1], past-only); rank tickers descending; long the
+    top_k, short the bottom_k with equal capital per leg; hold one day;
+    daily rebalance. The spread P&L at bar t equals the mean of the
+    long-legs' next-day simple returns minus the mean of the short-legs'
+    next-day simple returns. Bars before lookback, and days with fewer than
+    2*k tickers available, are neutral (P&L = 0).
+
+    No look-ahead: every input at bar t uses closes only up to and
+    including t; the realized P&L is the return realized between bar t
+    and bar t+1.
+
+    Args:
+        tickers: dict ticker -> BarSequence of adjusted closes (all tickers
+            share the same date grid).
+        lookback: lookback window in bars.
+        top_k, bottom_k: leg sizes.
+
+    Returns:
+        np.ndarray of daily spread P&L (simple returns), one entry per bar
+        (0.0 where no trade is possible).
+    """
+    min_len = min(len(tb) for tb in tickers.values())
+    daily_pnl = np.zeros(min_len, dtype=np.float64)
+    for i in range(lookback, min_len - 1):
+        # truncate all series to the fully overlapping window so the spread
+        # is computed on the same date grid for every ticker; each ticker
+        # contributes a lookback return only where it has both the lookback
+        # window and the next-day close (past-only).
+        closes = {t: tb.closes_array()[:min_len] for t, tb in tickers.items()}
+        rets = {t: float(closes[t][i] / closes[t][i - lookback] - 1)
+                for t in closes}
+        sorted_tickers = sorted(rets, key=lambda t: rets[t], reverse=True)
+        longs = sorted_tickers[:top_k]
+        shorts = sorted_tickers[-bottom_k:]
+        if len(longs) < top_k or len(shorts) < bottom_k:
+            continue
+        long_ret = float(np.mean(
+            [closes[t][i + 1] / closes[t][i] - 1 for t in longs]))
+        short_ret = float(np.mean(
+            [closes[t][i + 1] / closes[t][i] - 1 for t in shorts]))
+        daily_pnl[i] = long_ret - short_ret
+    return daily_pnl
+
+
+def csrs_null_spread_family(family, lookback, top_k, bottom_k, seed=42):
+    """Coin-flip null of the CSRS spread over a synthetic family of assets.
+
+    Ranks are computed identically (past-only) across the family; the
+    long/short assignment is randomized by a deterministic per-bar coin flip,
+    preserving the spread's magnitude/structure while destroying its
+    information content.
+
+    Args:
+        family: list of BarSequence, one per asset (same length).
+        lookback, top_k, bottom_k: as in csrs_spread_family.
+        seed: deterministic RNG seed for the coin flips.
+
+    Returns:
+        np.ndarray of daily P&L (one entry per bar).
+    """
+    rng = np.random.default_rng(seed)
+    first_len = len(family[0])
+    daily_pnl = np.zeros(first_len, dtype=np.float64)
+    for i in range(lookback, first_len - 1):
+        rets = {}
+        for a, asset in enumerate(family):
+            c = asset.closes_array()
+            rets[a] = float(np.log(c[i]) - np.log(c[i - lookback]))
+        sorted_assets = sorted(rets, key=lambda a: rets[a], reverse=True)
+        longs = sorted_assets[:top_k]
+        shorts = sorted_assets[-bottom_k:]
+        if len(longs) < top_k or len(shorts) < bottom_k:
+            continue
+        leg_ret = lambda a: float(np.log(family[a].closes_array()[i + 1])
+                                  - np.log(family[a].closes_array()[i]))
+        spread = np.mean([leg_ret(a) for a in longs]) - np.mean([leg_ret(a) for a in shorts])
+        daily_pnl[i] = spread if rng.random() < 0.5 else -spread
+    return daily_pnl
+
+
+def csrs_null_spread_daily_returns(tickers, lookback=20, top_k=3, bottom_k=3,
+                                   seed=42):
+    """Coin-flip null of the CSRS spread.
+
+    Ranks are computed identically (past-only); the long/short assignment is
+    randomized: a deterministic coin flip per bar decides whether the
+    rank-ordered legs are held long (as in csrs_spread_daily_returns) or
+    shorted. This preserves the spread's magnitude/structure while removing
+    its information content.
+
+    Args:
+        tickers: dict ticker -> BarSequence.
+        lookback, top_k, bottom_k: as in csrs_spread_daily_returns.
+        seed: deterministic RNG seed for the coin flips.
+
+    Returns:
+        np.ndarray of daily P&L (one entry per bar).
+    """
+    rng = np.random.default_rng(seed)
+    min_len = min(len(tb) for tb in tickers.values())
+    daily_pnl = np.zeros(min_len, dtype=np.float64)
+    for i in range(lookback, min_len - 1):
+        closes = {t: tb.closes_array()[:min_len] for t, tb in tickers.items()}
+        rets = {t: float(closes[t][i] / closes[t][i - lookback] - 1)
+                for t in closes}
+        sorted_tickers = sorted(rets, key=lambda t: rets[t], reverse=True)
+        longs = sorted_tickers[:top_k]
+        shorts = sorted_tickers[-bottom_k:]
+        if len(longs) < top_k or len(shorts) < bottom_k:
+            continue
+        leg_ret = lambda t: float(closes[t][i + 1] / closes[t][i] - 1)
+        spread = np.mean([leg_ret(t) for t in longs]) - np.mean([leg_ret(t) for t in shorts])
+        daily_pnl[i] = spread if rng.random() < 0.5 else -spread
+    return daily_pnl
+
+
+def build_synthetic_spread_asset(daily_pnl, start_price=100.0):
+    """Build a BarSequence whose close path equals the cumulative equity of a
+    spread P&L series, with a constant-long signal suitable for the engine.
+
+    The synthetic asset carries the spread's compounded equity path; when it
+    is backtested fully invested (signal weight 1.0 at every bar), the
+    framework's walk-forward OOS total_return equals the spread's compounded
+    return over the OOS test window:
+
+        total_return = prod(1 + daily_pnl[OOS_bars]) - 1
+
+    so the walk-forward machinery can be reused for the spread. Neutral bars
+    carry the equity forward (daily_pnl = 0 before lookback is harmless).
+
+    Args:
+        daily_pnl: np.ndarray of daily spread P&L (one entry per bar).
+        start_price: starting equity level of the synthetic asset.
+
+    Returns:
+        BarSequence with close == cumulative equity and open/high/low derived
+        from the day-to-day move (range within the day's high/low; no
+        look-ahead).
+    """
+    n = len(daily_pnl)
+    eq = np.empty(n, dtype=np.float64)
+    eq[0] = start_price * (1.0 + daily_pnl[0]) if daily_pnl[0] != 0.0 else start_price
+    for i in range(1, n):
+        r = daily_pnl[i]
+        eq[i] = eq[i - 1] * (1.0 + r) if r != 0.0 else eq[i - 1]
+
+    opens = np.empty(n, dtype=np.float64)
+    opens[0] = start_price
+    opens[1:] = eq[:-1]
+    lows = np.empty(n, dtype=np.float64)
+    highs = np.empty(n, dtype=np.float64)
+    lows[0] = highs[0] = eq[0]
+    lows[1:] = np.minimum(eq[:-1], eq[1:])
+    highs[1:] = np.maximum(eq[:-1], eq[1:])
+    volumes = np.full(n, 1_000_000.0, dtype=np.float64)
+    dates = np.arange(1, n + 1, dtype=np.int64)
+    return BarSequence(dates, opens, highs, lows, eq, volumes)
+
+
+def csrs_spread_family(family, lookback, top_k, bottom_k):
+    """Compute the CSRS spread daily P&L across a synthetic family of
+    BarSequence assets (same pattern as csrs_spread_daily_returns but over a
+    family instead of a dict of tickers).
+
+    Args:
+        family: list of BarSequence, one per asset (same length).
+        lookback, top_k, bottom_k: as in csrs_spread_daily_returns.
+
+    Returns:
+        np.ndarray of daily spread P&L.
+    """
+    first_len = len(family[0])
+    daily_pnl = np.zeros(first_len, dtype=np.float64)
+    for i in range(lookback, first_len - 1):
+        rets = {}
+        for a, asset in enumerate(family):
+            c = asset.closes_array()
+            rets[a] = float(np.log(c[i]) - np.log(c[i - lookback]))
+        sorted_assets = sorted(rets, key=lambda a: rets[a], reverse=True)
+        longs = sorted_assets[:top_k]
+        shorts = sorted_assets[-bottom_k:]
+        if len(longs) < top_k or len(shorts) < bottom_k:
+            continue
+        leg_ret = lambda a: float(np.log(family[a].closes_array()[i + 1])
+                                  - np.log(family[a].closes_array()[i]))
+        long_ret = float(np.mean([leg_ret(a) for a in longs]))
+        short_ret = float(np.mean([leg_ret(a) for a in shorts]))
+        daily_pnl[i] = long_ret - short_ret
+    return daily_pnl
