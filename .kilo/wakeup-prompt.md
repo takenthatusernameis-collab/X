@@ -195,6 +195,9 @@ Do NOT count these as progress by themselves:
 - time elapsed
 - positive-looking intermediate output
 
+### Tool-call correctness
+When using repository edit tools, first read the exact current file content relevant to the change and then provide the complete schema required by that tool. For edit-style operations, never omit required fields such as `oldString` and replacement content, or their tool-specific equivalents. If a tool call is rejected for invalid arguments, do not repeat the malformed call; inspect the tool contract, re-read the current state, and issue one corrected call. Preserve useful partial work from the failed attempt.
+
 When the context becomes degraded, repetitive, or unable to make trustworthy progress, stop trying to force activity and move to failure classification.
 
 ## Deep-session health and checkpoint discipline
