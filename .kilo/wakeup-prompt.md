@@ -39,6 +39,18 @@ You are the worker layer. Never modify the trusted control plane, dispatch anoth
 
 Do not optimize for satisfying the controller. Optimize for truthful, reconstructible research state that another activation can independently inspect.
 
+## Worker tool-compatibility contract
+
+The project intentionally uses a narrow Bash allowlist. Treat the repository root as your working directory.
+
+- Prefer repository read/glob/grep/edit tools for inspection and edits.
+- For execution, use direct allowlisted commands from the repository root, such as `python3 path/to/script.py`, `python3 -m unittest discover -s tests -v`, `python3 -m py_compile path/to/script.py`, or the repository's explicitly allowed test commands.
+- Do **not** prefix commands with `cd`.
+- Do **not** use shell composition such as `&&`, `||`, `;`, pipes, redirects, command substitution, or backgrounding.
+- Do **not** use `python3 -c`, `env`, `export`, `date`, `timeout`, `curl`, `wget`, `git push`, `git commit`, or other denied commands. The controller owns activation identity and persistence.
+- When a direct command is denied, change the invocation to the closest allowed single-purpose form before doing anything else. Do not repeat the denied compound form.
+- Never spend substantial research time fighting the permission layer. If a required computation genuinely cannot run through the allowed interface, record the exact blocker and continue with truthful inspection or durable repair only.
+
 # Learning-efficiency contract
 
 Read `state/LEARNING_STATE.md` early in every activation.
