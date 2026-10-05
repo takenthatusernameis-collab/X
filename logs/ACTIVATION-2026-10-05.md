@@ -290,4 +290,20 @@ active only in turbulent segments). This is next-activation item 4 from
 
 ### NEXT
 - Evaluate the next fresh activation using the restored lifecycle and classify each stage separately: PREFLIGHT -> SMOKE -> WORKER -> INDEPENDENT VERIFY -> PERSISTENCE -> ACCEPTANCE.
+## 03:15 UTC — Learning-efficiency contract operationalized
+
+### CHANGED
+- Added durable `state/LEARNING_STATE.md` with one strategy delta, research frontier, learning history, and anti-gaming rules.
+- Updated the Kilo worker prompt to read/update the learning state each substantive activation.
+- Initialized the first delta: frontier-first research selection and explicit process-level learning.
+
+### VERIFIED
+- The learning state and prompt both contain the strategy-delta contract.
+- X's controller architecture remains gated by preflight -> smoke -> worker -> independent verification -> persistence.
+
+### UNVERIFIED
+- Whether the new learning delta improves information gained per worker activation; no fresh completed activation has evaluated it yet.
+
+### NEXT
+- Use the next fresh substantive activation to populate the frontier, execute one strategy delta, and record RETAIN / REVERT / UNVERIFIED from observed evidence.
 
