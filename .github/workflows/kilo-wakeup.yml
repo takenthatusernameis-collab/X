@@ -28,9 +28,28 @@ jobs:
       - name: Install Kilo Code CLI
         run: npm install -g @kilocode/cli
 
-      - name: Verify Kilo installation
-        run: kilo --version
-
+      - name: Verify Kilo installation and smoke-test execution path
+        id: verify_install
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          kilo --version
+          rm -rf /tmp/kilo-smoke
+          mkdir -p /tmp/kilo-smoke
+          cat > /tmp/kilo-smoke/prompt.txt <<'EOF'
+Use the available shell/tool capability to create exactly one file:
+  /tmp/kilo-smoke/sentinel.txt
+The complete contents must be exactly SMOKE_OK.
+Do not modify the Git repository. Verify the file contents and stop.
+EOF
+          cd /tmp/kilo-smoke
+          kilo run --model openai-compatible/free-kilo --auto "$(cat /tmp/kilo-smoke/prompt.txt)" > /tmp/kilo-smoke.log 2>&1
+          status=$?
+          cat /tmp/kilo-smoke.log
+          test "$status" -eq 0
+          test -s /tmp/kilo-smoke/sentinel.txt
+          test "$(cat /tmp/kilo-smoke/sentinel.txt)" = "SMOKE_OK"
+          echo "Representative Kilo execution-path smoke test passed."
       - name: Diagnose Kilo API key
         id: kilo_auth
         continue-on-error: true
@@ -244,30 +263,8 @@ jobs:
           print(f"Trusted Kilo configuration validated for {model['id']}.")
           PY
 
-      - name: Smoke-test real Kilo execution path
-        id: kilo_smoke
-        timeout-minutes: 5
-        run: |
-          set -euo pipefail
-          rm -rf /tmp/kilo-smoke
-          mkdir -p /tmp/kilo-smoke
-          cat > /tmp/kilo-smoke/prompt.txt <<'EOF'
-Use the available shell/tool capability to create exactly one file:
-  /tmp/kilo-smoke/sentinel.txt
-The complete contents must be exactly SMOKE_OK.
-Do not modify the Git repository. Verify the file contents and stop.
-EOF
-          cd /tmp/kilo-smoke
-          kilo run --model openai-compatible/free-kilo --auto "$(cat /tmp/kilo-smoke/prompt.txt)" > /tmp/kilo-smoke.log 2>&1
-          status=$?
-          cat /tmp/kilo-smoke.log
-          test "$status" -eq 0
-          test -s /tmp/kilo-smoke/sentinel.txt
-          test "$(cat /tmp/kilo-smoke/sentinel.txt)" = "SMOKE_OK"
-          echo "Representative Kilo execution-path smoke test passed."
       - name: Run Kilo
         id: kilo
-        if: steps.kilo_smoke.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 340
         env:
@@ -297,20 +294,47 @@ EOF
 
           exit "$status"
 
-      - name: Independently verify activation evidence
-        id: verify
-        if: always() && steps.kilo.outcome != 'skipped'
+      - name: Verify and persist safe repository changes
+        id: persist
+        if: always()
         continue-on-error: true
         env:
-          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_TOKEN: ${{ github.token }}
+          KILO_OUTCOME: ${{ steps.kilo.outcome }}
         run: |
           set -euo pipefail
-          git diff --check
-          if git diff --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)$' >/tmp/verify_protected; then
-            echo "Protected control-plane paths were changed by the worker:"
-            cat /tmp/verify_protected
+          echo "PERSISTENCE_STATUS=FAILED" >> "$GITHUB_ENV"
+
+          git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
+          git reset -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
+          git add -A
+          git reset -- \
+            ':(glob)**/__pycache__/**' \
+            ':(glob)**/*.pyc' \
+            ':(glob)**/*.py.c' 2>/dev/null || true
+
+          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)$' >/tmp/kilo_protected_paths; then
+            echo "Protected paths unexpectedly staged:"
+            cat /tmp/kilo_protected_paths
             exit 1
           fi
+          if git diff --cached --name-only | grep -E '(^|/)(\.env(\..*)?|id_rsa|id_dsa|id_ecdsa|id_ed25519|credentials\.(json|ya?ml|toml)|secrets\.(json|ya?ml|toml))$|\.(pem|key)$' >/tmp/kilo_credential_paths; then
+            echo "Credential-like paths are not allowed to persist:"
+            cat /tmp/kilo_credential_paths
+            exit 1
+          fi
+          if git diff --cached --binary | grep -E -n 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|kilo_[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}' >/tmp/kilo_secrets; then
+            echo "Potential credential material detected:"
+            cat /tmp/kilo_secrets
+            exit 1
+          fi
+          if git diff --cached --summary | grep -E '^ create mode 120000 ' >/tmp/kilo_symlinks; then
+            echo "Symbolic links are not allowed to persist:"
+            cat /tmp/kilo_symlinks
+            exit 1
+          fi
+
+          git diff --check
           test -f state/activation_status.json
           python3 - <<'PY'
           import json
@@ -327,67 +351,33 @@ EOF
               raise SystemExit("invalid activation status")
           if str(d["activation_id"]) != os.environ["GITHUB_RUN_ID"]:
               raise SystemExit("receipt activation_id does not match current run")
-          for key in ("changed","verified","unverified"):
-              if not isinstance(d[key], list):
-                  raise SystemExit(f"receipt field {key} must be a list")
+          if not all(isinstance(d[k], list) for k in ("changed","verified","unverified")):
+              raise SystemExit("receipt list field has invalid type")
           if not all(isinstance(d[k], str) and d[k].strip() for k in ("objective","phase","next")):
               raise SystemExit("receipt objective/phase/next must be non-empty strings")
-          print("Activation receipt independently schema-validated.")
+          print("Activation receipt schema and run identity independently validated.")
           PY
-          echo "Independent repository/evidence gate passed."
-      - name: Persist safe repository changes
-        id: persist
-        if: always()
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          echo "PERSISTENCE_STATUS=FAILED" >> "$GITHUB_ENV"
-          git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
-          git reset -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
-          git add -A
-          git reset -- \
-            ':(glob)**/__pycache__/**' \
-            ':(glob)**/*.pyc' \
-            ':(glob)**/*.py.c' 2>/dev/null || true
-          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)$' >/tmp/protected; then
-            echo "Protected paths unexpectedly staged:"
-            cat /tmp/protected
-            exit 1
-          fi
-          if git diff --cached --name-only | grep -E '(^|/)(\.env(\..*)?|id_rsa|id_dsa|id_ecdsa|id_ed25519|credentials\.(json|ya?ml|toml)|secrets\.(json|ya?ml|toml))$|\.(pem|key)$' >/tmp/credential_paths; then
-            echo "Credential-like paths are not allowed to persist:"
-            cat /tmp/credential_paths
-            exit 1
-          fi
-          if git diff --cached --binary | grep -E -n 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|kilo_[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}' >/tmp/secrets; then
-            echo "Potential credential material detected:"
-            cat /tmp/secrets
-            exit 1
-          fi
-          if git diff --cached --summary | grep -E '^ create mode 120000 ' >/tmp/symlinks; then
-            echo "Symbolic links are not allowed to persist:"
-            cat /tmp/symlinks
-            exit 1
-          fi
+
           if git diff --cached --quiet; then
             echo "No safe repository changes to persist."
             echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
             exit 0
           fi
+
           git config user.name "kilo-research-enterprise"
           git config user.email "kilo-research-enterprise@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
           git commit -m "Kilo activation: update research state"
           local_commit="$(git rev-parse HEAD)"
           git fetch origin "$GITHUB_REF_NAME"
+
           if git rebase "origin/$GITHUB_REF_NAME"; then
             if git push origin "HEAD:$GITHUB_REF_NAME"; then
               echo "PERSISTENCE_STATUS=MAIN" >> "$GITHUB_ENV"
               exit 0
             fi
           fi
+
           git rebase --abort >/dev/null 2>&1 || true
           recovery_branch="recovery/kilo-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           git push origin "${local_commit}:refs/heads/${recovery_branch}"
@@ -397,31 +387,35 @@ EOF
       - name: Report Kilo outcome
         if: always()
         env:
-          SMOKE_OUTCOME: ${{ steps.kilo_smoke.outcome }}
+          PREFLIGHT_OUTCOME: ${{ steps.verify_install.outcome }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
-          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
           PERSISTENCE_STATUS: ${{ env.PERSISTENCE_STATUS }}
           PERSISTENCE_RECOVERY_BRANCH: ${{ env.PERSISTENCE_RECOVERY_BRANCH }}
         run: |
           set -euo pipefail
-          echo "Smoke: ${SMOKE_OUTCOME:-unknown}"
-          echo "Kilo: ${KILO_OUTCOME:-unknown}"
-          echo "Verifier: ${VERIFY_OUTCOME:-unknown}"
+          echo "Smoke/preflight: ${PREFLIGHT_OUTCOME:-unknown}"
+          echo "Kilo worker: ${KILO_OUTCOME:-unknown}"
           echo "Persistence: ${PERSISTENCE_STATUS:-unknown}"
-          if [ "${SMOKE_OUTCOME:-}" != "success" ]; then exit 1; fi
-          if [ "${KILO_OUTCOME:-}" = "skipped" ]; then exit 1; fi
-          if [ "${VERIFY_OUTCOME:-}" != "success" ]; then exit 1; fi
+
+          if [ "${PREFLIGHT_OUTCOME:-}" != "success" ]; then
+            echo "FAILED: representative Kilo execution smoke test did not pass; deep research was not trustworthy to start."
+            exit 1
+          fi
+          if [ "${KILO_OUTCOME:-}" = "skipped" ]; then
+            echo "FAILED: Kilo deep session was skipped."
+            exit 1
+          fi
           case "${PERSISTENCE_STATUS:-FAILED}" in
             MAIN)
               if [ "${KILO_OUTCOME:-}" = "success" ]; then
-                echo "COMPLETE: worker + verifier + main persistence succeeded."
+                echo "COMPLETE: smoke, deep worker, deterministic receipt verification, and main persistence succeeded."
               else
-                echo "PARTIAL: worker was non-zero but research state persisted."
+                echo "PARTIAL: useful worker work persisted, but the raw Kilo session ended non-zero."
                 exit 1
               fi
               ;;
             RECOVERY_BRANCH)
-              echo "PARTIAL: research work preserved on ${PERSISTENCE_RECOVERY_BRANCH:-recovery branch}, not integrated into main."
+              echo "PARTIAL: worker work preserved on ${PERSISTENCE_RECOVERY_BRANCH:-recovery branch}, not integrated into main."
               exit 1
               ;;
             NO_CHANGES)
