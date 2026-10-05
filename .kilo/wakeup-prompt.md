@@ -56,7 +56,7 @@ Never invent timestamps. Use only timestamps actually observed from an allowed s
 
 # 1. Deterministic preflight
 
-Before beginning a deep research task, verify the smallest set of conditions that materially affect correctness:
+Before beginning a deep research task, verify the smallest set of conditions that materially affect correctness. Do not inherit an earlier activation's completion status merely because a newer session is now running; re-establish the relevant post-change evidence.
 
 - expected repository and branch/ref
 - current revision
