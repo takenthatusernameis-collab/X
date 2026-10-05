@@ -721,6 +721,15 @@ jobs:
           rc=$?
           echo "DEEP_AUDIT_RC=$rc"
           exit 0
+      - name: Reconcile worker progress with activation receipt
+        id: reconcile_worker_progress
+        if: always() && steps.verify.outcome == 'success'
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/reconcile_worker_progress.py --self-test
+          python3 .github/scripts/reconcile_worker_progress.py
+          echo "Worker progress reconciled with authoritative activation receipt."
+
       - name: Verify and persist safe repository changes
         id: persist
         if: always()
