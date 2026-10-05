@@ -49,7 +49,7 @@ class KiloOutcomeClassifierTests(unittest.TestCase):
             worker="success",
             liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT",
         )
-        self.assertEqual(MODULE.classify(**common, verify="success", persistence="MAIN"), (1, "PARTIAL"))
+        self.assertEqual(MODULE.classify(**common, verify="success", persistence="MAIN"), (0, "PARTIAL"))
         self.assertEqual(MODULE.classify(**common, verify="failure", persistence="MAIN"), (1, "FAILED"))
         self.assertEqual(MODULE.classify(**common, verify="success", persistence="RECOVERY_BRANCH"), (1, "FAILED"))
 
@@ -63,7 +63,7 @@ class KiloOutcomeClassifierTests(unittest.TestCase):
                 liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS",
                 persistence="MAIN",
             ),
-            (1, "PARTIAL"),
+            (0, "PARTIAL"),
         )
 
     def test_controller_preflight_failure_blocks_activation(self):
