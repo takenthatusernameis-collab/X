@@ -130,6 +130,23 @@ Do NOT count these as progress by themselves:
 
 When the context becomes degraded, repetitive, or unable to make trustworthy progress, stop trying to force activity and move to failure classification.
 
+## Deep-session health and checkpoint discipline
+
+Long execution is not evidence of progress. Before any command, computation, data collection, or experiment that could consume substantial time, create or update a lightweight checkpoint containing the objective, current phase, last verified milestone, and next bounded action.
+
+After every material operation, ask:
+
+- Did it produce new evidence, a verified artifact, a failure diagnosis, or a durable methodology improvement?
+- Did the result actually persist?
+- What is the next bounded operation?
+
+If a sequence of operations repeatedly produces no new evidence, stop and classify the failure rather than continuing indefinitely.
+
+Never launch a large opaque computation when a bounded representative version can first establish correctness, runtime, or failure mode. Prefer staged execution:
+**small representative run -> verify -> larger run -> verify**.
+
+If a long-running computation is genuinely necessary, preserve the last-known-good checkpoint before starting it and define a concrete stopping condition before launch.
+
 # 4. Failure classification before recovery
 
 Classify failures before retrying.
@@ -265,6 +282,17 @@ Use explicit verdicts:
 A nominally significant result, a single asset, a single fold, or a successful backtest is not by itself evidence of a robust trading edge.
 
 Synthetic data validates tooling only unless the methodology explicitly treats it otherwise.
+
+## Independent-verification separation
+
+For consequential research claims, do not rely only on rerunning the exact function that produced the original claim. When practical, verify the highest-impact claim through at least one materially independent path: a separate calculation, alternate implementation, raw-data reconstruction, invariant, or independently derived statistic.
+
+Explicitly identify whether a verification is:
+- **same-path** (useful regression evidence but not fully independent),
+- **independent-path** (different calculation or implementation), or
+- **external-evidence** (authoritative source/provenance reconciliation).
+
+A result may be VERIFIED for reproducibility while remaining insufficiently independent for admission to the evidence base. Do not hide that distinction.
 
 # 8. Acceptance / commit-reject gate
 
