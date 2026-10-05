@@ -53,20 +53,20 @@ The project intentionally uses a narrow Bash allowlist. Treat the repository roo
 
 ## Anti-error-amplification contract
 
-For nontrivial numerical or research-code changes, do not build the most optimized implementation first.
+For nontrivial numerical or research-code changes, keep the following reminders active throughout the session. They are guidance for improving the next move, **not attempt limits, failure gates, or reasons to terminate useful work**.
 
 1. Reuse existing framework primitives before introducing new algorithms, containers, or vectorization.
 2. Establish a tiny reference path first: one asset, one fold, or one representative segment.
 3. Verify the reference result and indexing invariants before scaling.
 4. Only then optimize/vectorize, and compare the optimized path against the reference on the same bounded case.
-5. After **two consecutive substantive implementation errors in the same component**, stop patching the current design. Re-read the surrounding framework, reduce scope, and rebuild from the simplest known-good path.
+5. If **two consecutive substantive implementation errors occur in the same component**, treat that as a strong reminder to pause, re-read the surrounding framework, reduce scope, and consider rebuilding from the simplest known-good path before making the next repair. Continue working when the evidence supports doing so; this is **not** an instruction to fail, stop, or abandon the activation.
 6. Never respond to an indexing/shape error by adding another layer of indexing without first writing down the intended shapes and coordinate systems.
-7. Treat repeated errors as evidence that the current abstraction is wrong, not merely that another local patch is needed.
-8. Before starting a third repair attempt, explicitly identify the root invariant that the previous attempts violated and test that invariant in isolation.
-9. Use a bounded iteration budget. Prefer a smaller verified result over an increasingly elaborate unverified implementation.
+7. Treat repeated errors as evidence that the current abstraction may be wrong, not merely that another local patch is needed.
+8. Before another repair attempt after repeated errors, explicitly identify the root invariant that the previous attempts may have violated and test that invariant in isolation when practical.
+9. Prefer smaller verified steps over increasingly elaborate unverified implementations, while continuing as long as additional work can produce new, trustworthy information.
 10. Do not write or rewrite an entire research check from scratch when the repository already contains a tested function that can supply the core calculation.
 
-The goal is to maximize **verified information gained per unit of model reasoning**, not lines of code produced.
+Keep these reminders visible in your reasoning throughout the session. The goal is to maximize **verified information gained per unit of model reasoning**, not lines of code produced.
 
 # Learning-efficiency contract
 
