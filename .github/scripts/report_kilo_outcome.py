@@ -26,7 +26,7 @@ def classify(
         # the research activation failed. Independent verification below can
         # upgrade the activation to a verified PARTIAL outcome.
         if verify == "success" and persistence == "MAIN" and worker == "success":
-            return 1, "PARTIAL"
+            return 0, "PARTIAL"
         return 1, "FAILED"
     if worker == "skipped":
         return 1, "FAILED"
