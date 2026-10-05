@@ -28,28 +28,8 @@ jobs:
       - name: Install Kilo Code CLI
         run: npm install -g @kilocode/cli
 
-      - name: Verify Kilo installation and smoke-test execution path
-        id: verify_install
-        timeout-minutes: 10
-        run: |
-          set -euo pipefail
-          kilo --version
-          rm -rf /tmp/kilo-smoke
-          mkdir -p /tmp/kilo-smoke
-          cat > /tmp/kilo-smoke/prompt.txt <<'EOF'
-Use the available shell/tool capability to create exactly one file:
-  /tmp/kilo-smoke/sentinel.txt
-The complete contents must be exactly SMOKE_OK.
-Do not modify the Git repository. Verify the file contents and stop.
-EOF
-          cd /tmp/kilo-smoke
-          kilo run --model openai-compatible/free-kilo --auto "$(cat /tmp/kilo-smoke/prompt.txt)" > /tmp/kilo-smoke.log 2>&1
-          status=$?
-          cat /tmp/kilo-smoke.log
-          test "$status" -eq 0
-          test -s /tmp/kilo-smoke/sentinel.txt
-          test "$(cat /tmp/kilo-smoke/sentinel.txt)" = "SMOKE_OK"
-          echo "Representative Kilo execution-path smoke test passed."
+      - name: Verify Kilo installation
+        run: kilo --version
       - name: Diagnose Kilo API key
         id: kilo_auth
         continue-on-error: true
@@ -263,8 +243,30 @@ EOF
           print(f"Trusted Kilo configuration validated for {model['id']}.")
           PY
 
+      - name: Smoke-test real Kilo execution path
+        id: kilo_smoke
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/kilo-smoke
+          mkdir -p /tmp/kilo-smoke
+          cat > /tmp/kilo-smoke/prompt.txt <<'EOF'
+          Use the available shell/tool capability to create exactly one file:
+            /tmp/kilo-smoke/sentinel.txt
+          The complete contents must be exactly SMOKE_OK.
+          Do not modify the Git repository. Verify the file contents and stop.
+          EOF
+          cd /tmp/kilo-smoke
+          kilo run --model openai-compatible/free-kilo --auto "$(cat /tmp/kilo-smoke/prompt.txt)" > /tmp/kilo-smoke.log 2>&1
+          status=$?
+          cat /tmp/kilo-smoke.log
+          test "$status" -eq 0
+          test -s /tmp/kilo-smoke/sentinel.txt
+          test "$(cat /tmp/kilo-smoke/sentinel.txt)" = "SMOKE_OK"
+          echo "Representative Kilo execution-path smoke test passed."
       - name: Run Kilo
         id: kilo
+        if: steps.kilo_smoke.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 340
         env:
@@ -389,8 +391,6 @@ EOF
         env:
           PREFLIGHT_OUTCOME: ${{ steps.verify_install.outcome }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
-          PERSISTENCE_STATUS: ${{ env.PERSISTENCE_STATUS }}
-          PERSISTENCE_RECOVERY_BRANCH: ${{ env.PERSISTENCE_RECOVERY_BRANCH }}
         run: |
           set -euo pipefail
           echo "Smoke/preflight: ${PREFLIGHT_OUTCOME:-unknown}"
