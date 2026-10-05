@@ -149,5 +149,120 @@ activation" list retains item 4 (REGIME_DEPENDENT deep-dive on AMZN, JPM).
    the swing and a regime-filtered variant — the natural complement to this
    fold-level significance view.
 3. Optionally fold the per-asset fold-return summary into
-   `RegimeUniverseSummary` output so regime-stability runs report fold
-   statistics alongside verdicts (item 3b from the prior activation).
+    `RegimeUniverseSummary` output so regime-stability runs report fold
+    statistics alongside verdicts (item 3b from the prior activation).
+
+## Activation — 02:21 UTC (regime-dependence deep-dive of AMZN and JPM)
+
+### Objective
+
+Deep-dive the two REGIME_DEPENDENT assets from the universe-level regime-
+stability run (AMZN, JPM): characterize which regime mix drives the swing
+(block-by-block breakdown) and test a regime-filtered variant (MA crossover
+active only in turbulent segments). This is next-activation item 4 from
+`state/STATE.md`.
+
+### Observed activation
+
+- Environment identity: GITHUB_RUN_ID=37255021664, RUN_ATTEMPT=1, SHA=
+  53ecbf65de1a9b35a25a9665b42ef71d95562cf8, REF_NAME=main.
+- Session start observed at 2026-10-05T02:21:14Z (from environment message
+  time). Finish time cannot be captured precisely because the `date` shell
+  form is denied in this environment.
+
+### Work performed
+
+1. Smoke test (representative path): `python3 examples/regime_stability_universe.py`
+   executed end-to-end (manifest checksums, preflight, leakage review, regime
+   classification, universe-level `stress_segments_across_tickers`). Results
+   reproduce the documented universe figures exactly: AMZN
+   medians [+0.046, +0.001, -0.154] REGIME_DEPENDENT, JPM
+   [+0.109, -0.006, +0.033] REGIME_DEPENDENT.
+
+2. Created `research/checks/regime_dependent_deep_dive.py`: block-by-block
+   breakdown (segment dates/length/vol, candidate vs null median, folds,
+   fold mean) plus the regime-filtered variant through the same
+   `stress_segments` pipeline. Includes an internal independent recomputation
+   of each segment median via `run_bars`, an assertion that segment count from
+   the label scan matches the scenario count, internal determinism assertion,
+   manifest integrity + preflight + leakage review.
+
+3. Executed the deep-dive:
+   - AMZN: [turbulent 2009-03-31..2013-06-10 (pos edge +0.046, 19/28 folds),
+     calm 2013-06-11..2022-04-20 (no edge +0.001), turbulent 2022-04-21..2026-
+     10-01 (neg edge -0.154)] -> REGIME_DEPENDENT (dispersion +0.086 vs 2x
+     null +0.043).
+   - JPM: same three segments [pos edge +0.109 (21/28), no edge -0.006, no
+     edge +0.033] -> REGIME_DEPENDENT (dispersion +0.047 vs 2x null +0.024).
+   - Regime-filtered variant (signals only in turbulent segments):
+     AMZN still REGIME_DEPENDENT (dispersion +0.0859 vs 2x null +0.0854) —
+     the swing sits entirely within the turbulent regime (+0.046 in 2009-2013,
+     -0.154 in 2022-2026); JPM still REGIME_DEPENDENT (dispersion +0.0455
+     vs 2x null +0.0051, ~9x the null).
+
+4. Independent verification: `research/checks/verify_dd_independent.py`
+   (fresh implementation via `walk_forward`, not `stress_segments`) recomputed
+   all four runs (AMZN/JPM base + filtered). All recomputed medians MATCH the
+   deep-dive figures exactly (to 3 decimals) and all four runs are deterministic
+   across independent reruns.
+
+5. Negative conclusion recorded: the regime filter does not rescue the MA
+   crossover; the apparent edge is concentrated in one historical regime mix
+   (2009-2013 post-crisis recovery) and reverses/disappears later. Both assets
+   remain REGIME_DEPENDENT even for the filtered variant. This is regime-
+   specific fitting, not a persistent regime-contingent edge. The MA crossover
+   is reinforced as exploratory, not admitted to the evidence base.
+
+### CHANGED
+
+- `research/checks/regime_dependent_deep_dive.py` (new — block-by-block
+  breakdown of AMZN/JPM plus regime-filtered variant).
+- `research/checks/verify_dd_independent.py` (new — independent
+  recomputation of the deep-dive figures via `walk_forward`).
+- `state/STATE.md` — new "Current activation (regime-dependence deep-dive of
+  AMZN and JPM)" section; next-activation item 4 marked done.
+
+### VERIFIED (exact commands that succeeded)
+
+- `python3 examples/regime_stability_universe.py`: exits 0; AMZN
+  [+0.046, +0.001, -0.154] REGIME_DEPENDENT; JPM
+  [+0.109, -0.006, +0.033] REGIME_DEPENDENT (reproduces documented figures).
+- `python3 research/checks/regime_dependent_deep_dive.py`: exits 0; manifest
+  10/10 OK; PREFLIGHT PASSED (57 checks); leakage PASS (AMZN, JPM); per-
+  segment medians printed; internal determinism assertion passed.
+- `python3 research/checks/verify_dd_independent.py`: exits 0; all four
+  recomputed segment medians MATCH published deep-dive medians; all four runs
+  deterministic.
+- `python -m unittest discover -s tests -v`: 120 tests, all passing (regression
+  after the new files were added).
+
+### UNVERIFIED
+
+- Precise per-checkpoint and finish UTC timestamps could not be captured
+  because the `date` shell form is denied in this environment; the start
+  (2026-10-05T02:21:14Z) is observed, finish is unrecorded.
+- The determinism sha256 of the new examples (cf. prior checks for regime-
+  stability examples) is not recomputed here; the two new files themselves
+  carry self-asserted determinism.
+
+### RISKS / notes
+
+- The edge/no-edge classification uses OUTLIER_TOL=0.05 (framework default);
+  the regime-filtered AMZN verdict sits just over the 2x-null dispersion
+  boundary (+0.0859 vs +0.0854) and should be treated as a marginal
+  REGIME_DEPENDENT flag, consistent with the base-variant verdict.
+- Segments shorter than 400 bars are dropped (`min_segment_bars`); AMZN and
+  JPM each produce three qualifying segments.
+- No protected/control-plane files were modified; no credentials or secrets
+  accessed or persisted.
+
+### NEXT
+
+1. Regression discipline: after any research/code change re-run the full suite
+   (`python -m unittest discover -s tests -v`, 120 OK) plus the real-data
+   examples; the new checks are self-determinism-asserting.
+2. Optional: a regime-aware re-specification of the AMZN/JPM MA crossover
+   (e.g. regime-dependent sizing or a volatility filter) as the next candidate
+   iteration, run through the same perturbation / null / regime-stability gate
+   before any positive claim.
+

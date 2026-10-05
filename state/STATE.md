@@ -767,6 +767,62 @@ the collected universe; the per-asset significant results are consistent
 with the established finding that the AAPL MA crossover is exploratory,
 within noise, and not admitted to the evidence base.
 
+## Current activation (regime-dependence deep-dive of AMZN and JPM)
+
+Deep-dived the two REGIME_DEPENDENT assets from the universe-level
+regime-stability run (`examples/regime_stability_universe.py`, seed 42) to
+answer which regime mix drives the swing and whether a regime-filtered
+variant rescues the edge. Added `research/checks/regime_dependent_deep_dive.py`:
+block-by-block breakdown (segment dates, length, realized vol, candidate vs
+null median, folds) plus the same asset run with the MA crossover active only
+inside turbulent segments; both variants go through the same
+`stress_segments` pipeline with the coin-flip null. Determinism and an
+independent recomputation path (fresh implementation via `walk_forward`) are
+asserted.
+
+Block-by-block (MA(20/60), train=252d/test=84d, warmup=60d, overlap=60d,
+4 contiguous blocks by date, min_segment_bars=400):
+
+- AMZN (4465 bars): [turbulent 2009-03-31..2013-06-10 / calm 2013-06-11..2022-
+  04-20 / turbulent 2022-04-21..2026-10-01], medians
+  [+0.046, +0.001, -0.154]; first turbulent segment shows a pos edge
+  (19/28 folds positive), calm shows no edge, second turbulent shows a neg
+  edge. Verdict REGIME_DEPENDENT (dispersion +0.086 > 2x null +0.043).
+- JPM (4465 bars): same three segments, medians
+  [+0.109, -0.006, +0.033]; pos edge in the first turbulent segment
+  (21/28 positive), no edge in calm, no edge (marginal) in the second
+  turbulent. Verdict REGIME_DEPENDENT (dispersion +0.047 > 2x null +0.024).
+
+Regime-filtered variant (crossover active only in turbulent segments):
+
+- AMZN: still REGIME_DEPENDENT, dispersion +0.0859 vs 2x null +0.0854. The
+  swing is entirely WITHIN the turbulent regime — pos edge in the 2009-2013
+  turbulent period, neg edge in the 2022-2026 turbulent period — so restricting
+  to turbulent regimes does not remove the dependence.
+- JPM: still REGIME_DEPENDENT, dispersion +0.0455 vs 2x null +0.0051 (about 9x
+  the null's). The edge present in the first turbulent block disappears in the
+  second.
+
+Interpretation: the regime filter does not rescue the MA crossover. The
+apparent edge is concentrated in one historical regime mix (the 2009-2013
+post-crisis recovery period) and reverses or vanishes later; even a
+regime-aware implementation keeps fitting a particular period/ regime mix.
+This is the signature of regime-specific fitting rather than a persistent
+regime-contingent edge, so it strengthens the existing decision to reject the
+MA crossover from the evidence base (in addition to: canonical (20,60) not a
+peak in any asset, full-sample walk-forward within the sample-calibrated
+noise tolerance, only 1/10 assets significant in the universe sweep, no edge
+surviving Bonferroni correction across the universe, and AAPL/REGIME_STABLE
+not generalizing beyond that one asset).
+
+Verification: 120-test suite all passing; `regime_dependent_deep_dive.py`
+runs end-to-end with manifest checksums 10/10 OK, PREFLIGHT PASSED (57 checks),
+leakage review PASS on both assets, internal determinism assertion `r1 == r2`,
+and an independent recomputation script
+(`research/checks/verify_dd_independent.py`) that re-runs each segment and the
+filtered variant via `walk_forward` directly: all four recomputed figures
+match the deep-dive medians exactly and are deterministic across reruns.
+
 ## Next activation
 
 1. Regression discipline maintained: `python -m unittest discover -s tests -v`
@@ -780,8 +836,12 @@ within noise, and not admitted to the evidence base.
    t-statistic over the collected universe, and/or fold a per-asset
    fold-return summary into `RegimeUniverseSummary` output.
 4. Optional: deep-dive on the REGIME_DEPENDENT assets (AMZN, JPM) —
-   characterize which regime mix drives the swing (block-by-block breakdown)
-   and test a regime-filtered variant.
+    characterize which regime mix drives the swing (block-by-block breakdown)
+    and test a regime-filtered variant — **done (this activation)**: see the
+    "Current activation (regime-dependence deep-dive of AMZN and JPM)" section.
+    Verdict: both assets are regime-dependent because their edge is
+    concentrated in one historical regime mix (2009-2013); a regime-filtered
+    variant does not remove the dependence. Not admitted to the evidence base.
 
 
 1. Run the new `TestStressSegments` suite (in `tests/test_regime_stability.py`)
