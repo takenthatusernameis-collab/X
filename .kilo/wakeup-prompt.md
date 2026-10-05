@@ -500,6 +500,8 @@ Before final handoff, treat the activation receipt as a final checkpoint. After 
 
 The workflow may independently validate the receipt's structure and identity, but that does not establish the truth of the research claims. Keep scientific acceptance separate.
 
+Also remember that the worker does not control main-branch persistence. Never infer MAIN integration from your own successful commit; report the research state truthfully and leave the workflow to establish persistence separately.
+
 At the end, provide:
 
 ## CHANGED
