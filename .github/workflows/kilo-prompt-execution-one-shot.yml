@@ -735,27 +735,7 @@ jobs:
 
           git diff --check
           test -f state/activation_status.json
-          python3 - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          p = Path("state/activation_status.json")
-          d = json.loads(p.read_text(encoding="utf-8"))
-          required = {"activation_id","status","objective","phase","changed","verified","unverified","next"}
-          missing = required - set(d)
-          if missing:
-              raise SystemExit(f"missing receipt fields: {sorted(missing)}")
-          allowed = {"COMPLETE","PARTIAL","FAILED","BLOCKED","QUARANTINED","NO_SUBSTANTIVE_ACTION"}
-          if d["status"] not in allowed:
-              raise SystemExit("invalid activation status")
-          if str(d["activation_id"]) != os.environ["GITHUB_RUN_ID"]:
-              raise SystemExit("receipt activation_id does not match current run")
-          if not all(isinstance(d[k], list) for k in ("changed","verified","unverified")):
-              raise SystemExit("receipt list field has invalid type")
-          if not all(isinstance(d[k], str) and d[k].strip() for k in ("objective","phase","next")):
-              raise SystemExit("receipt objective/phase/next must be non-empty strings")
-          print("Activation receipt schema and run identity independently validated.")
-          PY
+          python3 .github/scripts/stamp_activation_receipt.py --validate-only
 
           if git diff --cached --quiet; then
             echo "No safe repository changes to persist."
