@@ -57,7 +57,10 @@ def self_test() -> int:
     assert classify(**common, verify="success", worker="skipped", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (1, "FAILED")
     assert classify(**common, worker="success", verify="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (1, "PARTIAL")
     assert classify(**common, verify="success", worker="success", liveness="STALLED", persistence="MAIN") == (1, "FAILED")
-    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="MAIN") == (1, "FAILED")
+    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="MAIN") == (1, "PARTIAL")
+    assert classify(**common, verify="failure", worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="MAIN") == (1, "FAILED")
+    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="RECOVERY_BRANCH") == (1, "FAILED")
+    assert classify(preflight="failure", smoke="success", worker="success", verify="success", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (1, "FAILED")
 
     print("Kilo outcome reporter self-test: PASS")
     return 0
