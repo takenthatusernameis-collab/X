@@ -29,6 +29,7 @@ jobs:
         run: npm install -g @kilocode/cli
 
       - name: Verify Kilo installation
+        id: verify_install
         run: kilo --version
       - name: Diagnose Kilo API key
         id: kilo_auth
@@ -295,6 +296,7 @@ jobs:
           interval_seconds=300
           stale_for=0
           semantic_progress_seen=0
+          liveness_status="RUNNING"
           last_signal="controller-initialized"
 
           while kill -0 "$kilo_pid" 2>/dev/null; do
@@ -341,6 +343,7 @@ jobs:
 
             if [ "$stale_for" -ge "$stall_seconds" ]; then
               echo "::error::Kilo worker appears stalled: no semantic checkpoint or fresh worker output for $stale_for s."
+              liveness_status="STALLED"
               echo "KILO_LIVENESS_STATUS=STALLED" >> "$GITHUB_ENV"
               echo "KILO_LIVENESS_REASON=no semantic checkpoint or fresh worker output for $stale_for s" >> "$GITHUB_ENV"
               kill -TERM "$kilo_pid" 2>/dev/null || true
@@ -353,7 +356,7 @@ jobs:
           wait "$kilo_pid"
           status=$?
 
-          if [ "$KILO_LIVENESS_STATUS" != "STALLED" ]; then
+          if [ "$liveness_status" != "STALLED" ]; then
             if [ "$semantic_progress_seen" -eq 1 ]; then
               echo "KILO_LIVENESS_STATUS=COMPLETED_WITH_SEMANTIC_CHECKPOINTS" >> "$GITHUB_ENV"
               echo "KILO_LIVENESS_REASON=worker terminated after emitting at least one post-start semantic checkpoint" >> "$GITHUB_ENV"
@@ -398,6 +401,7 @@ jobs:
                 kill -TERM "$retry_pid" 2>/dev/null || true
                 sleep 10
                 kill -KILL "$retry_pid" 2>/dev/null || true
+                liveness_status="STALLED"
                 echo "KILO_LIVENESS_STATUS=STALLED" >> "$GITHUB_ENV"
                 echo "KILO_LIVENESS_REASON=fresh retry produced no semantic checkpoint or worker output for $retry_stale s" >> "$GITHUB_ENV"
                 break
