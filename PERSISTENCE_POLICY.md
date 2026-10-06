@@ -26,13 +26,14 @@ A temporary-looking filename is not unsafe merely because it is temporary-lookin
 The autonomous agent must not modify or persist changes to trusted control-plane files:
 
 - `.github/workflows/**`
+- `.github/scripts/**`
 - `.kilo/**`
 - `AGENTS.md`
 - `ENTERPRISE.md`
 - `MANUAL_SETUP.md`
 - `PERSISTENCE_POLICY.md`
 
-The trusted workflow restores these paths before persistence and rejects any staged violation.
+The trusted workflow restores these paths before persistence and rejects any staged violation. Controller-evaluation helpers under `.github/scripts/**` are part of the same trust boundary and are never worker-owned.
 
 ## Never persist
 
