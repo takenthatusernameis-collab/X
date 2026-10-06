@@ -55,10 +55,10 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--agent-id", required=True)
     ap.add_argument("--exit-code", required=True, type=int)
-    ap.add_argument("--before", required=True)
+    ap.add_argument("--before")
     args = ap.parse_args()
 
-    before = json.loads(Path(args.before).read_text(encoding="utf-8"))
+    before = json.loads(Path(args.before).read_text(encoding="utf-8")) if args.before else {}
     before_hashes = before.get("hashes", {})
     after_paths = current_changed()
 
