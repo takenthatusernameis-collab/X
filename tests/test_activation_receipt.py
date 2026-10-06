@@ -141,6 +141,14 @@ class ActivationReceiptStampTests(unittest.TestCase):
             self.assertEqual(validated["activation_id"], "999")
             self.assertEqual(validated, stamped)
 
+    def test_wakeup_validates_receipt_after_controller_synthesis(self):
+        wakeup = WAKEUP.read_text(encoding="utf-8")
+        verification_start = wakeup.index("      - name: Final independent research verification")
+        synthesis_start = wakeup.index("      - name: Controller-owned final synthesis")
+        first_validator = wakeup.index("stamp_activation_receipt.py --validate-only")
+        self.assertGreater(first_validator, synthesis_start)
+        self.assertGreater(first_validator, verification_start)
+
     def test_wakeup_persist_uses_tested_validator_not_raise_expression(self):
         wakeup = WAKEUP.read_text(encoding="utf-8")
         oneshot = ONESHOT.read_text(encoding="utf-8")
