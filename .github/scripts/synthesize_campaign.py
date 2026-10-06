@@ -9,7 +9,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-SEVERITY = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+BENEFIT = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
+COST = {"LOW": 0, "MEDIUM": 1, "HIGH": 2}
 
 
 def load(path: Path):
@@ -28,13 +29,13 @@ def append_section(path: Path, text: str) -> None:
 
 def rank(task: dict) -> tuple:
     return (
-        SEVERITY[task["expected_information_gain"]],
-        SEVERITY[task["downstream_leverage"]],
-        SEVERITY[task["falsification_power"]],
-        SEVERITY[task["verifiability"]],
-        SEVERITY[task["effort"]],
-        SEVERITY[task["complexity"]],
-        SEVERITY[task["execution_risk"]],
+        BENEFIT[task["expected_information_gain"]],
+        BENEFIT[task["downstream_leverage"]],
+        BENEFIT[task["falsification_power"]],
+        BENEFIT[task["verifiability"]],
+        COST[task["effort"]],
+        COST[task["complexity"]],
+        COST[task["execution_risk"]],
         task["task_id"],
     )
 
