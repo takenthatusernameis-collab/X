@@ -19,7 +19,7 @@ PATTERNS = (
     (
         "kilo_jwt_key",
         re.compile(
-            r"(?i)(?:KILO_API_KEY|Authorization\\s*:\\s*Bearer)\\s*[:=]\\s*['\"]?"
+            r"(?i)(?:KILO_API_KEY\\s*[:=]\\s*|Authorization\\s*:\\s*Bearer\\s+)"
             r"(eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+)"
         ),
     ),
