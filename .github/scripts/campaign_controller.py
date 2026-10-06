@@ -454,31 +454,37 @@ def render_prompt(run_id: str, agent_number: int) -> str:
     }
 
     prompt_path = ROOT / ".kilo" / "wakeup-prompt.md"
-    base_prompt = ""
-    if prompt_path.exists():
-        base_prompt = prompt_path.read_text(encoding="utf-8").strip()
+    base_prompt = prompt_path.read_text(encoding="utf-8").strip() if prompt_path.exists() else ""
 
-    return f"""{base_prompt}
+    result_path = f"state/campaign/runs/{run_id}/agents/agent_{agent_number:02d}.json"
+    return f"""
+{base_prompt}
 
 CURRENT ACTIVATION ENVIRONMENT:
 {json.dumps(activation_environment, indent=2, sort_keys=True)}
 
-SESSION CONTEXT:
-You are a fresh session. Durable repository state is the only cross-session memory.
-Your highest-order objective is the contract objective below. You choose the workflow and intervention.
+AUTONOMOUS SESSION:
+You decide the workflow, priorities, organization, experiments, validation, tooling, and process improvements.
+Treat the contract below as the highest-order objective and safety boundary, not as a preselected research task.
 
-AUTONOMOUS CONTRACT:
+CONTRACT:
 {json.dumps(contract, indent=2, sort_keys=True)}
 
-MAXIMUM SAFE AUTONOMY:
-- Decide how to organize and conduct the work.
-- Build, adapt, test, and preserve the workflow you judge most effective.
-- You may create or modify research code, tests, tooling, documentation, process artifacts, and workflow definitions when useful.
-- Do not modify the immutable supervisor/controller safeguards, credentials, or security boundaries.
-- Do not dispatch recursive runs or create uncontrolled self-triggering schedules.
-- Never fabricate evidence, and distinguish observations, inferences, and conclusions.
-- Prefer the smallest change that materially improves future research capability.
-- Verify consequential changes and preserve durable knowledge for the next session.
+RESULT CONTRACT:
+Before ending the session, write the machine-readable durable result to:
+{result_path}
+
+Required fields:
+agent_number, global_agent_number, campaign_slot, role, task_id, objective, bottleneck, question,
+action, changed, verified, unverified, observed_effect, uncertainty_targeted, uncertainty_reduced,
+process_decision, research_result, decision, next, candidate_tasks, complexity_added, failure_class,
+task_selection_observation.
+
+Use only canonical status tokens already defined by the repository. Do not fabricate evidence.
+
+IMMUTABLE SAFETY BOUNDARY:
+Do not modify the supervisor/controller safeguards in .github/scripts/, the scheduled supervisor workflow .github/workflows/kilo-wakeup.yml, credential/secret controls, or recursion safeguards.
+Do not dispatch another workflow or create uncontrolled self-triggering schedules.
 """
 
 def main() -> int:
