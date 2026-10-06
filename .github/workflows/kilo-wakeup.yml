@@ -635,46 +635,10 @@ jobs:
           fi
 
           if grep -Eq 'invalid request error trace_id:' /tmp/kilo-primary.log; then
-            echo "::warning::Kilo gateway returned a transient invalid-request trace; retrying once with a fresh Kilo session."
-            sleep 5
-            : > /tmp/kilo-retry.log
-            # Stream retry output live as well.
-            stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-retry.log) 2>&1 &
-            retry_pid=$!
-            retry_stale=0
-
-            while kill -0 "$retry_pid" 2>/dev/null; do
-              sleep "$interval_seconds"
-              if ! kill -0 "$retry_pid" 2>/dev/null; then
-                break
-              fi
-              now="$(date +%s)"
-              retry_output_mtime="$(stat -c %Y /tmp/kilo-retry.log 2>/dev/null || echo "$now")"
-              retry_output_age=$((now - retry_output_mtime))
-              retry_checkpoint_mtime="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo "$initial_checkpoint_mtime")"
-              retry_checkpoint_age=$((now - retry_checkpoint_mtime))
-              if [ "$retry_checkpoint_mtime" -gt "$initial_checkpoint_mtime" ] || [ "$retry_output_age" -le "$interval_seconds" ]; then
-                retry_stale=0
-              else
-                retry_stale=$((retry_stale + interval_seconds))
-              fi
-              echo "::notice::Kilo retry liveness: checkpoint_age=$retry_checkpoint_age s output_age=$retry_output_age s stale_for=$retry_stale s"
-              if [ "$retry_stale" -ge "$stall_seconds" ]; then
-                echo "::error::Fresh Kilo retry also appears stalled; stopping it after $retry_stale s without progress signal."
-                kill -TERM "$retry_pid" 2>/dev/null || true
-                sleep 10
-                kill -KILL "$retry_pid" 2>/dev/null || true
-                liveness_status="STALLED"
-                echo "KILO_LIVENESS_STATUS=STALLED" >> "$GITHUB_ENV"
-                echo "KILO_LIVENESS_REASON=fresh retry produced no semantic checkpoint or worker output for $retry_stale s" >> "$GITHUB_ENV"
-                break
-              fi
-            done
-
-            wait "$retry_pid"
-            retry_status=$?
-            echo "Kilo retry session exited with status $retry_status; live retry output was streamed above."
-            exit "$retry_status"
+            echo "::warning::Kilo gateway returned a transient invalid-request trace; recording it as a recoverable execution event without an automatic retry."
+            echo "KILO_GATEWAY_RECOVERY=TRANSIENT_GATEWAY_NO_RETRY" >> "$GITHUB_ENV"
+            echo "KILO_GATEWAY_RECOVERY_REASON=transient invalid-request trace; preserved current session evidence and deferred recovery to the next fresh activation" >> "$GITHUB_ENV"
+            exit "$status"
           fi
 
           exit "$status"
