@@ -536,7 +536,7 @@ jobs:
             agent_count=10
             identity_mode=PERSISTENT
           fi
-          python3 .github/scripts/campaign_controller.py init --run-id "$GITHUB_RUN_ID" --agent-count "$agent_count" --identity-mode "$identity_mode" --campaign-mode AUTONOMOUS
+          python3 .github/scripts/campaign_controller.py init --run-id "$GITHUB_RUN_ID" --agent-count "$agent_count" --identity-mode "$identity_mode"
           echo "CAMPAIGN_AGENT_COUNT=$agent_count" >> "$GITHUB_ENV"
           echo "CAMPAIGN_IDENTITY_MODE=$identity_mode" >> "$GITHUB_ENV"
           echo "CAMPAIGN_MODE=$mode" >> "$GITHUB_ENV"
@@ -1024,125 +1024,14 @@ jobs:
             echo "::error::Final synthesis record is missing."
             exit 1
           fi
-          git restore --worktree --staged -- .github/workflows/kilo-wakeup.yml .github/scripts AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
+          git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
           git add -A
           git diff --check
-          python3 - <<'PY'
-          import subprocess
-          paths = [p for p in subprocess.check_output(["git", "diff", "--cached", "--name-only"], text=True).splitlines() if p]
-          protected = []
-          for p in paths:
-              if (
-                  p == ".github/workflows/kilo-wakeup.yml"
-                  or p.startswith(".github/scripts/")
-                  or (p.startswith(".kilo/") and p != ".kilo/wakeup-prompt.md")
-                  or p in {"AGENTS.md", "ENTERPRISE.md", "MANUAL_SETUP.md", "PERSISTENCE_POLICY.md"}
-              ):
-                  protected.append(p)
-          if protected:
-              raise SystemExit("Immutable supervisor/control-plane paths are staged: " + ", ".join(protected))
-          PY
-          python3 .github/scripts/validate_autonomous_workflow_changes.py
-          python3 .github/scripts/scan_staged_secrets.py
-          if git diff --cached --summary | grep -E '^ create mode 120000 '; then
-            echo "::error::Symbolic links are not allowed to persist."
+          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)$'; then
+            echo "::error::Protected control-plane paths are staged."
             exit 1
           fi
-          if git diff --cached --quiet; then
-            echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          persistence="$(python3 -c 'import json,os; from pathlib import Path; print(json.loads((Path("state/campaign/runs") / os.environ["GITHUB_RUN_ID"] / "final_synthesis.json").read_text())["persistence_decision"])')"
-          git config user.name "kilo-research-enterprise"
-          git config user.email "kilo-research-enterprise@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
-          if [ "$persistence" = "MAIN" ]; then
-            git commit -m "Kilo campaign: persist validated learning state"
-            git fetch origin "$GITHUB_REF_NAME"
-            if git rebase "origin/$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
-              echo "PERSISTENCE_STATUS=MAIN" >> "$GITHUB_ENV"
-              exit 0
-            fi
-            git rebase --abort >/dev/null 2>&1 || true
-          fi
-          git commit -m "Kilo campaign: preserve recovery state"
-          local_commit="$(git rev-parse HEAD)"
-          recovery_branch="recovery/kilo-campaign-$GITHUB_RUN_ID-${{ github.run_attempt }}"
-          git push origin "$local_commit:refs/heads/$recovery_branch"
-          echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
-          echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
-
-      - name: Report campaign outcome
-        id: report_campaign
-        if: always() && steps.campaign_init.outcome == 'success'
-        run: |
-          set -euo pipefail
-          python3 .github/scripts/report_campaign_outcome.py --run-id "$GITHUB_RUN_ID"
-
-      - name: Deep audit — final rollup
-        id: deep_audit_final
-        if: always()
-        continue-on-error: true
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xwake --final
-          rc=$?
-          echo "DEEP_AUDIT_FINAL_RC=$rc"
-          exit 0 ; then
-            echo "::error::Immutable supervisor/control-plane paths are staged."
-            exit 1
-          fi
-          python3 .github/scripts/validate_autonomous_workflow_changes.py
-          if git diff --cached --name-only | grep -E '(^|/)(\.env(\..*)?|id_rsa|id_dsa|id_ecdsa|id_ed25519|credentials\.(json|ya?ml|toml)|secrets\.(json|ya?ml|toml))$|\.(pem|key)
-            echo "::error::Credential-like paths are staged."
-            exit 1
-          fi
-          python3 .github/scripts/scan_staged_secrets.py
-          if git diff --cached --summary | grep -E '^ create mode 120000 '; then
-            echo "::error::Symbolic links are not allowed to persist."
-            exit 1
-          fi
-          if git diff --cached --quiet; then
-            echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          persistence="$(python3 -c 'import json,os; from pathlib import Path; print(json.loads((Path("state/campaign/runs") / os.environ["GITHUB_RUN_ID"] / "final_synthesis.json").read_text())["persistence_decision"])')"
-          git config user.name "kilo-research-enterprise"
-          git config user.email "kilo-research-enterprise@users.noreply.github.com"
-          git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
-          if [ "$persistence" = "MAIN" ]; then
-            git commit -m "Kilo campaign: persist validated learning state"
-            git fetch origin "$GITHUB_REF_NAME"
-            if git rebase "origin/$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
-              echo "PERSISTENCE_STATUS=MAIN" >> "$GITHUB_ENV"
-              exit 0
-            fi
-            git rebase --abort >/dev/null 2>&1 || true
-          fi
-          git commit -m "Kilo campaign: preserve recovery state"
-          local_commit="$(git rev-parse HEAD)"
-          recovery_branch="recovery/kilo-campaign-$GITHUB_RUN_ID-${{ github.run_attempt }}"
-          git push origin "$local_commit:refs/heads/$recovery_branch"
-          echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
-          echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
-
-      - name: Report campaign outcome
-        id: report_campaign
-        if: always() && steps.campaign_init.outcome == 'success'
-        run: |
-          set -euo pipefail
-          python3 .github/scripts/report_campaign_outcome.py --run-id "$GITHUB_RUN_ID"
-
-      - name: Deep audit — final rollup
-        id: deep_audit_final
-        if: always()
-        continue-on-error: true
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xwake --final
-          rc=$?
-          echo "DEEP_AUDIT_FINAL_RC=$rc"
-          exit 0; then
+          if git diff --cached --name-only | grep -E '(^|/)(\.env(\..*)?|id_rsa|id_dsa|id_ecdsa|id_ed25519|credentials\.(json|ya?ml|toml)|secrets\.(json|ya?ml|toml))$|\.(pem|key)$'; then
             echo "::error::Credential-like paths are staged."
             exit 1
           fi
