@@ -681,3 +681,6 @@ Exactly one highest-value next bounded action.
 The central question remains:
 
 > What action, at whatever level of the system is currently most consequential, would most improve our ability to learn what is genuinely worth knowing about robust quantitative trading opportunities — and to become better at learning it thereafter?
+
+
+Controller boundary reminder: campaign agents must treat `.github/scripts/**` as trusted controller-owned infrastructure and must not edit, stage, restore, or persist it.
