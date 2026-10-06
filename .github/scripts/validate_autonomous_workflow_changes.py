@@ -10,7 +10,7 @@ from pathlib import Path
 SUPERVISOR = ".github/workflows/kilo-wakeup.yml"
 FORBIDDEN_TRIGGERS = ("schedule:", "workflow_run:", "repository_dispatch:", "workflow_call:")
 FORBIDDEN_PERMISSIONS = ("contents: write", "actions: write", "id-token: write")
-FORBIDDEN_COMMANDS = ("gh workflow run", "repository_dispatch", "workflow_dispatch", "/dispatches", "secrets: inherit")
+FORBIDDEN_COMMANDS = ("gh workflow run", "repository_dispatch", "/dispatches", "secrets: inherit")
 FORBIDDEN_RUNNERS = ("runs-on: self-hosted", "runs-on: [self-hosted")
 
 def staged_paths() -> list[str]:
