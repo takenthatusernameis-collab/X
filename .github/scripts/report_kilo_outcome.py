@@ -14,6 +14,7 @@ def classify(
     verify: str,
     liveness: str,
     persistence: str,
+    process: str,
 ) -> tuple[int, str]:
     if preflight != "success":
         return 1, "FAILED"
@@ -22,10 +23,11 @@ def classify(
     if liveness == "STALLED":
         return 1, "FAILED"
     if liveness == "COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT":
-        # A missing live checkpoint is a process-quality defect, not proof that
-        # the research activation failed. Independent verification below can
-        # upgrade the activation to a verified PARTIAL outcome.
-        if verify == "success" and persistence == "MAIN" and worker == "success":
+        if process == "VERIFIED_PROGRESS" and verify == "success" and persistence == "MAIN" and worker == "success":
+            return 0, "PARTIAL"
+        return 1, "FAILED"
+    if process == "UNVERIFIED":
+        if verify == "success" and persistence == "RECOVERY_BRANCH":
             return 0, "PARTIAL"
         return 1, "FAILED"
     if worker == "skipped":
@@ -33,13 +35,17 @@ def classify(
     if verify != "success":
         return 0, "PARTIAL"
     if persistence == "MAIN":
-        if worker == "success":
+        if worker == "success" and process in {"VERIFIED_PROGRESS", "VERIFIED_REPAIR"}:
             return 0, "COMPLETE"
+        if worker == "success" and process == "NO_SUBSTANTIVE_ACTION":
+            return 0, "NO_SUBSTANTIVE_ACTION"
         return 0, "PARTIAL"
     if persistence == "RECOVERY_BRANCH":
         return 0, "PARTIAL"
     if persistence == "NO_CHANGES":
-        return 0, "NO_SUBSTANTIVE_ACTION"
+        if process == "NO_SUBSTANTIVE_ACTION":
+            return 0, "NO_SUBSTANTIVE_ACTION"
+        return 0, "PARTIAL"
     return 1, "FAILED"
 
 
@@ -49,18 +55,18 @@ def self_test() -> int:
         "smoke": "success",
     }
 
-    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (0, "COMPLETE")
-    assert classify(**common, verify="success", worker="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (0, "PARTIAL")
-    assert classify(**common, verify="success", worker="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="RECOVERY_BRANCH") == (0, "PARTIAL")
-    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="NO_CHANGES") == (0, "NO_SUBSTANTIVE_ACTION")
-    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_POSTWORKER_VERIFICATION", persistence="MAIN") == (0, "COMPLETE")
-    assert classify(**common, verify="success", worker="skipped", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (1, "FAILED")
-    assert classify(**common, worker="success", verify="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (0, "PARTIAL")
-    assert classify(**common, verify="success", worker="success", liveness="STALLED", persistence="MAIN") == (1, "FAILED")
-    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="MAIN") == (0, "PARTIAL")
-    assert classify(**common, verify="failure", worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="MAIN") == (1, "FAILED")
-    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="RECOVERY_BRANCH") == (1, "FAILED")
-    assert classify(preflight="failure", smoke="success", worker="success", verify="success", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN") == (1, "FAILED")
+    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN", process="VERIFIED_PROGRESS") == (0, "COMPLETE")
+    assert classify(**common, verify="success", worker="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN", process="VERIFIED_PROGRESS") == (0, "PARTIAL")
+    assert classify(**common, verify="success", worker="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="RECOVERY_BRANCH", process="VERIFIED_PROGRESS") == (0, "PARTIAL")
+    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="NO_CHANGES", process="NO_SUBSTANTIVE_ACTION") == (0, "NO_SUBSTANTIVE_ACTION")
+    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITH_POSTWORKER_VERIFICATION", persistence="MAIN", process="VERIFIED_REPAIR") == (0, "COMPLETE")
+    assert classify(**common, verify="success", worker="skipped", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN", process="UNVERIFIED") == (1, "FAILED")
+    assert classify(**common, worker="success", verify="failure", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN", process="UNVERIFIED") == (0, "PARTIAL")
+    assert classify(**common, verify="success", worker="success", liveness="STALLED", persistence="MAIN", process="UNVERIFIED") == (1, "FAILED")
+    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="MAIN", process="VERIFIED_PROGRESS") == (0, "PARTIAL")
+    assert classify(**common, verify="failure", worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="MAIN", process="UNVERIFIED") == (1, "FAILED")
+    assert classify(**common, verify="success", worker="success", liveness="COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT", persistence="RECOVERY_BRANCH", process="VERIFIED_PROGRESS") == (1, "FAILED")
+    assert classify(preflight="failure", smoke="success", worker="success", verify="success", liveness="COMPLETED_WITH_SEMANTIC_CHECKPOINTS", persistence="MAIN", process="UNVERIFIED") == (1, "FAILED")
 
     print("Kilo outcome reporter self-test: PASS")
     return 0
@@ -75,6 +81,7 @@ def main() -> int:
     parser.add_argument("--verify")
     parser.add_argument("--liveness")
     parser.add_argument("--persistence")
+    parser.add_argument("--process")
     args = parser.parse_args()
 
     if args.self_test:
@@ -87,6 +94,7 @@ def main() -> int:
         "verify": args.verify,
         "liveness": args.liveness,
         "persistence": args.persistence,
+        "process": args.process,
     }
     missing = [name for name, value in values.items() if value is None]
     if missing:
