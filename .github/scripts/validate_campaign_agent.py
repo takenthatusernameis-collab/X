@@ -47,7 +47,11 @@ def sha(path: Path) -> str | None:
 def current_changed() -> list[str]:
     _, out = run(["git", "diff", "--name-only"])
     _, out2 = run(["git", "ls-files", "--others", "--exclude-standard"])
-    return sorted(set(x for x in out.splitlines() if x) | set(x for x in out2.splitlines() if x))
+    paths = set(x for x in out.splitlines() if x) | set(x for x in out2.splitlines() if x)
+    return sorted(
+        p for p in paths
+        if "__pycache__/" not in p and not p.endswith(".pyc")
+    )
 
 
 def fallback_record(agent: int, contract: dict, runtime: dict | None, reason: str) -> dict:
