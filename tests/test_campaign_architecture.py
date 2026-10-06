@@ -98,7 +98,8 @@ class CampaignArchitectureTests(unittest.TestCase):
             self.controller.GLOBAL_COUNTER_PATH = original
 
     def test_global_identity_is_used_in_prompt_contract(self):
-        self.assertIn("Global Agent", self.controller.render_prompt.__doc__ or "")
+        import inspect
+        self.assertIn("Global Agent", inspect.getsource(self.controller.render_prompt))
 
     def test_role_mapping(self):
         for n in range(1, 11):
