@@ -49,11 +49,10 @@ class CampaignArchitectureTests(unittest.TestCase):
                 self.workflow,
             )
 
-    def test_odd_even_roles_are_explicit(self):
-        for n in (1, 3, 5, 7, 9):
-            self.assertIn(f"Campaign Slot {n:02d} — Learning Process — Fresh Kilo session", self.workflow)
-        for n in (2, 4, 6, 8, 10):
-            self.assertIn(f"Campaign Slot {n:02d} — Higher-Order Objective — Fresh Kilo session", self.workflow)
+    def test_sessions_have_an_autonomous_mode_contract(self):
+        self.assertEqual(self.controller.AUTONOMOUS_ROLE, "AUTONOMOUS_RESEARCH")
+        for n in range(1, 11):
+            self.assertIn(f"--agent-number {n:02d}", self.workflow)
 
     def test_persistence_secret_scan_is_delegated_to_testable_helper(self):
         self.assertIn("python3 .github/scripts/scan_staged_secrets.py", self.workflow)
@@ -124,10 +123,8 @@ class CampaignArchitectureTests(unittest.TestCase):
         import inspect
         self.assertIn("Global Agent", inspect.getsource(self.controller.render_prompt))
 
-    def test_role_mapping(self):
-        for n in range(1, 11):
-            expected = "LEARNING_PROCESS" if n % 2 else "HIGHER_ORDER_OBJECTIVE"
-            self.assertEqual(self.controller.ROLE_BY_AGENT[n], expected)
+    def test_autonomous_role_is_available(self):
+        self.assertEqual(self.controller.AUTONOMOUS_ROLE, "AUTONOMOUS_RESEARCH")
 
     def test_validator_sees_staged_changes_and_protects_control_test(self):
         validator = (ROOT / ".github" / "scripts" / "validate_campaign_agent.py").read_text(encoding="utf-8")
