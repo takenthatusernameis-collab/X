@@ -22,6 +22,7 @@ PROTECTED_FILES = {
     "ENTERPRISE.md",
     "MANUAL_SETUP.md",
     "PERSISTENCE_POLICY.md",
+    "tests/test_campaign_architecture.py",
 }
 DECISIONS = controller.DECISIONS
 PROCESS_DECISIONS = controller.PROCESS_DECISIONS
@@ -46,8 +47,13 @@ def sha(path: Path) -> str | None:
 
 def current_changed() -> list[str]:
     _, out = run(["git", "diff", "--name-only"])
+    _, out_cached = run(["git", "diff", "--cached", "--name-only"])
     _, out2 = run(["git", "ls-files", "--others", "--exclude-standard"])
-    paths = set(x for x in out.splitlines() if x) | set(x for x in out2.splitlines() if x)
+    paths = (
+        set(x for x in out.splitlines() if x)
+        | set(x for x in out_cached.splitlines() if x)
+        | set(x for x in out2.splitlines() if x)
+    )
     return sorted(
         p for p in paths
         if "__pycache__/" not in p and not p.endswith(".pyc")
