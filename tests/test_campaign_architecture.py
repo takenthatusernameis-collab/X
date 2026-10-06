@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import re
 from pathlib import Path
 import unittest
 
@@ -30,6 +31,11 @@ class CampaignArchitectureTests(unittest.TestCase):
         self.controller = load_controller()
         self.runner = RUNNER.read_text(encoding="utf-8")
 
+    def test_campaign_has_non_overlapping_concurrency_guard(self):
+        self.assertIn("concurrency:", self.workflow)
+        self.assertIn("group: x-kilo-research-campaign", self.workflow)
+        self.assertIn("cancel-in-progress: false", self.workflow)
+
     def test_single_job_ten_sequential_agent_steps(self):
         self.assertEqual(self.workflow.count("jobs:"), 1)
         self.assertNotIn("strategy:", self.workflow)
@@ -48,6 +54,10 @@ class CampaignArchitectureTests(unittest.TestCase):
             self.assertIn(f"Campaign Slot {n:02d} — Learning Process — Fresh Kilo session", self.workflow)
         for n in (2, 4, 6, 8, 10):
             self.assertIn(f"Campaign Slot {n:02d} — Higher-Order Objective — Fresh Kilo session", self.workflow)
+
+    def test_persistence_secret_scan_is_delegated_to_testable_helper(self):
+        self.assertIn("python3 .github/scripts/scan_staged_secrets.py", self.workflow)
+        self.assertNotIn("kilo_[A-Za-z0-9_-]{20,}", self.workflow)
 
     def test_no_recursive_dispatch_or_retry_once_architecture(self):
         for value in (self.workflow, self.oneshot):
@@ -111,6 +121,11 @@ class CampaignArchitectureTests(unittest.TestCase):
         for n in range(1, 11):
             expected = "LEARNING_PROCESS" if n % 2 else "HIGHER_ORDER_OBJECTIVE"
             self.assertEqual(self.controller.ROLE_BY_AGENT[n], expected)
+
+    def test_validator_sees_staged_changes_and_protects_control_test(self):
+        validator = (ROOT / ".github" / "scripts" / "validate_campaign_agent.py").read_text(encoding="utf-8")
+        self.assertIn('git", "diff", "--cached", "--name-only"', validator)
+        self.assertIn('"tests/test_campaign_architecture.py"', validator)
 
     def test_fresh_session_runner_has_no_retry(self):
         self.assertIn("[kilo_bin, \"run\", \"--model\", args.model, \"--auto\", prompt]", self.runner)
