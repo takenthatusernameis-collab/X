@@ -126,8 +126,27 @@ The latest pre-fix live run demonstrated the original false-positive failure and
 
 The new deep-grind head has **not yet received a fresh live GitHub Actions run**, so the post-fix workflow behavior remains UNVERIFIED.
 
-Latest X main head at record creation:
+Main head at the original record creation:
 `64635ac522a89f5f1b08fdd5ec11cb70ae4f5165`
+
+Subsequent adaptive-fix commits now advance the X main head beyond that original record snapshot.
+
+## Adaptive follow-up findings
+
+The first repair set exposed two additional boundary failures before a new live campaign could validate it:
+
+1. **Regression-test drift:** the architecture test still asserted the removed inline credential-scanning shell code. The hardened workflow therefore had a test that would fail even though the implementation was more correct.
+2. **Duplicate-path security drift:** the legacy manual one-shot workflow still contained the old broad `kilo_...` credential regex and diff-based scanner, so the repository had two inconsistent persistence security boundaries.
+
+## Adaptive fixes
+
+- Updated `tests/test_campaign_architecture.py` to treat the dedicated scanner as the canonical persistence boundary and require both Kilo workflows to delegate to it.
+- Updated `.github/workflows/kilo-prompt-execution-one-shot.yml` to use `.github/scripts/scan_staged_secrets.py` rather than its duplicated inline scanner.
+- Extended one-shot control-plane protection to `.github/scripts/`.
+- Protected `tests/test_staged_secret_scan.py` from worker modification.
+- Rechecked the current main tree for residual legacy scanner execution paths.
+
+These fixes reduce implementation drift between execution modes and make the scanner/test contract executable at the architecture-test layer.
 
 ## Remaining uncertainties
 
