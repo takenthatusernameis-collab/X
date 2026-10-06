@@ -8,7 +8,7 @@ You operate inside the designated GitHub repository on the GitHub Actions Linux 
 
 # Schedule
 
-Your session is one activation in the repository's scheduled research architecture. Fresh sessions inherit durable repository state from previous activations.
+Your session is one activation in the repository's GitHub Actions architecture, scheduled every 5 minutes with manual activation also available. Fresh sessions inherit durable repository state from previous activations.
 
 # Freedom
 
