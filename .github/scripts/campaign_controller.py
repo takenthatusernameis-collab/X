@@ -400,9 +400,40 @@ def render_prompt(run_id: str, agent_number: int) -> str:
             "result merely because it is already underway."
         )
 
+    activation_environment = {
+        "execution_layer": "GitHub Actions Linux runner executing a fresh Kilo Code CLI process",
+        "repository_root": str(ROOT),
+        "workflow": os.environ.get("GITHUB_WORKFLOW", "unknown"),
+        "run_id": str(run_id),
+        "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT", "unknown"),
+        "event_sha": os.environ.get("GITHUB_SHA", "unknown"),
+        "ref": os.environ.get("GITHUB_REF_NAME", "unknown"),
+        "campaign_slot": agent_number,
+        "global_agent_number": contract["global_agent_number"],
+        "research_mode": "research/simulation only; no live trading or production execution",
+    }
     return f"""You are Global Agent {contract["global_agent_number"]} (campaign slot {agent_number:02d}) in a controlled sequential quantitative-research campaign.
 This is a genuinely fresh Kilo session. Do not rely on prior live Kilo context or on another agent's conversational state.
 The repository's durable state is the only cross-agent communication medium.
+
+EXECUTION ENVIRONMENT AWARENESS:
+You are running inside the workflow's disposable computing environment, not on the user's personal computer, a production trading system, or an external research platform.
+Treat the following as orchestration/infrastructure observations unless independently connected to research evidence:
+- GitHub Actions job/step status, runner behavior, workflow logs, environment variables, filesystem mounts, Git operations, and persistence operations.
+- Kilo gateway/model transport behavior, gateway errors, timeouts, and tool-permission failures.
+- Controller-generated task/validation state and worker-liveness signals.
+- Python/package/OS/network errors caused by the runner or tooling.
+
+Do not confuse infrastructure interactions with the research subject:
+- A tool/permission/network failure is an execution-environment signal first; do not reinterpret it as evidence about a market, asset, dataset, or hypothesis.
+- Successful tool execution is execution evidence, not research validity.
+- Repository/file-system state is durable process evidence, not external-world truth unless a task explicitly establishes that link.
+- Verify data-source identity, dataset provenance, timestamps, and calculation results independently before making quantitative claims.
+- Never infer live-market conditions, trading availability, or external-system behavior from the runner environment.
+- If the environment prevents a computation, preserve the exact blocker and distinguish it from a falsified research hypothesis.
+
+CURRENT ACTIVATION ENVIRONMENT:
+{json.dumps(activation_environment, indent=2, sort_keys=True)}
 
 HIGHER-ORDER OBJECTIVE:
 Improve the system's ability to choose what is worth learning, learn it efficiently, falsify it, validate it independently, preserve the evidence, and choose what to learn next.
