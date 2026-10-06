@@ -125,6 +125,9 @@ def question_is_single(question: str) -> bool:
         return False
     banned = (
         "improve everything",
+        "improve the research system",
+        "improve the research process",
+        "improve the repository",
         "continue research",
         "find something interesting",
         "advance the repository",
