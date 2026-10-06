@@ -589,7 +589,7 @@ jobs:
             before_checkpoint="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo 0)"
             before_head="$(git rev-parse --short=12 HEAD)"
             before_status="$(git status --short)"
-            printf '%s\\n' "$before_status" > "state/campaign/agent_${agent_id}_before_status.txt"
+            printf '%s\n' "$before_status" > "state/campaign/agent_${agent_id}_before_status.txt"
 
             cat > "/tmp/kilo-agent-${agent_id}.prompt" <<EOF
           CAMPAIGN_AGENT_NUMBER=${agent_id}
@@ -646,17 +646,17 @@ jobs:
               echo "- observed_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
               echo
               echo "STATUS_START"
-              printf '%s\\n' "$after_status"
+              printf '%s\n' "$after_status"
               echo "STATUS_END"
               echo
               echo "DIFF_NAMES_START"
-              printf '%s\\n' "$diff_names"
+              printf '%s\n' "$diff_names"
               echo "DIFF_NAMES_END"
               echo
               echo "This record reports controller-observed execution only; it does not certify research claims."
             } > "$record_path"
 
-            printf '%s\\n' "$after_status" > "state/campaign/agent_${agent_id}_after_status.txt"
+            printf '%s\n' "$after_status" > "state/campaign/agent_${agent_id}_after_status.txt"
 
             protected_tamper=0
             if git diff --name-only -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md | grep -q .; then
@@ -667,6 +667,7 @@ jobs:
             fi
             git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
             git reset -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
+            git clean -fd -- .github/workflows .kilo 2>/dev/null || true
 
             echo "CAMPAIGN_AGENT_${agent_id}_STATUS=${agent_status}" >> "$GITHUB_ENV"
             echo "CAMPAIGN_SUCCESS_COUNT=${campaign_successes}" >> "$GITHUB_ENV"
