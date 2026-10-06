@@ -228,7 +228,6 @@ def candidate_tasks_for_role(tasks: list[dict[str, Any]], role: str) -> list[dic
 def init_campaign(run_id: str, agent_count: int, identity_mode: str = "PERSISTENT") -> dict[str, Any]:
     if agent_count not in {2, 10}:
         raise SystemExit("agent_count must be 2 or 10")
-    global_agent_numbers = allocate_global_agent_numbers(run_id, agent_count, identity_mode)
     tasks = load_queue()
     for role in sorted(set(ROLE_BY_AGENT[n] for n in range(1, agent_count + 1))):
         if not any(t["role"] == role for t in tasks):
@@ -237,6 +236,7 @@ def init_campaign(run_id: str, agent_count: int, identity_mode: str = "PERSISTEN
         if task["status"] == "SELECTED":
             task["status"] = "OPEN"
     save_queue(tasks)
+    global_agent_numbers = allocate_global_agent_numbers(run_id, agent_count, identity_mode)
 
     d = run_dir(run_id)
     (d / "agents").mkdir(parents=True, exist_ok=True)
