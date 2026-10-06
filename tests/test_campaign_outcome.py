@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -35,14 +36,16 @@ class CampaignOutcomeReportTests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            with mock.patch.object(MODULE, "Path", Path), mock.patch(
-                "pathlib.Path.cwd", return_value=root
-            ):
+            previous = Path.cwd()
+            try:
+                os.chdir(root)
                 with mock.patch(
                     "sys.argv", ["report_campaign_outcome.py", "--run-id", "123"]
                 ):
                     with mock.patch("builtins.print"):
                         return MODULE.main()
+            finally:
+                os.chdir(previous)
 
     def test_quarantined_campaign_is_controlled_success(self):
         self.assertEqual(self.run_report("QUARANTINED"), 0)
