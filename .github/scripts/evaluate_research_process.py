@@ -56,13 +56,13 @@ def main() -> int:
 
     validated_process = [
         r for r in records
-        if r.get("role") == "LEARNING_PROCESS"
+        if r.get("role") in {"LEARNING_PROCESS", "AUTONOMOUS_RESEARCH"}
         and r.get("decision") in {"USEFUL_CHANGE", "VERIFIED_NEGATIVE_RESULT", "RETAIN"}
         and r.get("process_decision") in {"IMPROVE", "RETAIN", "REJECT"}
     ]
     validated_research = [
         r for r in records
-        if r.get("role") == "HIGHER_ORDER_OBJECTIVE"
+        if r.get("role") in {"HIGHER_ORDER_OBJECTIVE", "AUTONOMOUS_RESEARCH"}
         and r.get("decision") in {"USEFUL_CHANGE", "VERIFIED_NEGATIVE_RESULT", "RETAIN"}
         and r.get("uncertainty_reduced") not in {"", "none", "none demonstrated", None}
     ]
