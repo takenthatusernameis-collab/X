@@ -25,6 +25,9 @@ def main() -> int:
     print(f"CAMPAIGN_OUTCOME={outcome}")
     print(f"PERSISTENCE_DECISION={persistence}")
     print(f"HIGHEST_VALUE_NEXT_TASK={report['single_highest_value_next_task']}")
+    if outcome == "QUARANTINED":
+        print("::warning::Campaign was quarantined after preserving its validated evidence; this is a controlled research outcome, not a workflow infrastructure failure.")
+        return 0
     return 0 if outcome in {"COMPLETE", "PARTIAL"} else 1
 
 
