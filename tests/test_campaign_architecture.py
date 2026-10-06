@@ -59,6 +59,11 @@ class CampaignArchitectureTests(unittest.TestCase):
         self.assertIn("python3 .github/scripts/scan_staged_secrets.py", self.workflow)
         self.assertNotIn("kilo_[A-Za-z0-9_-]{20,}", self.workflow)
 
+    def test_worker_liveness_cap_leaves_controller_headroom(self):
+        self.assertIn('default=1760', self.runner)
+        self.assertNotIn('default=1680', self.runner)
+        self.assertIn('timeout-minutes: 30', self.workflow)
+
     def test_no_recursive_dispatch_or_retry_once_architecture(self):
         for value in (self.workflow, self.oneshot):
             self.assertNotIn("retrying the same worker workspace once", value.lower())
