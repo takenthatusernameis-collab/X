@@ -342,7 +342,7 @@ Repair the environment when possible, then rerun the smallest relevant check.
 ### Transient gateway/service
 Temporary external-service failure.
 
-The campaign already provides fresh Kilo sessions by design. Treat a transient gateway failure as a failed campaign member, not as permission to self-retry or recurse. The next campaign member may still proceed with its assigned perspective. Do not create recursive retries or hidden sub-campaigns.
+The campaign already provides fresh Kilo sessions by design. Treat a transient gateway failure as a recoverable campaign-member execution event, not as permission to self-retry or recurse. Record the failure truthfully, preserve any valid work, and let the next campaign member proceed with its assigned perspective. Do not create recursive retries or hidden sub-campaigns.
 
 ### Tool invocation denial
 A particular command was denied.
