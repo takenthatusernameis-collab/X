@@ -1,22 +1,26 @@
-name: Kilo Research Enterprise Wake
+name: Kilo Research Sequential Learning Campaign
 
 on:
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
-
-concurrency:
-  group: kilo-research-enterprise-v2
-  cancel-in-progress: false
-
+    inputs:
+      campaign_mode:
+        description: "Run the full 10-agent campaign or a cheap 2-agent miniature using the exact same architecture."
+        required: true
+        default: "full"
+        type: choice
+        options:
+          - full
+          - miniature
 permissions:
   contents: write
 
 jobs:
-  kilo:
+  campaign:
     name: Autonomous Kilo activation
     runs-on: ubuntu-24.04
-    timeout-minutes: 355
+    timeout-minutes: 350
 
     steps:
       - name: Checkout repository
@@ -442,21 +446,10 @@ jobs:
           print(f"Existing receipt status: {receipt['status']}; prior activation {receipt['activation_id']}.")
           PY
 
-          echo "Testing deterministic Kilo outcome reporting, including the prior worker-failure case..."
-          set +e
-          failure_output="$(python3 .github/scripts/report_kilo_outcome.py \
-            --preflight success \
-            --smoke success \
-            --worker failure \
-            --verify success \
-            --liveness COMPLETED_WITH_SEMANTIC_CHECKPOINTS \
-            --persistence MAIN 2>&1)"
-          failure_rc=$?
-          set -e
-          printf '%s\n' "$failure_output"
-          test "$failure_rc" -eq 0
-          printf '%s\n' "$failure_output" | grep -q "KILO_WORKER_OUTCOME=PARTIAL"
-
+          echo "Checking sequential campaign architecture and the focused-task firewall..."
+          ! grep -Eiq "TRANSIENT_GATEWAY_RETRY_ONCE|retrying the same worker workspace once|rerun_workflow" .github/workflows/kilo-wakeup.yml .github/workflows/kilo-prompt-execution-one-shot.yml
+          ! grep -q "report_kilo_outcome.py" .github/workflows/kilo-wakeup.yml
+          python3 -m unittest tests.test_campaign_architecture
           echo "Running deterministic real-data preflight..."
           if ! python3 research/data/preflight.py > /tmp/x-data-preflight.log 2>&1; then
             echo "Deterministic data preflight failed; emitting its full diagnostic:"
@@ -526,496 +519,555 @@ jobs:
           rc=$?
           echo "DEEP_AUDIT_RC=$rc"
           exit 0
-      - name: Run Kilo
-        id: kilo
+
+      - name: Initialize campaign controller
+        id: campaign_init
         if: steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success'
+        run: |
+          set -euo pipefail
+          mode="${{ inputs.campaign_mode || 'full' }}"
+          if [ "$mode" = "miniature" ]; then
+            agent_count=2
+          else
+            agent_count=10
+          fi
+          python3 .github/scripts/campaign_controller.py init --run-id "$GITHUB_RUN_ID" --agent-count "$agent_count"
+          echo "CAMPAIGN_AGENT_COUNT=$agent_count" >> "$GITHUB_ENV"
+          echo "CAMPAIGN_MODE=$mode" >> "$GITHUB_ENV"
+
+      - name: Select Agent 01 focused task
+        id: select_agent_01
+        if: ${{ always() && steps.campaign_init.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py select --run-id "$GITHUB_RUN_ID" --agent-number 01 > "$RUNNER_TEMP/agent_01_selection.json"
+
+      - name: Agent 01 — Learning Process — Fresh Kilo session
+        id: agent_01
+        if: ${{ always() && steps.select_agent_01.outcome == 'success' }}
+        timeout-minutes: 30
         continue-on-error: true
-        timeout-minutes: 340
         env:
           KILO_DISABLE_EXTERNAL_SKILLS: "true"
         run: |
-          set +e
-          mkdir -p state
-          cat > state/worker_progress.md <<EOF
-          # Worker Progress
-          
-          activation_id: $GITHUB_RUN_ID
-          phase: CONTROLLER_INITIALIZED
-          status: OBSERVATION_ONLY
-          last_verified_milestone: none yet
-          next_bounded_action: begin the declared research objective
-          
-          This file is a liveness contract. Update it only after a real research-state transition or verified milestone.
-          EOF
-          initial_checkpoint_mtime="$(stat -c %Y state/worker_progress.md)"
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py render-prompt --run-id "$GITHUB_RUN_ID" --agent-number 01 > "$RUNNER_TEMP/agent_01_prompt.txt"
+          python3 .github/scripts/run_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 01 \
+            --model "$KILO_FREE_MODEL_ID" \
+            --prompt-file "$RUNNER_TEMP/agent_01_prompt.txt"
 
-          : > /tmp/kilo-primary.log
-          # Stream Kilo stdout/stderr into the live GitHub Actions log while also
-          # retaining a local copy for liveness checks and post-run diagnostics.
-          stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-primary.log) 2>&1 &
-          kilo_pid=$!
-
-          stall_seconds=1800
-          interval_seconds=300
-          stale_for=0
-          semantic_progress_seen=0
-          liveness_status="RUNNING"
-          last_signal="controller-initialized"
-
-          while kill -0 "$kilo_pid" 2>/dev/null; do
-            sleep "$interval_seconds"
-
-            if ! kill -0 "$kilo_pid" 2>/dev/null; then
-              break
-            fi
-
-            now="$(date +%s)"
-            checkpoint_mtime="$initial_checkpoint_mtime"
-            if [ -f state/worker_progress.md ]; then
-              checkpoint_mtime="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo "$initial_checkpoint_mtime")"
-            fi
-            output_mtime="$(stat -c %Y /tmp/kilo-primary.log 2>/dev/null || echo "$now")"
-
-            checkpoint_age=$((now - checkpoint_mtime))
-            output_age=$((now - output_mtime))
-
-            if [ "$checkpoint_mtime" -gt "$initial_checkpoint_mtime" ]; then
-              semantic_progress_seen=1
-              stale_for=0
-              last_signal="SEMANTIC_CHECKPOINT"
-            elif [ "$output_age" -le "$interval_seconds" ]; then
-              stale_for=0
-              last_signal="PROCESS_ACTIVITY_ONLY"
-            else
-              stale_for=$((stale_for + interval_seconds))
-              last_signal="NO_RECENT_PROGRESS_SIGNAL"
-            fi
-
-            {
-              echo "### Kilo liveness heartbeat"
-              echo "- observed_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-              echo "- process: PID $kilo_pid alive"
-              echo "- semantic_checkpoint_age_seconds: $checkpoint_age"
-              echo "- worker_output_age_seconds: $output_age"
-              echo "- last_signal: $last_signal"
-              echo "- stale_for_seconds: $stale_for"
-              echo "- semantic_progress_seen: $semantic_progress_seen"
-            } >> "$GITHUB_STEP_SUMMARY"
-
-            echo "::notice::Kilo liveness: signal=$last_signal checkpoint_age=$checkpoint_age s output_age=$output_age s stale_for=$stale_for s"
-
-            if [ "$stale_for" -ge "$stall_seconds" ]; then
-              echo "::error::Kilo worker appears stalled: no semantic checkpoint or fresh worker output for $stale_for s."
-              liveness_status="STALLED"
-              echo "KILO_LIVENESS_STATUS=STALLED" >> "$GITHUB_ENV"
-              echo "KILO_LIVENESS_REASON=no semantic checkpoint or fresh worker output for $stale_for s" >> "$GITHUB_ENV"
-              kill -TERM "$kilo_pid" 2>/dev/null || true
-              sleep 10
-              kill -KILL "$kilo_pid" 2>/dev/null || true
-              break
-            fi
-          done
-
-          wait "$kilo_pid"
-          status=$?
-
-          if [ "$liveness_status" != "STALLED" ]; then
-            if [ "$semantic_progress_seen" -eq 1 ]; then
-              echo "KILO_LIVENESS_STATUS=COMPLETED_WITH_SEMANTIC_CHECKPOINTS" >> "$GITHUB_ENV"
-              echo "KILO_LIVENESS_REASON=worker terminated after emitting at least one post-start semantic checkpoint" >> "$GITHUB_ENV"
-            else
-              echo "KILO_LIVENESS_STATUS=COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT" >> "$GITHUB_ENV"
-              echo "KILO_LIVENESS_REASON=worker terminated without a post-start semantic checkpoint" >> "$GITHUB_ENV"
-            fi
-          fi
-
-          echo "Kilo primary session exited with status $status; live output was streamed above."
-          if [ "$status" -eq 0 ]; then
-            exit 0
-          fi
-
-          if grep -Eq 'invalid request error trace_id:' /tmp/kilo-primary.log; then
-            echo "::warning::Kilo gateway returned a transient invalid-request trace; retrying the same worker workspace once, following the proven Desktop Tutorial recovery pattern."
-            echo "KILO_GATEWAY_RECOVERY=TRANSIENT_GATEWAY_RETRY_ONCE" >> "$GITHUB_ENV"
-            echo "KILO_GATEWAY_RECOVERY_REASON=transient invalid-request trace; retrying the same worker workspace once before classifying the activation" >> "$GITHUB_ENV"
-            : > /tmp/kilo-retry.log
-            stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-retry.log) 2>&1 &
-            retry_pid=$!
-            wait "$retry_pid"
-            retry_status=$?
-            echo "Kilo retry session exited with status $retry_status."
-            if [ "$retry_status" -eq 0 ]; then
-              echo "KILO_GATEWAY_RECOVERY_RESULT=RETRY_SUCCEEDED" >> "$GITHUB_ENV"
-              echo "Kilo retry succeeded; treating the recovered worker session as the authoritative execution."
-              exit 0
-            fi
-            echo "KILO_GATEWAY_RECOVERY_RESULT=RETRY_FAILED" >> "$GITHUB_ENV"
-            echo "Kilo retry also failed with exit code $retry_status."
-            exit "$retry_status"
-          fi
-            echo "::warning::Kilo gateway returned a transient invalid-request trace; recording it as a recoverable execution event without an automatic retry."
-            echo "KILO_GATEWAY_RECOVERY=TRANSIENT_GATEWAY_NO_RETRY" >> "$GITHUB_ENV"
-            echo "KILO_GATEWAY_RECOVERY_REASON=transient invalid-request trace; preserved current session evidence and deferred recovery to the next fresh activation" >> "$GITHUB_ENV"
-            exit "$status"
-          fi
-
-          exit "$status"
-
-      - name: Deep audit — after Run Kilo
-        id: deep_audit_12_run_kilo
-        if: always()
+      - name: Validate Agent 01 focused-task checkpoint
+        id: validate_agent_01
+        if: ${{ always() && steps.select_agent_01.outcome == 'success' }}
         continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.kilo.outcome }}
         run: |
           set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xwake --step "Run Kilo"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
+          worker_exit=1
+          if [ "${{ steps.agent_01.outcome }}" = "success" ]; then
+            worker_exit=0
+          fi
+          python3 .github/scripts/validate_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 01 \
+            --worker-exit-code "$worker_exit"
+          validation_rc=$?
+          set -e
+          echo "Agent 01 controller validation exit: $validation_rc"
+          cat "state/campaign/runs/$GITHUB_RUN_ID/agents/agent_01_validation.json" 2>/dev/null || true
           exit 0
-      - name: Independent post-worker verification
-        id: independent_verify
-        if: always() && steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success' && steps.kilo.outcome != 'skipped'
-        continue-on-error: true
-        timeout-minutes: 15
+
+      - name: Select Agent 02 focused task
+        id: select_agent_02
+        if: ${{ always() && steps.campaign_init.outcome == 'success' }}
         run: |
           set -euo pipefail
+          python3 .github/scripts/campaign_controller.py select --run-id "$GITHUB_RUN_ID" --agent-number 02 > "$RUNNER_TEMP/agent_02_selection.json"
 
-          echo "=== Independent post-worker verification ==="
-          test -z "$(git status --porcelain --untracked-files=no)" || true
-          test -f state/activation_status.json
-
-          echo "Re-running data-integrity preflight independently of the worker..."
-          python3 research/data/preflight.py > /tmp/x-post-data-preflight.log 2>&1
-          tail -n 25 /tmp/x-post-data-preflight.log
-          grep -q "PREFLIGHT PASSED" /tmp/x-post-data-preflight.log
-
-          echo "Re-running the full deterministic regression suite independently..."
-          if ! python3 -m unittest discover -s tests -v > /tmp/x-post-regression.log 2>&1; then
-            echo "Independent deterministic regression suite failed; emitting its diagnostic:"
-            tail -n 120 /tmp/x-post-regression.log
-            exit 1
-          fi
-          tail -n 35 /tmp/x-post-regression.log
-          grep -q "OK" /tmp/x-post-regression.log
-
-          echo "Re-running the relevant real-data end-to-end example..."
-          python3 examples/regime_stability_universe.py > /tmp/x-post-e2e.log 2>&1
-          tail -n 35 /tmp/x-post-e2e.log
-
-          echo "Independent controller verification passed."
-          echo "KILO_LIVENESS_STATUS=COMPLETED_WITH_POSTWORKER_VERIFICATION" >> "$GITHUB_ENV"
-          echo "KILO_LIVENESS_REASON=independent post-worker verification completed successfully" >> "$GITHUB_ENV"
-      - name: Deep audit — after Independent post-worker verification
-        id: deep_audit_13_independent_post_worker_verification
-        if: always()
+      - name: Agent 02 — Higher-Order Objective — Fresh Kilo session
+        id: agent_02
+        if: ${{ always() && steps.select_agent_02.outcome == 'success' }}
+        timeout-minutes: 30
         continue-on-error: true
         env:
-          AUDIT_PREV_OUTCOME: ${{ steps.independent_verify.outcome }}
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py render-prompt --run-id "$GITHUB_RUN_ID" --agent-number 02 > "$RUNNER_TEMP/agent_02_prompt.txt"
+          python3 .github/scripts/run_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 02 \
+            --model "$KILO_FREE_MODEL_ID" \
+            --prompt-file "$RUNNER_TEMP/agent_02_prompt.txt"
+
+      - name: Validate Agent 02 focused-task checkpoint
+        id: validate_agent_02
+        if: ${{ always() && steps.select_agent_02.outcome == 'success' }}
+        continue-on-error: true
         run: |
           set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xwake --step "Independent post-worker verification"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
+          worker_exit=1
+          if [ "${{ steps.agent_02.outcome }}" = "success" ]; then
+            worker_exit=0
+          fi
+          python3 .github/scripts/validate_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 02 \
+            --worker-exit-code "$worker_exit"
+          validation_rc=$?
+          set -e
+          echo "Agent 02 controller validation exit: $validation_rc"
+          cat "state/campaign/runs/$GITHUB_RUN_ID/agents/agent_02_validation.json" 2>/dev/null || true
           exit 0
-      - name: Reconcile worker progress with activation receipt
-        id: reconcile_worker_progress
-        if: always() && steps.verify.outcome == 'success'
+
+      - name: Select Agent 03 focused task
+        id: select_agent_03
+        if: ${{ always() && steps.campaign_init.outcome == 'success' && (github.event_name != 'workflow_dispatch' || inputs.campaign_mode != 'miniature') }}
         run: |
           set -euo pipefail
-          python3 .github/scripts/reconcile_worker_progress.py --self-test
-          python3 .github/scripts/reconcile_worker_progress.py
-          echo "Worker progress reconciled with authoritative activation receipt."
+          python3 .github/scripts/campaign_controller.py select --run-id "$GITHUB_RUN_ID" --agent-number 03 > "$RUNNER_TEMP/agent_03_selection.json"
 
-      - name: Prepare controller recovery handoff
-        id: recovery_handoff
-        if: always() && steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success' && (steps.kilo.outcome != 'success' || steps.independent_verify.outcome != 'success')
+      - name: Agent 03 — Learning Process — Fresh Kilo session
+        id: agent_03
+        if: ${{ always() && steps.select_agent_03.outcome == 'success' }}
+        timeout-minutes: 30
         continue-on-error: true
         env:
-          KILO_OUTCOME: ${{ steps.kilo.outcome }}
-          VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
-          KILO_LIVENESS_STATUS: ${{ env.KILO_LIVENESS_STATUS }}
-          KILO_LIVENESS_REASON: ${{ env.KILO_LIVENESS_REASON }}
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
         run: |
           set -euo pipefail
+          python3 .github/scripts/campaign_controller.py render-prompt --run-id "$GITHUB_RUN_ID" --agent-number 03 > "$RUNNER_TEMP/agent_03_prompt.txt"
+          python3 .github/scripts/run_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 03 \
+            --model "$KILO_FREE_MODEL_ID" \
+            --prompt-file "$RUNNER_TEMP/agent_03_prompt.txt"
 
-          failure_class="UNRESOLVED_EXECUTION_FAILURE"
-          if [ "$KILO_LIVENESS_STATUS" = "STALLED" ]; then
-            failure_class="RESOURCE_OR_LIVENESS_FAILURE"
-          elif grep -Eiq 'invalid request error trace_id:' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'invalid request error trace_id:' /tmp/kilo-retry.log 2>/dev/null; then
-            failure_class="TRANSIENT_GATEWAY"
-          elif grep -Eiq 'permission.*deny|not allowed|specified a rule.*prevents|action.*deny' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'permission.*deny|not allowed|specified a rule.*prevents|action.*deny' /tmp/kilo-retry.log 2>/dev/null; then
-            failure_class="TOOL_INVOCATION_DENIAL"
-          elif grep -Eiq 'oldString|invalid arguments|edit tool' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'oldString|invalid arguments|edit tool' /tmp/kilo-retry.log 2>/dev/null; then
-            failure_class="TOOL_INVOCATION_FAILURE"
-          elif grep -Eiq 'Traceback|AttributeError|NameError|TypeError|SyntaxError' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'Traceback|AttributeError|NameError|TypeError|SyntaxError' /tmp/kilo-retry.log 2>/dev/null; then
-            failure_class="RESEARCH_EXECUTION_FAILURE"
+      - name: Validate Agent 03 focused-task checkpoint
+        id: validate_agent_03
+        if: ${{ always() && steps.select_agent_03.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          set +e
+          worker_exit=1
+          if [ "${{ steps.agent_03.outcome }}" = "success" ]; then
+            worker_exit=0
           fi
+          python3 .github/scripts/validate_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 03 \
+            --worker-exit-code "$worker_exit"
+          validation_rc=$?
+          set -e
+          echo "Agent 03 controller validation exit: $validation_rc"
+          cat "state/campaign/runs/$GITHUB_RUN_ID/agents/agent_03_validation.json" 2>/dev/null || true
+          exit 0
 
-          recovery_log="$(mktemp)"
-          {
-            echo
-            echo "## CONTROLLER RECOVERY RECORD"
-            echo
-            echo "- observed_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            echo "- activation_id: $GITHUB_RUN_ID"
-            echo "- run_attempt: $GITHUB_RUN_ATTEMPT"
-            echo "- worker_outcome: $KILO_OUTCOME"
-            echo "- independent_verification: $VERIFY_OUTCOME"
-            echo "- liveness_status: $KILO_LIVENESS_STATUS"
-            echo "- liveness_reason: $KILO_LIVENESS_REASON"
-            echo "- failure_class: $failure_class"
-            echo "- main_integration: PROHIBITED"
-            echo "- recovery_rule: preserve the current repository state on a recovery branch; a fresh activation must independently inspect and verify it before any main-branch integration."
-            echo "- next_action: inspect this recovery record and the exact diff, repair only from verified evidence, rerun the narrow failing check, then rerun the broader verification sequence."
-            echo
-            echo "### Controller-observed failure evidence"
-            for log_file in /tmp/kilo-primary.log /tmp/kilo-retry.log; do
-              if [ -s "$log_file" ]; then
-                echo "--- $log_file (tail) ---"
-                tail -n 30 "$log_file"
-              fi
-            done
-          } > "$recovery_log"
+      - name: Select Agent 04 focused task
+        id: select_agent_04
+        if: ${{ always() && steps.campaign_init.outcome == 'success' && (github.event_name != 'workflow_dispatch' || inputs.campaign_mode != 'miniature') }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py select --run-id "$GITHUB_RUN_ID" --agent-number 04 > "$RUNNER_TEMP/agent_04_selection.json"
 
-          cat "$recovery_log" >> state/worker_progress.md
-          echo "Controller recovery handoff appended to state/worker_progress.md."
-          echo "RECOVERY_FAILURE_CLASS=$failure_class" >> "$GITHUB_ENV"
+      - name: Agent 04 — Higher-Order Objective — Fresh Kilo session
+        id: agent_04
+        if: ${{ always() && steps.select_agent_04.outcome == 'success' }}
+        timeout-minutes: 30
+        continue-on-error: true
+        env:
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py render-prompt --run-id "$GITHUB_RUN_ID" --agent-number 04 > "$RUNNER_TEMP/agent_04_prompt.txt"
+          python3 .github/scripts/run_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 04 \
+            --model "$KILO_FREE_MODEL_ID" \
+            --prompt-file "$RUNNER_TEMP/agent_04_prompt.txt"
 
-      - name: Verify and persist safe repository changes
+      - name: Validate Agent 04 focused-task checkpoint
+        id: validate_agent_04
+        if: ${{ always() && steps.select_agent_04.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          set +e
+          worker_exit=1
+          if [ "${{ steps.agent_04.outcome }}" = "success" ]; then
+            worker_exit=0
+          fi
+          python3 .github/scripts/validate_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 04 \
+            --worker-exit-code "$worker_exit"
+          validation_rc=$?
+          set -e
+          echo "Agent 04 controller validation exit: $validation_rc"
+          cat "state/campaign/runs/$GITHUB_RUN_ID/agents/agent_04_validation.json" 2>/dev/null || true
+          exit 0
+
+      - name: Select Agent 05 focused task
+        id: select_agent_05
+        if: ${{ always() && steps.campaign_init.outcome == 'success' && (github.event_name != 'workflow_dispatch' || inputs.campaign_mode != 'miniature') }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py select --run-id "$GITHUB_RUN_ID" --agent-number 05 > "$RUNNER_TEMP/agent_05_selection.json"
+
+      - name: Agent 05 — Learning Process — Fresh Kilo session
+        id: agent_05
+        if: ${{ always() && steps.select_agent_05.outcome == 'success' }}
+        timeout-minutes: 30
+        continue-on-error: true
+        env:
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py render-prompt --run-id "$GITHUB_RUN_ID" --agent-number 05 > "$RUNNER_TEMP/agent_05_prompt.txt"
+          python3 .github/scripts/run_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 05 \
+            --model "$KILO_FREE_MODEL_ID" \
+            --prompt-file "$RUNNER_TEMP/agent_05_prompt.txt"
+
+      - name: Validate Agent 05 focused-task checkpoint
+        id: validate_agent_05
+        if: ${{ always() && steps.select_agent_05.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          set +e
+          worker_exit=1
+          if [ "${{ steps.agent_05.outcome }}" = "success" ]; then
+            worker_exit=0
+          fi
+          python3 .github/scripts/validate_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 05 \
+            --worker-exit-code "$worker_exit"
+          validation_rc=$?
+          set -e
+          echo "Agent 05 controller validation exit: $validation_rc"
+          cat "state/campaign/runs/$GITHUB_RUN_ID/agents/agent_05_validation.json" 2>/dev/null || true
+          exit 0
+
+      - name: Select Agent 06 focused task
+        id: select_agent_06
+        if: ${{ always() && steps.campaign_init.outcome == 'success' && (github.event_name != 'workflow_dispatch' || inputs.campaign_mode != 'miniature') }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py select --run-id "$GITHUB_RUN_ID" --agent-number 06 > "$RUNNER_TEMP/agent_06_selection.json"
+
+      - name: Agent 06 — Higher-Order Objective — Fresh Kilo session
+        id: agent_06
+        if: ${{ always() && steps.select_agent_06.outcome == 'success' }}
+        timeout-minutes: 30
+        continue-on-error: true
+        env:
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py render-prompt --run-id "$GITHUB_RUN_ID" --agent-number 06 > "$RUNNER_TEMP/agent_06_prompt.txt"
+          python3 .github/scripts/run_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 06 \
+            --model "$KILO_FREE_MODEL_ID" \
+            --prompt-file "$RUNNER_TEMP/agent_06_prompt.txt"
+
+      - name: Validate Agent 06 focused-task checkpoint
+        id: validate_agent_06
+        if: ${{ always() && steps.select_agent_06.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          set +e
+          worker_exit=1
+          if [ "${{ steps.agent_06.outcome }}" = "success" ]; then
+            worker_exit=0
+          fi
+          python3 .github/scripts/validate_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 06 \
+            --worker-exit-code "$worker_exit"
+          validation_rc=$?
+          set -e
+          echo "Agent 06 controller validation exit: $validation_rc"
+          cat "state/campaign/runs/$GITHUB_RUN_ID/agents/agent_06_validation.json" 2>/dev/null || true
+          exit 0
+
+      - name: Select Agent 07 focused task
+        id: select_agent_07
+        if: ${{ always() && steps.campaign_init.outcome == 'success' && (github.event_name != 'workflow_dispatch' || inputs.campaign_mode != 'miniature') }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py select --run-id "$GITHUB_RUN_ID" --agent-number 07 > "$RUNNER_TEMP/agent_07_selection.json"
+
+      - name: Agent 07 — Learning Process — Fresh Kilo session
+        id: agent_07
+        if: ${{ always() && steps.select_agent_07.outcome == 'success' }}
+        timeout-minutes: 30
+        continue-on-error: true
+        env:
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py render-prompt --run-id "$GITHUB_RUN_ID" --agent-number 07 > "$RUNNER_TEMP/agent_07_prompt.txt"
+          python3 .github/scripts/run_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 07 \
+            --model "$KILO_FREE_MODEL_ID" \
+            --prompt-file "$RUNNER_TEMP/agent_07_prompt.txt"
+
+      - name: Validate Agent 07 focused-task checkpoint
+        id: validate_agent_07
+        if: ${{ always() && steps.select_agent_07.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          set +e
+          worker_exit=1
+          if [ "${{ steps.agent_07.outcome }}" = "success" ]; then
+            worker_exit=0
+          fi
+          python3 .github/scripts/validate_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 07 \
+            --worker-exit-code "$worker_exit"
+          validation_rc=$?
+          set -e
+          echo "Agent 07 controller validation exit: $validation_rc"
+          cat "state/campaign/runs/$GITHUB_RUN_ID/agents/agent_07_validation.json" 2>/dev/null || true
+          exit 0
+
+      - name: Select Agent 08 focused task
+        id: select_agent_08
+        if: ${{ always() && steps.campaign_init.outcome == 'success' && (github.event_name != 'workflow_dispatch' || inputs.campaign_mode != 'miniature') }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py select --run-id "$GITHUB_RUN_ID" --agent-number 08 > "$RUNNER_TEMP/agent_08_selection.json"
+
+      - name: Agent 08 — Higher-Order Objective — Fresh Kilo session
+        id: agent_08
+        if: ${{ always() && steps.select_agent_08.outcome == 'success' }}
+        timeout-minutes: 30
+        continue-on-error: true
+        env:
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py render-prompt --run-id "$GITHUB_RUN_ID" --agent-number 08 > "$RUNNER_TEMP/agent_08_prompt.txt"
+          python3 .github/scripts/run_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 08 \
+            --model "$KILO_FREE_MODEL_ID" \
+            --prompt-file "$RUNNER_TEMP/agent_08_prompt.txt"
+
+      - name: Validate Agent 08 focused-task checkpoint
+        id: validate_agent_08
+        if: ${{ always() && steps.select_agent_08.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          set +e
+          worker_exit=1
+          if [ "${{ steps.agent_08.outcome }}" = "success" ]; then
+            worker_exit=0
+          fi
+          python3 .github/scripts/validate_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 08 \
+            --worker-exit-code "$worker_exit"
+          validation_rc=$?
+          set -e
+          echo "Agent 08 controller validation exit: $validation_rc"
+          cat "state/campaign/runs/$GITHUB_RUN_ID/agents/agent_08_validation.json" 2>/dev/null || true
+          exit 0
+
+      - name: Select Agent 09 focused task
+        id: select_agent_09
+        if: ${{ always() && steps.campaign_init.outcome == 'success' && (github.event_name != 'workflow_dispatch' || inputs.campaign_mode != 'miniature') }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py select --run-id "$GITHUB_RUN_ID" --agent-number 09 > "$RUNNER_TEMP/agent_09_selection.json"
+
+      - name: Agent 09 — Learning Process — Fresh Kilo session
+        id: agent_09
+        if: ${{ always() && steps.select_agent_09.outcome == 'success' }}
+        timeout-minutes: 30
+        continue-on-error: true
+        env:
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py render-prompt --run-id "$GITHUB_RUN_ID" --agent-number 09 > "$RUNNER_TEMP/agent_09_prompt.txt"
+          python3 .github/scripts/run_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 09 \
+            --model "$KILO_FREE_MODEL_ID" \
+            --prompt-file "$RUNNER_TEMP/agent_09_prompt.txt"
+
+      - name: Validate Agent 09 focused-task checkpoint
+        id: validate_agent_09
+        if: ${{ always() && steps.select_agent_09.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          set +e
+          worker_exit=1
+          if [ "${{ steps.agent_09.outcome }}" = "success" ]; then
+            worker_exit=0
+          fi
+          python3 .github/scripts/validate_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 09 \
+            --worker-exit-code "$worker_exit"
+          validation_rc=$?
+          set -e
+          echo "Agent 09 controller validation exit: $validation_rc"
+          cat "state/campaign/runs/$GITHUB_RUN_ID/agents/agent_09_validation.json" 2>/dev/null || true
+          exit 0
+
+      - name: Select Agent 10 focused task
+        id: select_agent_10
+        if: ${{ always() && steps.campaign_init.outcome == 'success' && (github.event_name != 'workflow_dispatch' || inputs.campaign_mode != 'miniature') }}
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py select --run-id "$GITHUB_RUN_ID" --agent-number 10 > "$RUNNER_TEMP/agent_10_selection.json"
+
+      - name: Agent 10 — Higher-Order Objective — Fresh Kilo session
+        id: agent_10
+        if: ${{ always() && steps.select_agent_10.outcome == 'success' }}
+        timeout-minutes: 30
+        continue-on-error: true
+        env:
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/campaign_controller.py render-prompt --run-id "$GITHUB_RUN_ID" --agent-number 10 > "$RUNNER_TEMP/agent_10_prompt.txt"
+          python3 .github/scripts/run_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 10 \
+            --model "$KILO_FREE_MODEL_ID" \
+            --prompt-file "$RUNNER_TEMP/agent_10_prompt.txt"
+
+      - name: Validate Agent 10 focused-task checkpoint
+        id: validate_agent_10
+        if: ${{ always() && steps.select_agent_10.outcome == 'success' }}
+        continue-on-error: true
+        run: |
+          set +e
+          worker_exit=1
+          if [ "${{ steps.agent_10.outcome }}" = "success" ]; then
+            worker_exit=0
+          fi
+          python3 .github/scripts/validate_campaign_agent.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --agent-number 10 \
+            --worker-exit-code "$worker_exit"
+          validation_rc=$?
+          set -e
+          echo "Agent 10 controller validation exit: $validation_rc"
+          cat "state/campaign/runs/$GITHUB_RUN_ID/agents/agent_10_validation.json" 2>/dev/null || true
+          exit 0
+
+      - name: Final independent process evaluation
+        id: final_process_evaluation
+        if: always() && steps.campaign_init.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set +e
+          python3 .github/scripts/evaluate_research_process.py --run-id "$GITHUB_RUN_ID"
+          rc=$?
+          set -e
+          echo "Final process evaluation exit: $rc"
+          exit 0
+
+      - name: Final independent research verification
+        id: final_research_verification
+        if: always() && steps.campaign_init.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python3 research/data/preflight.py
+          python3 -m unittest discover -s tests -q
+          python3 examples/regime_stability_universe.py > "$RUNNER_TEMP/x-final-e2e.log" 2>&1
+          tail -n 35 "$RUNNER_TEMP/x-final-e2e.log"
+          python3 .github/scripts/stamp_activation_receipt.py --validate-only
+
+      - name: Controller-owned final synthesis
+        id: final_synthesis
+        if: always() && steps.campaign_init.outcome == 'success'
+        continue-on-error: true
+        env:
+          RESEARCH_VERIFY_OUTCOME: ${{ steps.final_research_verification.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/synthesize_campaign.py \
+            --run-id "$GITHUB_RUN_ID" \
+            --independent-verify "$RESEARCH_VERIFY_OUTCOME"
+          rc=$?
+          set -e
+          echo "Final synthesis exit: $rc"
+          exit 0
+
+      - name: Persist validated campaign state
         id: persist
-        if: always()
+        if: always() && steps.campaign_init.outcome == 'success'
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
-          KILO_OUTCOME: ${{ steps.kilo.outcome }}
-          VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
-          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
-          KILO_SMOKE_OUTCOME: ${{ steps.kilo_smoke.outcome }}
         run: |
           set -euo pipefail
-          if [ "${PREFLIGHT_OUTCOME:-success}" != "success" ] || [ "${KILO_SMOKE_OUTCOME:-success}" != "success" ]; then
-            echo "No worker-integrated repository changes are eligible for persistence after an early controller/preflight failure."
-            echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
-            exit 0
+          RUN_ROOT="state/campaign/runs/$GITHUB_RUN_ID"
+          if [ ! -s "$RUN_ROOT/final_synthesis.json" ]; then
+            echo "::error::Final synthesis record is missing."
+            exit 1
           fi
-          echo "PERSISTENCE_STATUS=FAILED" >> "$GITHUB_ENV"
-
           git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
-          git reset -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
-
-          # Main-branch admission is deliberately conservative:
-          # worker success alone is insufficient. Independent verification must
-          # also succeed after the final worker edits. Any worker failure or
-          # verification failure is quarantined on a recovery branch.
-          recovery_required=0
-          if [ "$KILO_OUTCOME" != "success" ] || [ "$VERIFY_OUTCOME" != "success" ]; then
-            recovery_required=1
-            echo "::warning::Main integration is prohibited because worker outcome=$KILO_OUTCOME and independent verification=$VERIFY_OUTCOME."
-          fi
-
-          # Capture whether the worker produced any repository change BEFORE
-          # touching controller-owned metadata. The old implementation checked
-          # status after reset, which could miss the worker delta and leave a stale
-          # activation_id in state/activation_status.json.
-          worker_changes="$(git status --porcelain --untracked-files=all)"
-
-          if [ -n "$worker_changes" ]; then
-            python3 .github/scripts/stamp_activation_receipt.py
-          fi
-
           git add -A
-          git reset -- \
-            ':(glob)**/__pycache__/**' \
-            ':(glob)**/*.pyc' \
-            ':(glob)**/*.py.c' 2>/dev/null || true
-
-          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)$' >/tmp/kilo_protected_paths; then
-            echo "Protected paths unexpectedly staged:"
-            cat /tmp/kilo_protected_paths
-            exit 1
-          fi
-          if git diff --cached --name-only | grep -E '(^|/)(\.env(\..*)?|id_rsa|id_dsa|id_ecdsa|id_ed25519|credentials\.(json|ya?ml|toml)|secrets\.(json|ya?ml|toml))$|\.(pem|key)$' >/tmp/kilo_credential_paths; then
-            echo "Credential-like paths are not allowed to persist:"
-            cat /tmp/kilo_credential_paths
-            exit 1
-          fi
-          if git diff --cached --binary | grep -E -n 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|kilo_[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}' >/tmp/kilo_secrets; then
-            echo "Potential credential material detected:"
-            cat /tmp/kilo_secrets
-            exit 1
-          fi
-          if git diff --cached --summary | grep -E '^ create mode 120000 ' >/tmp/kilo_symlinks; then
-            echo "Symbolic links are not allowed to persist:"
-            cat /tmp/kilo_symlinks
-            exit 1
-          fi
-
           git diff --check
+          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)$'; then
+            echo "::error::Protected control-plane paths are staged."
+            exit 1
+          fi
+          if git diff --cached --name-only | grep -E '(^|/)(\.env(\..*)?|id_rsa|id_dsa|id_ecdsa|id_ed25519|credentials\.(json|ya?ml|toml)|secrets\.(json|ya?ml|toml))$|\.(pem|key)$'; then
+            echo "::error::Credential-like paths are staged."
+            exit 1
+          fi
+          if git diff --cached --binary | grep -E -n 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|kilo_[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}'; then
+            echo "::error::Potential credential material detected."
+            exit 1
+          fi
+          if git diff --cached --summary | grep -E '^ create mode 120000 '; then
+            echo "::error::Symbolic links are not allowed to persist."
+            exit 1
+          fi
           if git diff --cached --quiet; then
-            echo "No safe repository changes to persist."
             echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
             exit 0
           fi
-          test -f state/activation_status.json
-          python3 .github/scripts/stamp_activation_receipt.py --validate-only
-
-          if git diff --cached --quiet; then
-            echo "No safe repository changes to persist."
-            echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
-            exit 0
-          fi
-
+          persistence="$(python3 -c 'import json,os; from pathlib import Path; print(json.loads((Path("state/campaign/runs") / os.environ["GITHUB_RUN_ID"] / "final_synthesis.json").read_text())["persistence_decision"])')"
           git config user.name "kilo-research-enterprise"
           git config user.email "kilo-research-enterprise@users.noreply.github.com"
-
-          if [ "$recovery_required" -eq 1 ]; then
-            git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
-            git commit -m "Kilo activation: preserve recovery state"
-            local_commit="$(git rev-parse HEAD)"
-            recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-            if git push origin "$local_commit:refs/heads/$recovery_branch"; then
-              echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
-              echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
-              echo "::warning::Unverified or failed worker state preserved only on $recovery_branch; main integration was prohibited."
-              exit 0
-            fi
-            echo "::error::Recovery branch persistence failed; unverified worker state was not integrated."
-            exit 1
-          fi
-
           git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
-          git commit -m "Kilo activation: update research state"
-          local_commit="$(git rev-parse HEAD)"
-          git fetch origin "$GITHUB_REF_NAME"
-
-          if git rebase "origin/$GITHUB_REF_NAME"; then
-            if git push origin "HEAD:$GITHUB_REF_NAME"; then
+          if [ "$persistence" = "MAIN" ]; then
+            git commit -m "Kilo campaign: persist validated learning state"
+            git fetch origin "$GITHUB_REF_NAME"
+            if git rebase "origin/$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
               echo "PERSISTENCE_STATUS=MAIN" >> "$GITHUB_ENV"
               exit 0
             fi
+            git rebase --abort >/dev/null 2>&1 || true
           fi
-
-          git rebase --abort >/dev/null 2>&1 || true
-          recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          git commit -m "Kilo campaign: preserve recovery state"
+          local_commit="$(git rev-parse HEAD)"
+          recovery_branch="recovery/kilo-campaign-$GITHUB_RUN_ID-" + ${{ github.run_attempt }}
           git push origin "$local_commit:refs/heads/$recovery_branch"
           echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
           echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
-          echo "::warning::Main integration failed; worker commit preserved on $recovery_branch."
-      - name: Deep audit — after Verify and persist safe repository changes
-        id: deep_audit_14_verify_and_persist_safe_repository_changes
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.persist.outcome }}
+
+      - name: Report campaign outcome
+        id: report_campaign
+        if: always() && steps.campaign_init.outcome == 'success'
         run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xwake --step "Verify and persist safe repository changes"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
-      - name: Report Kilo outcome
-        id: audit_source_15_report_kilo_outcome
-        if: always()
-        env:
-          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
-          KILO_SMOKE_OUTCOME: ${{ steps.kilo_smoke.outcome }}
-          KILO_OUTCOME: ${{ steps.kilo.outcome }}
-          VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
-        run: |
-          echo "::group::REPORT KILO OUTCOME DEBUG — run metadata"
-          printf 'GITHUB_RUN_ID=%s\n' "${GITHUB_RUN_ID:-unknown}"
-          printf 'GITHUB_RUN_ATTEMPT=%s\n' "${GITHUB_RUN_ATTEMPT:-unknown}"
-          printf 'GITHUB_REF_NAME=%s\n' "${GITHUB_REF_NAME:-unknown}"
-          printf 'GITHUB_SHA=%s\n' "${GITHUB_SHA:-unknown}"
-          printf 'GITHUB_EVENT_NAME=%s\n' "${GITHUB_EVENT_NAME:-unknown}"
-          printf 'GITHUB_WORKFLOW=%s\n' "${GITHUB_WORKFLOW:-unknown}"
-          echo "::endgroup::"
-
-          echo "::group::REPORT KILO OUTCOME DEBUG — exact decision inputs"
-          printf 'PREFLIGHT_OUTCOME=%q\n' "${PREFLIGHT_OUTCOME:-<unset>}"
-          printf 'KILO_SMOKE_OUTCOME=%q\n' "${KILO_SMOKE_OUTCOME:-<unset>}"
-          printf 'KILO_OUTCOME=%q\n' "${KILO_OUTCOME:-<unset>}"
-          printf 'VERIFY_OUTCOME=%q\n' "${VERIFY_OUTCOME:-<unset>}"
-          printf 'KILO_LIVENESS_STATUS=%q\n' "${KILO_LIVENESS_STATUS:-<unset>}"
-          printf 'KILO_LIVENESS_REASON=%q\n' "${KILO_LIVENESS_REASON:-<unset>}"
-          printf 'PERSISTENCE_STATUS=%q\n' "${PERSISTENCE_STATUS:-<unset>}"
-          printf 'PERSISTENCE_RECOVERY_BRANCH=%q\n' "${PERSISTENCE_RECOVERY_BRANCH:-<unset>}"
-          echo "::endgroup::"
-
-          echo "::group::REPORT KILO OUTCOME DEBUG — classifier integrity and cross-check"
-          test -f .github/scripts/report_kilo_outcome.py
-          sha256sum .github/scripts/report_kilo_outcome.py
-          python3 -m py_compile .github/scripts/report_kilo_outcome.py
-          set +e
-          CLASSIFIER_OUTPUT="$(python3 .github/scripts/report_kilo_outcome.py \
-            --preflight "${PREFLIGHT_OUTCOME:-}" \
-            --smoke "${KILO_SMOKE_OUTCOME:-}" \
-            --worker "${KILO_OUTCOME:-}" \
-            --verify "${VERIFY_OUTCOME:-}" \
-            --liveness "${KILO_LIVENESS_STATUS:-}" \
-            --persistence "${PERSISTENCE_STATUS:-}" 2>&1)"
-          CLASSIFIER_RC=$?
-          set -e
-          printf '%s\n' "$CLASSIFIER_OUTPUT"
-          printf 'CLASSIFIER_RC=%s\n' "$CLASSIFIER_RC"
-          echo "The shell decision path below remains authoritative; this scripted result is a diagnostic consistency check."
-          echo "::endgroup::"
-
-          echo "::group::REPORT KILO OUTCOME DEBUG — repository/persistence evidence"
-          git rev-parse --short=12 HEAD
-          git status --short
-          echo "--- unstaged names ---"
-          git diff --name-status
-          echo "--- staged names ---"
-          git diff --cached --name-status
-          echo "--- recent commits ---"
-          git log -5 --format='%h %ct %s'
-          for debug_path in state/worker_progress.md state/worker_receipt.json state/activation_receipt.json reports logs; do
-            if [ -e "$debug_path" ]; then
-              stat -c '%n | type=%F | bytes=%s | mode=%a | mtime=%y' "$debug_path"
-            else
-              echo "ABSENT | $debug_path"
-            fi
-          done
-          echo "::endgroup::"
-
-          echo "::group::REPORT KILO OUTCOME DEBUG — terminal-state matrix"
-          case "${PERSISTENCE_STATUS:-FAILED}" in
-            MAIN|RECOVERY_BRANCH|NO_CHANGES|FAILED) echo "Persistence token recognized: ${PERSISTENCE_STATUS:-FAILED}" ;;
-            *) echo "UNRECOGNIZED persistence token: ${PERSISTENCE_STATUS:-<unset>}" ;;
-          esac
-          case "${KILO_LIVENESS_STATUS:-unknown}" in
-            STALLED|COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT|COMPLETED_WITH_SEMANTIC_CHECKPOINTS|COMPLETED_WITH_POSTWORKER_VERIFICATION|unknown) echo "Liveness token: ${KILO_LIVENESS_STATUS:-unknown}" ;;
-            *) echo "UNRECOGNIZED liveness token: ${KILO_LIVENESS_STATUS:-<unset>}" ;;
-          esac
-          echo "::endgroup::"
-
-          echo "::group::REPORT KILO OUTCOME — authoritative deterministic classifier"
-          echo "The Python classifier is the single authoritative terminal-state decision path."
-          echo "::endgroup::"
-
           set -euo pipefail
-          python3 .github/scripts/report_kilo_outcome.py \
-            --preflight "${PREFLIGHT_OUTCOME:-unknown}" \
-            --smoke "${KILO_SMOKE_OUTCOME:-unknown}" \
-            --worker "${KILO_OUTCOME:-unknown}" \
-            --verify "${VERIFY_OUTCOME:-skipped}" \
-            --liveness "${KILO_LIVENESS_STATUS:-unknown}" \
-            --persistence "${PERSISTENCE_STATUS:-FAILED}"
+          python3 .github/scripts/report_campaign_outcome.py --run-id "$GITHUB_RUN_ID"
 
-      - name: Deep audit — after Report Kilo outcome
-        id: deep_audit_15_report_kilo_outcome
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.audit_source_15_report_kilo_outcome.outcome }}
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xwake --step "Report Kilo outcome"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
       - name: Deep audit — final rollup
         id: deep_audit_final
         if: always()
