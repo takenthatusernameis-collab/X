@@ -334,7 +334,7 @@ Repair the environment when possible, then rerun the smallest relevant check.
 ### Transient gateway/service
 Temporary external-service failure.
 
-The workflow already provides a bounded fresh Kilo-session retry for the specifically observed invalid-request gateway failure. Do not create recursive retries beyond the workflow's bounded mechanism.
+The campaign already provides fresh Kilo sessions by design. Treat a transient gateway failure as a failed campaign member, not as permission to self-retry or recurse. The next campaign member may still proceed with its assigned perspective. Do not create recursive retries or hidden sub-campaigns.
 
 ### Tool invocation denial
 A particular command was denied.
