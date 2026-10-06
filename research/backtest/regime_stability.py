@@ -913,6 +913,39 @@ def momentum_signals(
     return out
 
 
+def breakout_signals(
+    closes: NDArray,
+    lookback: int = 20,
+) -> List[Signal]:
+    """Past-only breakout-continuation signal (new signal class).
+
+    Long the previous ``lookback``-day breakout and hold for one day: a
+    breakout occurs when the current close exceeds the highest close of the
+    preceding ``lookback`` bars; at a breakout, go long for one day. Neutral
+    before the ``lookback`` window and on non-breakout bars. Daily rebalancing
+    (a fresh signal at every bar). Bars before the ``lookback`` window are
+    neutral.
+
+    Unlike ``momentum_signals``, which bets on the sign of the
+    ``lookback``-day return, the breakout filter requires the price to make a
+    new ``lookback``-day high before taking a position — a directionally
+    biased, threshold-activated momentum rule. This is the enterprise's
+    new-signal-class test candidate: 20-day breakout continuation on large-cap
+    US equities. It is judged through the same perturbation / coin-flip-null /
+    regime-stability gates before any positive claim is considered.
+
+    No look-ahead: each signal uses only closes up to and including its own
+    bar.
+    """
+    n = len(closes)
+    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    lookback = int(lookback)
+    for i in range(lookback, n):
+        if float(closes[i]) > float(np.max(closes[i - lookback : i])):
+            out[i] = Signal(date=i + 1, weight=1.0)
+    return out
+
+
 def regime_adaptive_ma_signals(
     closes: NDArray,
     fast_calm: int = 20,

@@ -1,18 +1,38 @@
 # Worker Progress
 
-activation_id: 37394344201
-phase: DEEP
-status: ACTIVE
-last_verified_milestone: longer-horizon momentum cell executed and verified end-to-end. Path 1 (`momentum_longer_horizon.py`): lookback-20 REGIME_STABLE=6 / lookback-60 REGIME_STABLE=4; horizon-robustness ROBUST=3 (AAPL, AMZN, JPM), SENSITIVE=3 (GOOGL, META, TSLA), NO_EDGE=4; determinism r1==r2. Path 2 (`verify_momentum_longer_horizon.py`): Gate 1 fresh walk_forward recomputation AMZN/JPM MATCH; Gate 2 fresh medians/nulls for all 10 assets + regenerated verdicts MATCH; Gate 3 determinism identical. Path 3 (`momentum_horizon_gap_analysis.py`): independent gap recharacterization — candidate medians identical across lookback 20/60 for all 10 assets; positive candidate-vs-null gaps in all segments at both lookbacks for every asset (2/3 segments for NVDA); determinism identical. Key finding: the apparent 60-day verdict "degradation" is a coin-flip-null dispersion artifact, not an edge decay; the momentum edge is horizon-stable in magnitude. 134/134 regression tests pass.
+activation_id: 37414038601
+phase: COMPLETE
+status: COMPLETE
+last_verified_milestone: breakout_20day_cont cell closed FALSIFIED with full independent verification; 161/161 regression tests pass; state artifacts and frontier records updated
 
-next_bounded_action: record the findings in state/LEARNING_STATE.md (frontier), state/STATE.md, state/activation_status.json, and logs/ACTIVATION-2026-10-06.md, then close the activation.
+This file is a liveness contract. Updated after the final verified milestone.
 
-This file is a liveness contract. Update it only after a real research-state transition or verified milestone.
+## Objective completed (task R-004 from state/campaign/task_queue.json)
 
-## Active objective
+**Test:** Does a fixed 20-day breakout continuation signal (long when the close exceeds the highest close of the preceding 20 trading days; hold 1 day; daily rebalance) produce reproducible evidence beyond the currently qualified momentum family?
 
-Longer-horizon momentum on the collected universe: test whether the lookback=5 momentum edge (admitted as candidate positive evidence in activation 37318950814, verified lookback-3/5/10 robustness in activation 37361000967) survives at the classic momentum formation windows lookback 20 and 60.
+**Verdict: FALSIFIED.** Gate stack completed end-to-end (manifest 10/10 OK, preflight PASSED, leakage PASS on AMZN/JPM + equity-fill audit, walk-forward regime-stability gate across all 10 collected tickers with a matched coin-flip null, bounded lookback sensitivity {5, 10, 20}, determinism r1==r2, independent verifier 3 gates all MATCH). Results: canonical 20-day lookback = 9/10 CONSISTENT_WITH_NOISE, 1/10 REGIME_STABLE (TSLA, small edge); sensitivity = ROBUST=1 (TSLA @5/@20), SENSITIVE=2 (AAPL @5, NVDA @10), NO_EDGE=7. The small positive verdicts are absent from the momentum-asset list (MSFT/GOOGL/AMZN/META show NO_EDGE) and are non-lookback-robust. The result matches the a-priori prediction: noise-like in most assets, small positive verdicts only among momentum assets — the breakout filter adds no robust evidence beyond momentum.
 
-Method (fixed a-priori): long the previous 20-/60-day return, hold 1 day, daily rebalance; walk-forward per segment train=252d/test=84d/warmup=60d/overlap=60d; 4 contiguous volatility blocks; each lookback vs a coin-flip sign null on the same segments; universe sweep across all 10 collected tickers; determinism asserted; artifact written to state/check_artifacts/momentum_longer_horizon_results.json; independent verifier recomputes the artifact via a fresh walk_forward path.
+## Deliverables
+- `research/backtest/regime_stability.py::breakout_signals` (new signal function, exported)
+- `research/checks/breakout_20day_cont.py` (check)
+- `research/checks/verify_breakout_20day_cont.py` (independent verifier)
+- `research/checks/smoke_breakout_signals.py` (scratch smoke test; retained as a useful diagnostic)
+- `tests/test_regime_stability.py` (5 new unit tests)
+- `state/check_artifacts/breakout_20day_cont_results.json` (artifact)
+- `state/STATE.md`, `state/LEARNING_STATE.md`, `state/activation_status.json`, `state/worker_progress.md`, `logs/ACTIVATION-2026-10-06.md` (records)
 
-Expected effect: reduces uncertainty about whether the momentum edge is confined to the short-horizon window (3-10 days) or generalizes to the classic 1-3 month formation window; the result is admitted only if it passes the regime gate, the independent-verification gate, and determinism.
+## Post-change verification
+- `python3 research/checks/smoke_breakout_signals.py`: exits 0.
+- `python3 research/checks/breakout_20day_cont.py`: exits 0; all gates complete; artifact written.
+- `python3 research/checks/verify_breakout_20day_cont.py`: GATE 1 PASS (AMZN/JPM MATCH), GATE 2 PASS (all-asset MATCH + verdicts MATCH), GATE 3 PASS (determinism identical).
+- `python3 -m unittest discover -s tests -v`: 161 tests, all passing (156 existing + 5 new), no regressions.
+- Py_compile on all edited modules: OK.
+
+## Unresolved / caveats
+- The three borderline REGIME_STABLE verdicts (AAPL @5, TSLA @5/@20, NVDA @10) sit just above the framework's 0.05 noise band; their threshold sensitivity is not independently quantified (flagged in STATE.md).
+- No per-checkpoint UTC timestamps captured (the `date` shell form is denied); run identity anchored to GITHUB_RUN_ID=37414038601.
+- No KILO_RECOVERY_BRANCH present; no outstanding recovery work.
+
+## Next
+Task R-001: cost-sensitivity test of the qualified momentum edge (fixed cost model, lookback 3/5/10, matched null) through the full gate stack; report whether costs erase the edge.

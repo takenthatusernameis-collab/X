@@ -489,5 +489,86 @@ class TestStressSegmentsRealData(unittest.TestCase):
         self.assertGreater(len(result.inspect()), 0)
 
 
+class TestBreakoutSignals(unittest.TestCase):
+    """Unit tests for the breakout-continuation signal class."""
+
+    def test_breakout_signals_contract(self):
+        """The breakout signal must have the same shape contract as other signals."""
+        closes = np.array([100.0, 101.0, 102.0, 103.0, 104.0, 105.0,
+                           106.0, 107.0, 108.0, 109.0, 110.0], dtype=np.float64)
+        sig = bt.breakout_signals(closes, lookback=5)
+        self.assertEqual(len(sig), len(closes))
+        # Neutral before the 5-bar window; with a monotonic series every bar
+        # after the window breaks out (6 bars: i=5..10).
+        self.assertEqual(sum(1 for s in sig if s.weight != 0.0), 6)
+        # At i=5 the close (106) exceeds max of the prior 5 (100..104) -> long.
+        self.assertEqual(sig[5].weight, 1.0)
+        # At i=6 the close (107) exceeds max of the prior 5 (101..105) -> long.
+        self.assertEqual(sig[6].weight, 1.0)
+        # Lookback=10: only i=10 breaks out.
+        sig10 = bt.breakout_signals(closes, lookback=10)
+        self.assertEqual(sum(1 for s in sig10 if s.weight != 0.0), 1)
+        self.assertEqual(sig10[10].weight, 1.0)
+
+    def test_breakout_signals_past_only(self):
+        """A breakout at bar i must depend only on closes[:i] (past-only)."""
+        np.random.seed(1234)
+        closes = np.random.randn(500).cumsum() + 100.0
+        closes = np.abs(closes)
+        sig = bt.breakout_signals(closes, lookback=20)
+        for i in range(20, len(closes)):
+            expected = float(closes[i] > float(np.max(closes[i - 20 : i])))
+            self.assertEqual(sig[i].weight, 1.0 if expected else 0.0, msg=i)
+        # The signal at i does not depend on closes[i+1].
+        tweaked = np.array(closes, copy=True)
+        tweaked[300] *= 2.0
+        sig_orig = bt.breakout_signals(closes, lookback=20)
+        sig_tweaked = bt.breakout_signals(tweaked, lookback=20)
+        # The signal at bar i uses closes[:i+1] only, so bars before the tweak
+        # point are unaffected by doubling closes[300].
+        for i in range(20, 300):
+            self.assertEqual(sig_orig[i].weight, sig_tweaked[i].weight, msg=i)
+
+    def test_breakout_signals_determinism(self):
+        """Breakout signals must be fully deterministic for fixed inputs."""
+        np.random.seed(7)
+        closes = np.random.randn(1000).cumsum() + 100.0
+        closes = np.abs(closes)
+        s1 = bt.breakout_signals(closes, lookback=20)
+        s2 = bt.breakout_signals(closes, lookback=20)
+        self.assertEqual([s.weight for s in s1], [s.weight for s in s2])
+        s3 = bt.breakout_signals(closes, lookback=10)
+        s4 = bt.breakout_signals(closes, lookback=10)
+        self.assertEqual([s.weight for s in s3], [s.weight for s in s4])
+
+    def test_breakout_signals_edge_case_short_series(self):
+        """A series shorter than the lookback must emit all-neutral signals."""
+        closes = np.array([100.0, 101.0, 102.0], dtype=np.float64)
+        sig = bt.breakout_signals(closes, lookback=5)
+        self.assertEqual(len(sig), 3)
+        self.assertEqual(sum(1 for s in sig if s.weight != 0.0), 0)
+
+    def test_breakout_signals_in_regime_stress(self):
+        """The breakout signal must integrate with regime_stress correctly."""
+        bars = bt.generate_bars(600, seed=11)
+        grid = bt.parameter_grid_around((("lookback", 20),))
+        result = bt.regime_stress(
+            bt.breakout_signals, list(bars), grid, (("lookback", 20.0),),
+            train_window=60, test_window=20, warmup=0,
+        )
+        # On momentum-free regime-switching synthetic data there should be no
+        # persistent edge; the exact verdict (CONSISTENT_WITH_NOISE vs
+        # REGIME_STABLE) is less important than the verdict being well-formed
+        # and the run completing deterministically.
+        self.assertIn(result.overall_verdict,
+                      ("CONSISTENT_WITH_NOISE", "REGIME_STABLE",
+                       "REGIME_DEPENDENT", "REGIME_STABLE_LOSS"))
+        r2 = bt.regime_stress(
+            bt.breakout_signals, list(bars), grid, (("lookback", 20.0),),
+            train_window=60, test_window=20, warmup=0,
+        )
+        self.assertEqual(result.overall_verdict, r2.overall_verdict)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

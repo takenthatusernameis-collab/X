@@ -1438,6 +1438,81 @@ momentum, lookback 20/60) before declaring momentum robust across horizons.
 
 ---
 
+## Current activation (20-day breakout continuation on the collected universe — 37414038601)
+
+Tested a genuinely new signal class: the 20-day breakout continuation rule
+(long when the close exceeds the highest close of the preceding 20 trading
+days; hold 1 day; daily rebalanced) on the collected adjusted-close universe
+through the same gate stack as momentum — manifest 10/10 OK, preflight PASSED
+(all data-quality and survivorship checks), leakage review PASS on AMZN/JPM
+(full-sample equity-fill audit), walk-forward regime-stability gate across all
+10 collected tickers with a matched coin-flip null, bounded lookback sensitivity
+{5, 10, 20} (20 is the canonical breakout window; 5/10 a bounded sensitivity
+set), determinism, and an independent verifier. New framework function
+`research/backtest/regime_stability.py::breakout_signals` (past-only,
+momentum-variant with a threshold-activated entry filter), its export in
+`research/backtest/__init__.py`, the check
+(`research/checks/breakout_20day_cont.py`), the independent verifier
+(`research/checks/verify_breakout_20day_cont.py`), and 5 new unit tests in
+`tests/test_regime_stability.py` (161 tests total, all passing).
+
+Method: seed 42; dataset yf-ohlcv-universe-2009-to-2026-10-03; walk-forward per
+segment train=252d/test=84d/warmup=60d/overlap=60d; 4 contiguous volatility
+blocks; min 400 bars/segment; each lookback vs a coin-flip sign null on the same
+segments. A lookback is EDGE on an asset if it shows a uniformly-positive
+REGIME_STABLE edge; a per-lookback sensitivity verdict is ROBUST (edge at >= 2
+lookbacks), SENSITIVE (edge at exactly 1 lookback), or NO_EDGE.
+
+A-priori falsification prediction (observed): the breakout filter is a
+directionally-biased selection of the momentum long leg; expected to show
+CONSISTENT_WITH_NOISE in most assets (small positive medians below the
+framework's noise band), with possible small REGIME_STABLE positive edges only
+where the momentum edge already exists (AAPL, MSFT, GOOGL, AMZN, META, TSLA).
+
+Results:
+- Lookback regime-stability verdict counts across the 10-asset universe:
+  lookback 5: REGIME_STABLE=3, CONSISTENT_WITH_NOISE=7, REGIME_DEPENDENT=0,
+  REGIME_STABLE_LOSS=0; lookback 10: REGIME_STABLE=1, CONSISTENT_WITH_NOISE=8,
+  REGIME_DEPENDENT=1, REGIME_STABLE_LOSS=0; lookback 20: REGIME_STABLE=1,
+  CONSISTENT_WITH_NOISE=9, REGIME_DEPENDENT=0, REGIME_STABLE_LOSS=0.
+- Sensitivity verdict counts: ROBUST=1 (TSLA: positive REGIME_STABLE edges at
+  lookbacks 5 and 20), SENSITIVE=2 (AAPL at lookback 5; NVDA at lookback 10),
+  NO_EDGE=7 (MSFT, GOOGL, AMZN, META, JPM, JNJ, XOM).
+- Canonical 20-day lookback: 9/10 CONSISTENT_WITH_NOISE, 1/10 REGIME_STABLE
+  (TSLA).
+- Per-asset detail of the borderline cases: AAPL lookback 5
+  [0.039, 0.021, 0.063, 0.021] REGIME_STABLE (candidate dispersion +0.017 vs
+  2x null +0.056, uniformly positive medians); TSLA lookback 5
+  [0.038, 0.013, 0.068] REGIME_STABLE and lookback 20
+  [0.019, 0.040, 0.053] REGIME_STABLE; NVDA lookback 10
+  [0.003, 0.047, 0.050] REGIME_STABLE. All three edges are small in magnitude
+  and, except for TSLA, do not survive at more than one lookback; the assets
+  showing the momentum edge (MSFT, GOOGL, AMZN, META) show NO_EDGE for
+  breakout.
+
+Independent verification: Gate 1 (fresh walk_forward + noise_benchmark, AMZN/JPM
+on lookbacks 5/10/20) MATCH on medians/nulls/segments; Gate 2 (fresh medians
+and nulls for all 10 assets, verdicts regenerated from unrounded values) MATCH
+on every asset's medians and regime/sensitivity verdicts; Gate 3
+determinism identical. Full regression suite: 161 tests, all passing (156
+existing + 5 new `breakout_signals` unit tests).
+
+Assessment: the breakout continuation rule does not produce a reproducible
+robust edge on the collected universe. The positive verdicts that do appear are
+small in magnitude, are not lookback-robust (only TSLA at 2 lookbacks), and
+occur in only 3/10 assets — a subset of the momentum-asset list, not a
+generalization of it. The canonical 20-day rule earns REGIME_STABLE evidence in
+only 1/10 assets (TSLA). The result closely matches the a-priori prediction (noise-like in most assets;
+small positive verdicts only among the momentum-asset subset). The cell closes
+as FALSIFIED: the breakout filter adds no robust evidence beyond the momentum
+family. (Note for later reviews:
+the three borderline REGIME_STABLE assets have medians that sit just above the
+framework's 0.05 noise band, so these verdicts are sensitive to the threshold
+machinery; they are recorded as durable small-effect findings, not as a robust
+edge.)
+
+---
+
 ## Evidence standard
 
 Synthetic data validates tooling only; it is not evidence that any
