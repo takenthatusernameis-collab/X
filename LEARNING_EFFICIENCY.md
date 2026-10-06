@@ -76,3 +76,14 @@ The current controller implements the lightweight loop above without turning it 
 2. After the campaign, an independent process evaluator compares the live worktree with the committed baseline and distinguishes durable research progress, verified research/software repair, no substantive action, and unverified execution.
 3. The terminal outcome classifier requires this process result in addition to independent post-worker verification before returning `COMPLETE`.
 4. Failed or unverified worker output is eligible for recovery-branch quarantine rather than automatic main-branch integration.
+
+
+## Sequential 10-agent focused-task campaign
+
+The production Kilo campaign now uses one workflow run with ten strictly sequential fresh Kilo sessions. Odd agents (01/03/05/07/09) evaluate or improve the learning process; even agents (02/04/06/08/10) use that process against the highest-value unresolved research frontier and empirically test the preceding process decision.
+
+The controller selects exactly one bounded task per session from durable repository evidence. Every task must pass a firewall requiring one primary question, one objective, one deliverable, one evidence gate, one stop condition, and an independent verification path. Secondary ideas become future candidate tasks rather than live scope.
+
+The campaign treats validated information gained and uncertainty reduction as the evidence hierarchy. Workflow completion, edits, token use, experiments started, and agent confidence are not learning metrics. Gateway failures are recorded as diagnostic events with no automatic retry; failed sessions are quarantined so later agents start from validated state plus durable evidence.
+
+Per-agent records are durable controller inputs, and the final synthesis independently evaluates process improvement, research progress, rejected or negative evidence, unresolved uncertainty, added complexity, and the single highest-value next action. A 2-agent miniature mode uses the exact same architecture for cheap structural testing.
