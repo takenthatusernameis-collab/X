@@ -370,12 +370,6 @@ def main():
                 pnl_p[i] = rl - rs
             lrets = walk_forward_fold_lrets(pnl_p, 60, 20, 10, 10)
             recomputed[tuple(sorted(p.items()))].append(float(np.median(lrets)))
-            if (p["lookback"] == LOOKBACK and p["top_k"] == TOP_K
-                    and p["bottom_k"] == BOTTOM_K):
-                baseline_meds.append(float(np.median(lrets)))
-                baseline_nulls.append(float(np.median(nlrets)))
-                baseline_cand_fold.extend(lrets)
-                baseline_null_fold.extend(nlrets)
             rng2 = np.random.default_rng(SEED + int(round(
                 sum(float(v) for v in p.values()) * 1000)))
             null_pnl = np.zeros(first_len, dtype=np.float64)
@@ -400,7 +394,9 @@ def main():
             null_recomputed[tuple(sorted(p.items()))].append(float(np.median(nlrets)))
             if (p["lookback"] == LOOKBACK and p["top_k"] == TOP_K
                     and p["bottom_k"] == BOTTOM_K):
-                baseline_null = float(np.median(nlrets))
+                baseline_meds.append(float(np.median(lrets)))
+                baseline_nulls.append(float(np.median(nlrets)))
+                baseline_cand_fold.extend(lrets)
                 baseline_null_fold.extend(nlrets)
 
     summary_medians = {k: float(np.median(v)) for k, v in recomputed.items()}
