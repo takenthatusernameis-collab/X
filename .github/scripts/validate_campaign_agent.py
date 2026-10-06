@@ -56,6 +56,7 @@ def main() -> int:
     ap.add_argument("--agent-id", required=True)
     ap.add_argument("--exit-code", required=True, type=int)
     ap.add_argument("--before")
+    ap.add_argument("--before-worker-progress-sha", default="")
     args = ap.parse_args()
 
     before = json.loads(Path(args.before).read_text(encoding="utf-8")) if args.before else {}
@@ -121,7 +122,7 @@ def main() -> int:
 
     checkpoint_path = Path("state/worker_progress.md")
     checkpoint_present = checkpoint_path.exists() and checkpoint_path.stat().st_size > 0
-    before_checkpoint = before.get("worker_progress_sha256")
+    before_checkpoint = args.before_worker_progress_sha or before.get("worker_progress_sha256")
     after_checkpoint = sha(checkpoint_path)
     checkpoint_changed = before_checkpoint != after_checkpoint
 
