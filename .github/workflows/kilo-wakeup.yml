@@ -993,7 +993,6 @@ jobs:
           python3 -m unittest discover -s tests -q
           python3 examples/regime_stability_universe.py > "$RUNNER_TEMP/x-final-e2e.log" 2>&1
           tail -n 35 "$RUNNER_TEMP/x-final-e2e.log"
-          python3 .github/scripts/stamp_activation_receipt.py --validate-only
 
       - name: Controller-owned final synthesis
         id: final_synthesis
@@ -1010,6 +1009,14 @@ jobs:
           set -e
           echo "Final synthesis exit: $rc"
           exit 0
+
+      - name: Validate controller activation receipt
+        id: validate_activation_receipt
+        if: always() && steps.campaign_init.outcome == 'success'
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/stamp_activation_receipt.py --validate-only
 
       - name: Persist validated campaign state
         id: persist
