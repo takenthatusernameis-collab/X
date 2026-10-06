@@ -58,6 +58,8 @@ def fallback_record(agent: int, contract: dict, runtime: dict | None, reason: st
     failure = runtime.get("failure_class", "UNKNOWN") if runtime else "VALIDATION_FAILURE"
     return {
         "agent_number": agent,
+        "campaign_slot": agent,
+        "global_agent_number": contract["global_agent_number"],
         "role": contract["role"],
         "task_id": contract["task_id"],
         "objective": contract["objective"],
@@ -83,7 +85,7 @@ def fallback_record(agent: int, contract: dict, runtime: dict | None, reason: st
 
 def validate_record(record: dict, agent: int, contract: dict) -> list[str]:
     required = [
-        "agent_number", "role", "task_id", "objective", "bottleneck", "question",
+        "agent_number", "global_agent_number", "campaign_slot", "role", "task_id", "objective", "bottleneck", "question",
         "action", "changed", "verified", "unverified", "observed_effect",
         "uncertainty_targeted", "uncertainty_reduced", "process_decision",
         "research_result", "decision", "next", "candidate_tasks",
@@ -94,6 +96,10 @@ def validate_record(record: dict, agent: int, contract: dict) -> list[str]:
         return [f"missing_record_fields:{failures}"]
     if record["agent_number"] != agent:
         failures.append("agent_number_mismatch")
+    if record.get("campaign_slot") != agent:
+        failures.append("campaign_slot_mismatch")
+    if record.get("global_agent_number") != contract.get("global_agent_number"):
+        failures.append("global_agent_number_mismatch")
     if record["task_id"] != contract["task_id"]:
         failures.append("task_id_mismatch")
     if record["role"] != contract["role"]:
