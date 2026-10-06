@@ -72,6 +72,12 @@ class CampaignArchitectureTests(unittest.TestCase):
             )
         )
 
+    def test_credential_scan_reads_staged_content_not_filenames(self):
+        marker = "if git diff --cached --name-only -z --diff-filter=AM |"
+        self.assertIn(marker, self.workflow)
+        self.assertIn('git cat-file blob ":$path"', self.workflow)
+        self.assertNotIn("git diff --cached --binary | grep -E -n", self.workflow)
+
     def test_global_identity_counter_is_durable(self):
         import json
         counter = json.loads((ROOT / "state" / "campaign" / "global_agent_counter.json").read_text(encoding="utf-8"))
