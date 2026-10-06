@@ -572,7 +572,7 @@ Apply these repository-specific lessons explicitly:
 
 - A previous activation reported a successful workflow/job while the corrected real-data loader had not yet been executed after its final edit. Therefore workflow/Kilo success is not evidence of post-change correctness.
 - A previous activation encountered a denied Python invocation, then succeeded by switching to a small script file. Therefore adapt tool invocations rather than declaring the execution layer unavailable.
-- A previous activation hit a real gateway `invalid request` failure after useful research work and regression testing. The workflow now has one bounded fresh-session retry for that specific failure. Do not build additional unbounded retry behavior inside the worker.
+- Previous activations hit a real gateway `invalid request` transient after useful research work. Treat this as an external-service recovery event, not as a research failure: the controller records the event and proceeds with the next fresh campaign session. Do not create hidden or recursive retries inside the worker.
 - A recent successful activation reached 120 passing tests, deterministic real-data statistics, and an honest negative research conclusion. Treat that as strong evidence of a successful research activation, but still distinguish it from independent acceptance of every underlying claim.
 - Existing state already contains explicit negative findings and verification gaps. Preserve that honesty; do not overwrite them merely to present a cleaner progression narrative.
 
