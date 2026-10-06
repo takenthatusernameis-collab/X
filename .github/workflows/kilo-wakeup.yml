@@ -791,14 +791,16 @@ jobs:
           failure_class="UNRESOLVED_EXECUTION_FAILURE"
           if [ "$KILO_LIVENESS_STATUS" = "STALLED" ]; then
             failure_class="RESOURCE_OR_LIVENESS_FAILURE"
-          elif grep -Eiq 'invalid request error trace_id:' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'invalid request error trace_id:' /tmp/kilo-retry.log 2>/dev/null; then
+          elif grep -Eiq 'invalid request error trace_id:' state/campaign/agent_*.log 2>/dev/null; then
             failure_class="TRANSIENT_GATEWAY"
-          elif grep -Eiq 'permission.*deny|not allowed|specified a rule.*prevents|action.*deny' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'permission.*deny|not allowed|specified a rule.*prevents|action.*deny' /tmp/kilo-retry.log 2>/dev/null; then
+          elif grep -Eiq 'permission.*deny|not allowed|specified a rule.*prevents|action.*deny' state/campaign/agent_*.log 2>/dev/null; then
             failure_class="TOOL_INVOCATION_DENIAL"
-          elif grep -Eiq 'oldString|invalid arguments|edit tool' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'oldString|invalid arguments|edit tool' /tmp/kilo-retry.log 2>/dev/null; then
+          elif grep -Eiq 'oldString|invalid arguments|edit tool' state/campaign/agent_*.log 2>/dev/null; then
             failure_class="TOOL_INVOCATION_FAILURE"
-          elif grep -Eiq 'Traceback|AttributeError|NameError|TypeError|SyntaxError' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'Traceback|AttributeError|NameError|TypeError|SyntaxError' /tmp/kilo-retry.log 2>/dev/null; then
+          elif grep -Eiq 'Traceback|AttributeError|NameError|TypeError|SyntaxError' state/campaign/agent_*.log 2>/dev/null; then
             failure_class="RESEARCH_EXECUTION_FAILURE"
+          elif [ "${CONTROL_PLANE_TAMPER_ATTEMPT:-0}" = "1" ]; then
+            failure_class="CONTROL_PLANE_TAMPER"
           fi
 
           recovery_log="$(mktemp)"
@@ -818,13 +820,13 @@ jobs:
             echo "- recovery_rule: preserve the current repository state on a recovery branch; a fresh activation must independently inspect and verify it before any main-branch integration."
             echo "- next_action: inspect this recovery record and the exact diff, repair only from verified evidence, rerun the narrow failing check, then rerun the broader verification sequence."
             echo
-            echo "### Controller-observed failure evidence"
-            for log_file in /tmp/kilo-primary.log /tmp/kilo-retry.log; do
-              if [ -s "$log_file" ]; then
-                echo "--- $log_file (tail) ---"
-                tail -n 30 "$log_file"
-              fi
-            done
+            echo "### Controller-observed campaign failure evidence"
+          for log_file in state/campaign/agent_*.log; do
+            if [ -s "$log_file" ]; then
+              echo "--- $log_file (tail) ---"
+              tail -n 30 "$log_file"
+            fi
+          done
           } > "$recovery_log"
 
           cat "$recovery_log" >> state/worker_progress.md
