@@ -39,6 +39,13 @@ class StagedSecretScanTests(unittest.TestCase):
         )
 
 
+    def test_kilo_bearer_jwt_is_detected(self):
+        token = "eyJ" + "a" * 18 + "." + "b" * 18 + "." + "c" * 18
+        self.assertIn(
+            "kilo_jwt_key",
+            self.scanner.scan_text(f"Authorization: Bearer {token}"),
+        )
+
     def test_github_classic_token_is_detected(self):
         self.assertIn(
             "github_classic_token",
