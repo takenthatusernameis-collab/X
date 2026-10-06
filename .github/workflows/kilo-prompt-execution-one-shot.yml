@@ -165,124 +165,20 @@ jobs:
           rc=$?
           echo "DEEP_AUDIT_RC=$rc"
           exit 0
-      - name: Discover a currently available free model
-        id: discover_model
+      - name: Prepare Kilo Auto Free research configuration
+        id: audit_source_8_prepare_trusted_kilo_research_configuration
         run: |
           set -euo pipefail
-          python3 - <<'PY'
-          import json
-          import os
-          from urllib.request import Request, urlopen
-
-          url = "https://api.kilo.ai/api/gateway/models"
-          request = Request(url, headers={"Accept": "application/json"})
-          with urlopen(request, timeout=20) as response:
-              payload = json.load(response)
-
-          models = payload.get("data", [])
-          free = [
-              m for m in models
-              if isinstance(m.get("id"), str) and m["id"].endswith(":free")
-          ]
-
-          preferred = [
-              "minimax/minimax-m2.1:free",
-              "z-ai/glm-5:free",
-          ]
-
-          selected = None
-          for model_id in preferred:
-              candidate = next((m for m in free if m.get("id") == model_id), None)
-              if candidate:
-                  selected = candidate
-                  break
-
-          if selected is None:
-              def tool_capable(model):
-                  values = model.get("supported_parameters") or []
-                  return bool(
-                      model.get("tool_calling")
-                      or model.get("tool_call")
-                      or any(str(v).lower() in {"tools", "tool_choice"} for v in values)
-                  )
-
-              candidates = [m for m in free if tool_capable(m)]
-              candidates.sort(key=lambda m: m.get("id", ""))
-              if candidates:
-                  selected = candidates[0]
-
-          if selected is None:
-              ids = sorted(str(m.get("id")) for m in free if m.get("id"))
-              raise SystemExit(
-                  "No suitable tool-capable free Kilo model was found. "
-                  f"Available free IDs: {ids[:40]}"
-              )
-
-          model_id = selected["id"]
-          model_name = selected.get("name") or model_id
-
-          with open("/tmp/kilo-free-model-id", "w", encoding="utf-8") as f:
-              f.write(model_id)
-
-          with open("/tmp/kilo-free-model-name", "w", encoding="utf-8") as f:
-              f.write(model_name)
-
-          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
-              f.write(f"KILO_FREE_MODEL_ID={model_id}\n")
-
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
-              f.write("### Free model discovery\n")
-              f.write(f"Selected current free model: `{model_id}`\n")
-              f.write("Model selection came from Kilo's live `/models` catalogue.\n")
-
-          print(f"Selected current free model: {model_id}")
-          PY
-
-      - name: Deep audit — after Discover a currently available free model
-        id: deep_audit_6_discover_a_currently_available_free_model
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.discover_model.outcome }}
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Discover a currently available free model"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
-      - name: Prepare trusted Kilo research configuration
-        id: audit_source_7_prepare_trusted_kilo_research_configuration
-        run: |
-          set -euo pipefail
-          test -n "$KILO_FREE_MODEL_ID"
           python3 - <<'PY'
           import json
           import os
           from pathlib import Path
 
-          model_id = os.environ["KILO_FREE_MODEL_ID"]
-          model_name = Path("/tmp/kilo-free-model-name").read_text(encoding="utf-8")
-
           config = {
               "$schema": "https://app.kilo.ai/config.json",
-              "enabled_providers": ["openai-compatible"],
-              "model": "openai-compatible/free-kilo",
-              "small_model": "openai-compatible/free-kilo",
-              "subagent_model": "openai-compatible/free-kilo",
-              "provider": {
-                  "openai-compatible": {
-                      "options": {
-                          "baseURL": "https://api.kilo.ai/api/gateway"
-                      },
-                      "models": {
-                          "free-kilo": {
-                              "id": model_id,
-                              "name": model_name,
-                              "tool_call": True
-                          }
-                      }
-                  }
-              },
+              "model": "kilo-auto/free",
+              "small_model": "kilo-auto/free",
+              "subagent_model": "kilo-auto/free",
               "sandbox": {
                   "enabled": False,
                   "network": "allow",
@@ -302,7 +198,7 @@ jobs:
           path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
           os.chmod(path, 0o600)
 
-          print(f"Prepared secretless Kilo research config for {model_id}.")
+          print("Prepared Kilo Auto Free research config.")
           PY
 
       - name: Deep audit — after Prepare trusted Kilo research configuration
@@ -317,8 +213,8 @@ jobs:
           rc=$?
           echo "DEEP_AUDIT_RC=$rc"
           exit 0
-      - name: Validate trusted Kilo configuration
-        id: audit_source_8_validate_trusted_kilo_configuration
+      - name: Validate Kilo Auto Free configuration
+        id: audit_source_9_validate_trusted_kilo_configuration
         run: |
           set -euo pipefail
           test "$(stat -c '%a' "$HOME/.config/kilo/kilo.json")" = "600"
@@ -330,21 +226,11 @@ jobs:
           path = Path(os.environ["HOME"]) / ".config" / "kilo" / "kilo.json"
           config = json.loads(path.read_text(encoding="utf-8"))
 
-          assert config["enabled_providers"] == ["openai-compatible"]
-          assert config["model"] == "openai-compatible/free-kilo"
-          assert config["small_model"] == "openai-compatible/free-kilo"
-          assert config["subagent_model"] == "openai-compatible/free-kilo"
-
-          gateway = config["provider"]["openai-compatible"]
-          assert gateway["options"]["baseURL"] == "https://api.kilo.ai/api/gateway"
-          assert "apiKey" not in gateway["options"]
-
-          model = gateway["models"]["free-kilo"]
-          assert model["id"].endswith(":free")
-          assert model["tool_call"] is True
-
+          assert config["model"] == "kilo-auto/free"
+          assert config["small_model"] == "kilo-auto/free"
+          assert config["subagent_model"] == "kilo-auto/free"
           assert config["sandbox"]["enabled"] is False
-          print(f"Trusted Kilo configuration validated for {model['id']}.")
+          print("Kilo Auto Free configuration validated.")
           PY
 
       - name: Deep audit — after Validate trusted Kilo configuration
@@ -466,7 +352,7 @@ jobs:
           Do not modify the Git repository. Verify the file contents and stop.
           EOF
           cd /tmp/kilo-smoke
-          kilo run --model openai-compatible/free-kilo --auto "$(cat /tmp/kilo-smoke/prompt.txt)" > /tmp/kilo-smoke.log 2>&1
+          kilo run --model kilo-auto/free --auto "$(cat /tmp/kilo-smoke/prompt.txt)" > /tmp/kilo-smoke.log 2>&1
           status=$?
           cat /tmp/kilo-smoke.log
           test "$status" -eq 0
@@ -511,7 +397,7 @@ jobs:
           : > /tmp/kilo-primary.log
           # Stream Kilo stdout/stderr into the live GitHub Actions log while also
           # retaining a local copy for liveness checks and post-run diagnostics.
-          stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-primary.log) 2>&1 &
+          stdbuf -oL -eL kilo run --model kilo-auto/free --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-primary.log) 2>&1 &
           kilo_pid=$!
 
           stall_seconds=1800
