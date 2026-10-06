@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "kilo-wakeup.yml"
 ONE_SHOT = ROOT / ".github" / "workflows" / "kilo-prompt-execution-one-shot.yml"
 CONTROLLER = ROOT / ".github" / "scripts" / "campaign_controller.py"
+RUNNER = ROOT / ".github" / "scripts" / "run_campaign_agent.py"
 
 
 def load_controller():
@@ -27,6 +28,7 @@ class CampaignArchitectureTests(unittest.TestCase):
         self.workflow = WORKFLOW.read_text(encoding="utf-8")
         self.oneshot = ONE_SHOT.read_text(encoding="utf-8")
         self.controller = load_controller()
+        self.runner = RUNNER.read_text(encoding="utf-8")
 
     def test_single_job_ten_sequential_agent_steps(self):
         self.assertEqual(self.workflow.count("jobs:"), 1)
@@ -53,10 +55,11 @@ class CampaignArchitectureTests(unittest.TestCase):
 
     def test_no_recursive_dispatch_or_retry_once_architecture(self):
         for content in (self.workflow, self.oneshot):
-            self.assertNotIn("retrying the same worker workspace once", content.lower())
+                self.assertNotIn("retrying the same worker workspace once", content.lower())
             self.assertNotIn("TRANSIENT_GATEWAY_RETRY_ONCE", content)
             self.assertNotIn("rerun_workflow", content)
         self.assertNotIn("report_kilo_outcome.py", self.workflow)
+        self.assertNotIn("report_kilo_outcome.py", self.oneshot)
 
     def test_task_firewall_rejects_broad_tasks(self):
         for phrase in (
@@ -78,6 +81,20 @@ class CampaignArchitectureTests(unittest.TestCase):
         for n in range(1, 11):
             expected = "LEARNING_PROCESS" if n % 2 else "HIGHER_ORDER_OBJECTIVE"
             self.assertEqual(self.controller.ROLE_BY_AGENT[n], expected)
+
+    def test_fresh_session_runner_has_no_retry(self):
+        self.assertIn("[kilo_bin, \"run\", \"--model\", args.model, \"--auto\", prompt]", self.runner)
+        self.assertIn('\"automatic_retry\": False', self.runner)
+        self.assertIn('\"previous_session_context_reused\": False', self.runner)
+        self.assertNotIn("kilo retry", self.runner.lower())
+        self.assertNotIn("retry_pid", self.runner)
+
+    def test_task_queue_has_bounded_contracts(self):
+        import json
+        queue = json.loads((ROOT / "state" / "campaign" / "task_queue.json").read_text(encoding="utf-8"))
+        self.assertGreaterEqual(len(queue["tasks"]), 10)
+        for task in queue["tasks"]:
+            self.controller.validate_task(task)
 
     def test_canonical_status_tokens_have_no_annotations(self):
         tokens = (
