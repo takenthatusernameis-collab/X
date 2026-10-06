@@ -251,8 +251,10 @@ def select_task(run_id: str, agent_number: int) -> dict[str, Any]:
             for task in tasks:
                 if task["task_id"] != previous_task_id:
                     continue
-                if decision in {"USEFUL_CHANGE", "VERIFIED_NEGATIVE_RESULT", "RETAIN", "REJECT", "NO_SUBSTANTIVE_ACTION"}:
-                    task["status"] = "RESOLVED" if decision != "REJECT" else "REJECTED"
+                if decision in {"USEFUL_CHANGE", "VERIFIED_NEGATIVE_RESULT", "RETAIN"}:
+                    task["status"] = "RESOLVED"
+                elif decision == "REJECT":
+                    task["status"] = "REJECTED"
                 else:
                     task["status"] = "DEFERRED"
     save_queue(tasks)
