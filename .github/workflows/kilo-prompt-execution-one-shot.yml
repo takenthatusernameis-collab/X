@@ -500,7 +500,7 @@ jobs:
           CAMPAIGN_AGENT_COUNT: "10"
           CAMPAIGN_AGENT_TIMEOUT_MINUTES: "28"
         run: |
-          set +e
+          set -euo pipefail
           mkdir -p state/campaign
           cat > state/worker_progress.md <<EOF
           # Worker Progress
@@ -591,8 +591,12 @@ jobs:
           EOF
 
             : > "$log_path"
-            stdbuf -oL -eL timeout --foreground --signal=TERM --kill-after=60s 28m kilo run --model openai-compatible/free-kilo --auto "$(cat "/tmp/kilo-agent-${agent_id}.prompt")" > >(tee "$log_path") 2>&1
-            status=$?
+            status=0
+            if stdbuf -oL -eL timeout --foreground --signal=TERM --kill-after=60s 28m kilo run --model openai-compatible/free-kilo --auto "$(cat "/tmp/kilo-agent-${agent_id}.prompt")" > >(tee "$log_path") 2>&1; then
+              status=0
+            else
+              status=$?
+            fi
 
             after_checkpoint="$(sha256sum state/worker_progress.md 2>/dev/null | cut -d " " -f1 || true)"
             after_head="$(git rev-parse --short=12 HEAD)"
@@ -613,11 +617,11 @@ jobs:
               agent_status="FAILED"
             fi
 
-            validation_rc=0
-            set +e
-            python3 .github/scripts/validate_campaign_agent.py --agent-id "$agent_id" --exit-code "$status" --before "/tmp/kilo-agent-${agent_id}-before.json" --before-worker-progress-sha "$before_checkpoint"
-            validation_rc=$?
-            set -e
+            if python3 .github/scripts/validate_campaign_agent.py --agent-id "$agent_id" --exit-code "$status" --before "/tmp/kilo-agent-${agent_id}-before.json" --before-worker-progress-sha "$before_checkpoint"; then
+              validation_rc=0
+            else
+              validation_rc=$?
+            fi
 
             if [ "$validation_rc" -eq 0 ] && [ "$status" -eq 0 ]; then
               campaign_successes=$((campaign_successes + 1))
