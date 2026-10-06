@@ -35,15 +35,11 @@ class CampaignArchitectureTests(unittest.TestCase):
         self.assertNotIn("strategy:", self.workflow)
         self.assertNotIn("matrix:", self.workflow)
         self.assertNotIn("needs:", self.workflow)
+        self.assertEqual(self.workflow.count("run_campaign_agent.py \\"), 10)
         for n in range(1, 11):
+            self.assertIn(f"--agent-number {n:02d}", self.workflow)
             self.assertIn(
-                f"run_campaign_agent.py \
-            --run-id "$GITHUB_RUN_ID" \
-            --agent-number {n:02d}",
-                self.workflow,
-            )
-            self.assertIn(
-                f"campaign_controller.py select --run-id "$GITHUB_RUN_ID" --agent-number {n:02d}",
+                f"campaign_controller.py select --run-id \"$GITHUB_RUN_ID\" --agent-number {n:02d}",
                 self.workflow,
             )
 
@@ -54,12 +50,11 @@ class CampaignArchitectureTests(unittest.TestCase):
             self.assertIn(f"Agent {n:02d} — Higher-Order Objective", self.workflow)
 
     def test_no_recursive_dispatch_or_retry_once_architecture(self):
-        for content in (self.workflow, self.oneshot):
-                self.assertNotIn("retrying the same worker workspace once", content.lower())
-            self.assertNotIn("TRANSIENT_GATEWAY_RETRY_ONCE", content)
-            self.assertNotIn("rerun_workflow", content)
-        self.assertNotIn("report_kilo_outcome.py", self.workflow)
-        self.assertNotIn("report_kilo_outcome.py", self.oneshot)
+        for value in (self.workflow, self.oneshot):
+            self.assertNotIn("retrying the same worker workspace once", value.lower())
+            self.assertNotIn("TRANSIENT_GATEWAY_RETRY_ONCE", value)
+            self.assertNotIn("rerun_workflow", value)
+            self.assertNotIn("report_kilo_outcome.py", value)
 
     def test_task_firewall_rejects_broad_tasks(self):
         for phrase in (
