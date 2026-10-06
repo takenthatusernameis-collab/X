@@ -16,8 +16,9 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import campaign_controller as controller  # noqa: E402
 
 
-PROTECTED_PREFIXES = (".github/workflows/", ".github/scripts/", ".kilo/")
+PROTECTED_PREFIXES = (".github/scripts/",)
 PROTECTED_FILES = {
+    ".github/workflows/kilo-wakeup.yml",
     "AGENTS.md",
     "ENTERPRISE.md",
     "MANUAL_SETUP.md",
