@@ -450,7 +450,8 @@ jobs:
             --worker failure \
             --verify success \
             --liveness COMPLETED_WITH_SEMANTIC_CHECKPOINTS \
-            --persistence MAIN 2>&1)"
+            --persistence MAIN \
+            --process VERIFIED_PROGRESS 2>&1)"
           failure_rc=$?
           set -e
           printf '%s\n' "$failure_output"
@@ -625,8 +626,7 @@ jobs:
             fi
 
             if [ "$status" -eq 0 ]; then
-              campaign_successes=$((campaign_successes + 1))
-              agent_status="SUCCESS"
+              agent_status="WORKER_SUCCESS"
             elif [ "$status" -eq 124 ]; then
               campaign_failed=1
               agent_status="TIMEOUT"
@@ -635,27 +635,49 @@ jobs:
               agent_status="FAILED"
             fi
 
+            validation_rc=0
+            set +e
+            python3 .github/scripts/validate_campaign_agent.py --agent-id "$agent_id" --exit-code "$status"
+            validation_rc=$?
+            set -e
+
+            if [ "$validation_rc" -eq 0 ] && [ "$status" -eq 0 ]; then
+              campaign_successes=$((campaign_successes + 1))
+              agent_status="SUCCESS"
+            elif [ "$status" -eq 0 ] && [ "$validation_rc" -ne 0 ]; then
+              campaign_failed=1
+              agent_status="FAILED_VALIDATION"
+            fi
+
             {
               echo "# Campaign Agent ${agent_id}"
               echo
               echo "- role: ${role}"
               echo "- status: ${agent_status}"
-              echo "- exit_code: ${status}"
+              echo "- worker_exit_code: ${status}"
+              echo "- controller_validation_rc: ${validation_rc}"
               echo "- before_head: ${before_head}"
               echo "- after_head: ${after_head}"
               echo "- observed_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
               echo
               echo "STATUS_START"
-              printf '%s\n' "$after_status"
+              printf "%s\n" "$after_status"
               echo "STATUS_END"
               echo
               echo "DIFF_NAMES_START"
-              printf '%s\n' "$diff_names"
+              printf "%s\n" "$diff_names"
               echo "DIFF_NAMES_END"
               echo
-              echo "This record reports controller-observed execution only; it does not certify research claims."
+              echo "VALIDATION_REPORT"
+              if [ -f "state/campaign/agent_${agent_id}_validation.json" ]; then
+                cat "state/campaign/agent_${agent_id}_validation.json"
+              else
+                echo "missing"
+              fi
+              echo "END_VALIDATION_REPORT"
+              echo
+              echo "This record reports controller-observed execution and validation only; it does not certify research claims."
             } > "$record_path"
-
             printf '%s\n' "$after_status" > "state/campaign/agent_${agent_id}_after_status.txt"
 
             protected_tamper=0
@@ -776,6 +798,36 @@ jobs:
           python3 .github/scripts/reconcile_worker_progress.py
           echo "Worker progress reconciled with authoritative activation receipt."
 
+      - name: Independent research-process evaluation
+        id: process_evaluation
+        if: always() && steps.preflight.outcome == "success" && steps.kilo_smoke.outcome == "success" && steps.kilo.outcome != "skipped"
+        continue-on-error: true
+        env:
+          VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
+          WORKER_OUTCOME: ${{ steps.kilo.outcome }}
+          LIVENESS_STATUS: ${{ env.KILO_LIVENESS_STATUS }}
+        run: |
+          set +e
+          python3 .github/scripts/evaluate_research_process.py \
+            --verify-outcome "$VERIFY_OUTCOME" \
+            --worker-outcome "$WORKER_OUTCOME" \
+            --liveness "$LIVENESS_STATUS"
+          rc=$?
+          echo "PROCESS_EVALUATION_RC=$rc"
+          exit 0
+
+      - name: Deep audit — after Independent research-process evaluation
+        id: deep_audit_process_evaluation
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.process_evaluation.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xwake --step "Independent research-process evaluation"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
       - name: Prepare controller recovery handoff
         id: recovery_handoff
         if: always() && steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success' && (steps.kilo.outcome != 'success' || steps.independent_verify.outcome != 'success')
@@ -910,6 +962,9 @@ jobs:
           fi
           test -f state/activation_status.json
           python3 .github/scripts/stamp_activation_receipt.py --validate-only
+          if [ -f state/campaign/process_evaluation.json ]; then
+            python3 -m json.tool state/campaign/process_evaluation.json >/dev/null
+          fi
 
           if git diff --cached --quiet; then
             echo "No safe repository changes to persist."
@@ -973,6 +1028,7 @@ jobs:
           KILO_SMOKE_OUTCOME: ${{ steps.kilo_smoke.outcome }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
           VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
+          PROCESS_OUTCOME: ${{ env.RESEARCH_PROCESS_OUTCOME }}
         run: |
           echo "::group::REPORT KILO OUTCOME DEBUG — run metadata"
           printf 'GITHUB_RUN_ID=%s\n' "${GITHUB_RUN_ID:-unknown}"
@@ -992,6 +1048,7 @@ jobs:
           printf 'KILO_LIVENESS_REASON=%q\n' "${KILO_LIVENESS_REASON:-<unset>}"
           printf 'PERSISTENCE_STATUS=%q\n' "${PERSISTENCE_STATUS:-<unset>}"
           printf 'PERSISTENCE_RECOVERY_BRANCH=%q\n' "${PERSISTENCE_RECOVERY_BRANCH:-<unset>}"
+          printf 'RESEARCH_PROCESS_OUTCOME=%q\n' "${PROCESS_OUTCOME:-<unset>}"
           echo "::endgroup::"
 
           echo "::group::REPORT KILO OUTCOME DEBUG — classifier integrity and cross-check"
@@ -1005,7 +1062,8 @@ jobs:
             --worker "${KILO_OUTCOME:-}" \
             --verify "${VERIFY_OUTCOME:-}" \
             --liveness "${KILO_LIVENESS_STATUS:-}" \
-            --persistence "${PERSISTENCE_STATUS:-}" 2>&1)"
+            --persistence "${PERSISTENCE_STATUS:-}" \
+            --process "${PROCESS_OUTCOME:-UNVERIFIED}" 2>&1)"
           CLASSIFIER_RC=$?
           set -e
           printf '%s\n' "$CLASSIFIER_OUTPUT"
@@ -1053,7 +1111,8 @@ jobs:
             --worker "${KILO_OUTCOME:-unknown}" \
             --verify "${VERIFY_OUTCOME:-skipped}" \
             --liveness "${KILO_LIVENESS_STATUS:-unknown}" \
-            --persistence "${PERSISTENCE_STATUS:-FAILED}"
+            --persistence "${PERSISTENCE_STATUS:-FAILED}" \
+            --process "${PROCESS_OUTCOME:-UNVERIFIED}"
 
       - name: Deep audit — after Report Kilo outcome
         id: deep_audit_15_report_kilo_outcome
