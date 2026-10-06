@@ -31,6 +31,25 @@ OBS = controller.SELECTION_OBSERVATIONS
 FAILURES = controller.FAILURE_CLASSES
 
 
+CONTROLLER_IDENTITY_FIELDS = ("agent_number", "campaign_slot", "global_agent_number")
+
+
+def bind_controller_identity(record: dict, agent: int, contract: dict) -> tuple[dict, list[str]]:
+    """Bind immutable controller-owned identity metadata without hiding agent content errors."""
+    normalized = dict(record)
+    expected = {
+        "agent_number": agent,
+        "campaign_slot": agent,
+        "global_agent_number": contract["global_agent_number"],
+    }
+    filled: list[str] = []
+    for field in CONTROLLER_IDENTITY_FIELDS:
+        if field not in normalized:
+            normalized[field] = expected[field]
+            filled.append(field)
+    return normalized, filled
+
+
 def run(cmd: list[str]) -> tuple[int, str]:
     p = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
     return p.returncode, p.stdout
@@ -226,6 +245,10 @@ def main() -> int:
         record_path.write_text(json.dumps(raw_record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         warnings.append("controller_created_UNVERIFIED_fallback")
     else:
+        raw_record, identity_filled = bind_controller_identity(raw_record, args.agent_number, contract)
+        if identity_filled:
+            warnings.append(f"controller_filled_identity_fields:{identity_filled}")
+            record_path.write_text(json.dumps(raw_record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         record_failures = validate_record(raw_record, args.agent_number, contract)
         failures.extend(record_failures)
         if record_failures:

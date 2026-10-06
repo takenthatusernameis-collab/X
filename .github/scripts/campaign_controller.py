@@ -462,6 +462,12 @@ MANDATORY SESSION FIREWALL:
 - Do not add cosmetic changes.
 - Do not treat commands executed, files edited, workflow success, tokens, runtime, or confidence as learning evidence.
 
+TOOL-USE RELIABILITY:
+- Prefer repository-native read, glob, grep, edit, and write operations over shell discovery.
+- Avoid compound shell commands, pipes, heredocs, and chained commands when a single-purpose operation is sufficient.
+- If using a Write tool, always provide the exact repository path AND the complete file content; never issue a path-only or otherwise incomplete Write call.
+- A denied command is an invocation-level restriction; change the invocation rather than concluding that the capability is unavailable.
+
 BEFORE SUBSTANTIVE WORK, ANSWER CONCISELY IN YOUR NOTES:
 1. What is the system ultimately trying to become better at learning?
 2. What currently most constrains useful learning?
@@ -487,6 +493,11 @@ agent_number, role, task_id, objective, bottleneck, question, action, changed, v
 unverified, observed_effect, uncertainty_targeted, uncertainty_reduced,
 process_decision, research_result, decision, next, candidate_tasks,
 complexity_added, failure_class, task_selection_observation
+
+Controller-owned identity metadata (copy exactly; do not invent or omit):
+- agent_number: ${agent_number}
+- campaign_slot: ${agent_number}
+- global_agent_number: ${contract["global_agent_number"]}
 
 Canonical decision values:
 {sorted(DECISIONS)}
