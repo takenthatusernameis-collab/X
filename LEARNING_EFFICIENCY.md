@@ -2,7 +2,7 @@
 
 ## Current diagnosis
 
-The worker has a strong research-methodology prompt and durable state, but there is no independent per-activation process evaluator comparable to desktop-tutorial's hidden benchmark and aggregate solver feedback.
+The worker has a strong research-methodology prompt and durable state. The controller now also provides an independent per-activation process evaluator and per-agent worktree validation, so the learning loop has an execution-quality feedback path distinct from the worker's own claims.
 
 The main learning bottleneck is therefore not adding more instructions. It is converting each activation into a compact, falsifiable **strategy update** that improves the next activation without encouraging score/activity gaming.
 
@@ -65,4 +65,14 @@ A strategy delta may improve the research process, but it must not use OOS perfo
 
 The first lightweight implementation should be durable strategy-delta logging and frontier state, not a second autonomous evaluator.
 
-Only add a quantitative process score after repeated activations demonstrate that the qualitative learning loop is insufficient.
+Use the evaluator categorically, not as a reward score: `VERIFIED_PROGRESS`, `VERIFIED_REPAIR`, `NO_SUBSTANTIVE_ACTION`, or `UNVERIFIED`. Add finer quantitative scoring only after repeated activations demonstrate that these categorical gates are insufficient.
+
+
+## Controller enforcement
+
+The current controller implements the lightweight loop above without turning it into a gamified score:
+
+1. Each fresh campaign agent receives a post-session controller validation gate covering protected paths, syntax, regression health when research code changed, receipt structure, and semantic checkpoint transition.
+2. After the campaign, an independent process evaluator compares the live worktree with the committed baseline and distinguishes durable research progress, verified research/software repair, no substantive action, and unverified execution.
+3. The terminal outcome classifier requires this process result in addition to independent post-worker verification before returning `COMPLETE`.
+4. Failed or unverified worker output is eligible for recovery-branch quarantine rather than automatic main-branch integration.
