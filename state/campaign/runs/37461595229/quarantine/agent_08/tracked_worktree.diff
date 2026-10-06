@@ -1,0 +1,3326 @@
+diff --git a/research/backtest/regime_stability.py b/research/backtest/regime_stability.py
+index 09a3cdd..71c9158 100644
+--- a/research/backtest/regime_stability.py
++++ b/research/backtest/regime_stability.py
+@@ -878,7 +878,7 @@ def mean_reversion_signals(
+     out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+     lookback = int(lookback)
+     for i in range(lookback, n):
+-        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++        ret = float(np.log(closes[i]) - np.log(closes[i - lookback]))
+         out[i] = Signal(date=i + 1, weight=-1.0 if ret > 0 else 1.0)
+     return out
+ 
+@@ -908,7 +908,7 @@ def momentum_signals(
+     out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+     lookback = int(lookback)
+     for i in range(lookback, n):
+-        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++        ret = float(np.log(closes[i]) - np.log(closes[i - lookback]))
+         out[i] = Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+     return out
+ 
+diff --git a/research/checks/momentum_hold_period_sensitivity.py b/research/checks/momentum_hold_period_sensitivity.py
+index d6f76e7..30a6b1f 100644
+--- a/research/checks/momentum_hold_period_sensitivity.py
++++ b/research/checks/momentum_hold_period_sensitivity.py
+@@ -443,18 +443,19 @@ def main() -> int:
+             ) for h in HOLD_PERIODS},
+             hold_profiles={t: {str(h): (
+                 "STABLE_EDGE" if all(
+-                    profiles[t][str(h)]["verdict"] == "REGIME_STABLE"
+-                    and all(m > 0 for m in profiles[t][str(h)]["medians"])
++                    profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
++                    and all(m > 0 for m in profiles[t][str(h2)]["medians"])
++                    for h2 in HOLD_PERIODS
+                 ) else (
+-                    "SINGULAR" if (
+-                        sum(
+-                            profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
+-                            and all(m > 0 for m in profiles[t][str(h2)]["medians"])
+-                        ) == 1 for h2 in HOLD_PERIODS
+-                    ) else (
++                    "SINGULAR" if sum(
++                        profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
++                        and all(m > 0 for m in profiles[t][str(h2)]["medians"])
++                        for h2 in HOLD_PERIODS
++                    ) == 1 else (
+                         "WEAKENS" if sum(
+                             profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
+                             and all(m > 0 for m in profiles[t][str(h2)]["medians"])
++                            for h2 in HOLD_PERIODS
+                         ) > 1 else "NO_EDGE"
+                     )
+                 )
+@@ -467,12 +468,12 @@ def main() -> int:
+                 and all(m > 0 for m in profiles[t][str(h)]["medians"])
+                 for h in HOLD_PERIODS
+             )],
+-            singular_assets=[t for t in ticker_order if any(
+-                sum(
+-                    profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
+-                    and all(m > 0 for m in profiles[t][str(h2)]["medians"])
+-                ) == 1 for h2 in HOLD_PERIODS
+-            )],
++            singular_assets=[t for t in ticker_order
++                             if sum(
++                                 profiles[t][str(h)]["verdict"] == "REGIME_STABLE"
++                                 and all(m > 0 for m in profiles[t][str(h)]["medians"])
++                                 for h in HOLD_PERIODS
++                             ) == 1],
+             ticker_order=ticker_order,
+         ),
+         perturbation=pers,
+diff --git a/state/LEARNING_STATE.md b/state/LEARNING_STATE.md
+index 2b7bae0..1ea5939 100644
+--- a/state/LEARNING_STATE.md
++++ b/state/LEARNING_STATE.md
+@@ -10,7 +10,8 @@ This is the compact durable learning layer for the autonomous quantitative-resea
+ - **Anti-gaming Constraint:** Do not tune to OOS results or treat experiment count, positive results, runtime, or commits as learning. Prefer reliable negative conclusions.
+ - **Observed Effect:** The frontier-first contract is now operative and demonstrated across four new-signal-class cells: activation 37263008074 selected the DEFERRED short-horizon return-reversal cell, executed it with a complete test + independent-verifier pair, and closed it FALSIFIED; this activation (37304873966) selected the next deferred cell (cross-sectional relative strength), executed it end-to-end (manifest, preflight, leakage, regime gate, concentration gate, perturbation sweep), repaired four implementation defects found during execution (off-by-one in synthetic spread loops, missing export, engine-path warmup/compounding mismatch fixed via per-fold constant-share signals, and three sweep/determinism bugs), and closed it FALSIFIED; the following activation (37314710995) selected the next deferred cell (volatility targeting), executed it end-to-end through the same regime + concentration + perturbation-sweep gates with an engine-path cross-check and an independent verifier, wrote check + verifier cleanly with no execution-time defects, and closed it FALSIFIED with uniformly negative figures; activation 37318950814 selected the next deferred cell (momentum: go LONG the previous N-day return), executed it end-to-end (manifest, preflight, leakage, regime gate + 10-asset sweep, synthetic sweep, determinism) and independently verified it (fresh `walk_forward` recomputation MATCH on all per-asset/universe medians and verdicts), closing it SUPPORTED with a REGIME_STABLE positive edge in 7/10 of the universe; and the current activation (37361000967) extended the momentum cell with a real-data lookback sweep (lookback 3 / 5 / 10) across all 10 collected tickers through the walk-forward regime-stability gate with a matched coin-flip null, verified the artifact through three independent gates (fresh `walk_forward` + `noise_benchmark` recomputation MATCH on AMZN/JPM; lookback-5 column cross-consistency vs the prior `momentum_results.json` MATCH on all 10 tickers; robustness verdicts re-derived from the artifact reproduce for all assets), found the lookback=5 edge is lookback-robust for 6/10 assets and 0/10 lookback-sensitive, and admitted momentum to the evidence base as candidate positive evidence.
+ - **Decision: RETAIN (verified)** — the frontier-first selection produced a clean ordering (MA crossover -> reversal -> CSRS -> volatility targeting -> momentum), each cell closed with a decisive verdict and no equivalent re-tests; three cells closed FALSIFIED (negative evidence, as expected) but the momentum cell closed SUPPORTED with a genuine positive edge that survived the regime gate, the independent-verification gate, and a post-hoc engine-asymmetry investigation (the apparent reversal/momentum magnitude asymmetry was shown to be an engine warmup+train compounding artifact that understates rather than fakes the momentum edge); the current activation (37361000967) then tested the remaining lookback-robustness question on REAL data and found the edge persists across lookback 3/5/10 for 6/10 assets with 0 lookback-sensitive cases, this activation (current) completed the momentum-boundary review: the cross-sectional-momentum artifact (lookback 63) reproduced exactly via an independent engine walk-forward + coin-flip null path (post-repair verifier: all recomputations MATCH, including baseline null -0.013), verdict FALSIFIED (CONSISTENT_WITH_NOISE; 9/10 sub-universes CONSISTENT_WITH_NOISE, 1/10 REGIME_DEPENDENT (JNJ, dispersion > 2x null), 1/10 REGIME_STABLE (XOM, small positive stable edge); full-universe spread median +0.002 within null tol +0.0305, concentration NO_EDGE, perturbation sweep CONSISTENT_WITH_NOISE). The frontier-first delta remains RETAIN (verified): both momentum boundary cells were tested once, decisively, and independently, with no equivalent re-tests.
+-- **Next:** momentum boundary + 20-day breakout continuation cell closed on this universe: short-horizon per-asset momentum (lookback 3-5) admitted as candidate positive evidence; the genuinely new breakout signal class (long on 20-day-high breakout) was tested and closed FALSIFIED (noise-like in 7/10 assets; small, non-lookback-robust positive REGIME_STABLE verdicts only for AAPL, TSLA, NVDA). No new-signal-class frontier cell remains; the next decision-relevant qualification of the qualified momentum evidence is a conservative transaction-cost sensitivity test (fixed cost model, lookback 3/5/10, matched null). A fresh activation should run that cost test through the gate stack with an a-priori cost-robustness prediction.
++- **Infrastructure defect discovered and repaired:** `momentum_signals` and `mean_reversion_signals` in `research/backtest/regime_stability.py` computed `np.mean(np.log(closes[...]))` — the mean of *log prices* — instead of the lookback-day log return (`np.log(closes[i]) - np.log(closes[i - lookback])`). For any appreciably trending series (all 10 collected tickers), this made momentum permanently long the market (weight +1 everywhere) and reversal permanently short (weight -1 everywhere); the momentum "7/10 uniformly-positive REGIME_STABLE edge" and the reversal "systematic losses everywhere" verdict were both artifacts of this construction error. The signals were repaired to the correct return sign; momentum.py, mean_reversion.py, and all momentum robustness checks were re-run on the corrected signal. Momentum now shows 3/10 REGIME_STABLE (all with mixed-sign medians), 6/10 CONSISTENT_WITH_NOISE, 1/10 REGIME_DEPENDENT; mean-reversion shows 4/10 CONSISTENT_WITH_NOISE, 3/10 REGIME_STABLE-mixed, 3/10 REGIME_DEPENDENT — no uniformly-positive or uniformly-negative result anywhere. The momentum admission of candidate positive evidence is withdrawn; both momentum and reversal close FALSIFIED (no robust positive edge) on the corrected signal. The momentum cell's independent verifier and several momentum verifiers (`verify_momentum*.py`, `verify_momentum_cost_sensitivity.py`) still embed the defective formula and are recorded as stale/unverified pending repair.
++- **Next:** the momentum cell is closed FALSIFIED (post-repair): no robust positive edge survives lookback (ROBUST=0, NO_EDGE=10), horizon (ROBUST=0), or holding-period (HORIZON_DESTROYED; 0 positive edges at any hold in grid (1,2,3,5)) variation. No new-signal-class frontier cell remains. Two follow-ups are queued: (P-004) repair and re-run the stale momentum/reversal independent verifiers that still embed the defective signal formula; (P-005) formalize a minimal signal-construction audit (sign-persistence sanity check) to catch a permanently-directional or mis-aggregated signal before admission.
+ 
+ ## Research frontier
+ 
+@@ -27,9 +28,8 @@ This is the compact durable learning layer for the autonomous quantitative-resea
+ | Short-horizon return reversal (mean-reversion signal) on collected data | FALSIFIED (executed, 37263008074) | Mechanical 1-day reversal bet (short the previous 5-day return): negative median walk-forward log returns in every segment of all 10 collected assets; perturbation sweep (lookback 3/5/10) flat on the coin-flip null ([0.003, 0.003, 0.003] vs -0.001); universe verdict counts CONSISTENT_WITH_NOISE=0/REGIME_STABLE=6/REGIME_DEPENDENT=4 with no positive edge anywhere; independently recomputed and deterministic. Verdict recorded in state/STATE.md. | None — cell closed FALSIFIED |
+ | Cross-sectional relative strength (long top-3 / short bottom-3 by 20-day lookback return, rank-based) on collected data | FALSIFIED (executed, 37304873966) | Full universe: segment medians calm -0.027, turbulent -0.013 vs null -0.067 / +0.017; CONSISTENT_WITH_NOISE (dispersion +0.010 vs null +0.059, < 2x); per-asset drop-one: CWN=9, REGIME_STABLE=1 (NVDA, negative medians, not an edge), REGIME_DEPENDENT=0; concentration NO_EDGE (median -0.013 within null tol +0.030); synthetic sweep baseline -0.001 vs null +0.009 within fixed 0.05, sweep-level CONSISTENT_WITH_NOISE; engine-path cross-check MATCH on every fold, determinism r1==r2 across two full runs. | None — cell closed FALSIFIED |
+ | Volatility targeting (vol-normalized sizing / long low-vol short high-vol) on collected data | FALSIFIED (executed, 37314710995) | Full-universe spread median -0.084: every segment of every asset shows a negative median walk-forward log return; regime gate medians calm -0.081, turbulent -0.056 vs null calm +0.017, turbulent +0.074; REGIME_STABLE describes stability of *losses* (dispersion +0.018 < 2x null +0.040), not an edge; per-sub-universe verdicts CONSISTENT_WITH_NOISE=1 (TSLA, both segments negative), REGIME_STABLE=9 (uniformly negative), REGIME_DEPENDENT=0 — no positive edge anywhere; synthetic sweep CONSISTENT_WITH_NOISE (baseline +0.001 vs null -0.002, within sample-calibrated tol +0.007); engine-path cross-check MATCH on every segment, determinism r1==r2 across two full runs; independently recomputed and MATCH | None — cell closed FALSIFIED |
+-| Momentum (long the previous 5-day return, hold 1 day, daily rebalance) on collected data |
+-| Momentum: longer-horizon generalization (lookback 20 / 60) | TESTED (activation 37394344201, 2026-10-06) | Lookback-5 momentum (7/10 REGIME_STABLE) was admitted as candidate positive evidence. A longer-horizon sweep (lookback 20 and 60) was executed with three independent paths: (1) `momentum_longer_horizon.py` -- lookback-20 REGIME_STABLE=6 / lookback-60 REGIME_STABLE=4 across the 10-asset universe; horizon-robustness ROBUST=3 (AAPL, AMZN, JPM), SENSITIVE=3 (GOOGL, META, TSLA), NO_EDGE=4 (MSFT, NVDA, JNJ, XOM); determinism r1==r2. (2) `verify_momentum_longer_horizon.py` -- Gate 1 fresh walk_forward + noise_benchmark recomputation of AMZN/JPM MATCH; Gate 2 fresh medians/nulls for all 10 assets + regenerated regime/horizon verdicts MATCH; Gate 3 determinism identical. (3) `momentum_horizon_gap_analysis.py` -- null-dispersion-robust recharacterization (independent fresh path): candidate per-segment medians are IDENTICAL across lookback 20 and 60 for all 10 assets; every asset keeps positive candidate-vs-null gaps in all segments at both lookbacks (2/3 segments for NVDA); determinism identical. Key finding: the apparent 60-day verdict "degradation" (4/10 REGIME_STABLE at 60 vs 6/10 at 20) is entirely a coin-flip-null dispersion artifact -- the null dispersion varies wildly with lookback (e.g. TSLA 0.603 -> 0.013, GOOGL 0.034 -> 0.006, NVDA 0.022 -> 0.132) rather than an edge decay; the momentum edge is horizon-stable in magnitude. Decision: the momentum cell (lookback 5) remains ADMITTED AS CANDIDATE POSITIVE EVIDENCE, now qualified: the edge generalizes to the 60-day horizon in magnitude; the regime-stability verdict at 60-day is reported as null-dispersion-sensitive. | None -- cell closed TESTED; momentum admission now qualified with the horizon finding. |
+- ADMITTED AS CANDIDATE POSITIVE EVIDENCE (executed 37318950814; lookback-sweep verification 37361000967) | Mechanical 1-day-ahead bet LONG the previous 5-day return: uniformly POSITIVE segment medians in 7/10 assets and REGIME_STABLE (regime-stable across blocks): AAPL [+0.071, +0.054, +0.092, +0.069], MSFT [+0.052, +0.072], GOOGL [+0.069, +0.071, +0.101], AMZN [+0.065, +0.076, +0.077], META [+0.073, +0.067, +0.042], NVDA [-0.038, +0.013, +0.100], TSLA [+0.132, +0.016, +0.107]; 2/10 CONSISTENT_WITH_NOISE (JNJ [+0.050, +0.046], XOM [+0.018, +0.037] — small positive, at the noise threshold); 1/10 REGIME_DEPENDENT (JPM [+0.113, +0.044, +0.083], dispersion +0.028 > 2x null +0.012). The result is the exact opposite of the falsified reversal class (reversal lost everywhere; momentum wins 7/10), internally consistent with a genuine short-horizon positive return autocorrelation (documented momentum anomaly). Independent verifier MATCH on all per-asset/universe medians and verdicts; determinism asserted; 134/134 regression tests pass. Lookback-sweep verification (37361000967): real-data lookback sweep 3/5/10 across all 10 collected tickers through the walk-forward regime-stability gate with a matched coin-flip null; the lookback=5 medians/nulls/verdicts reproduce the 37318950814 artifact exactly (cross-consistency gate); fresh walk_forward + noise_benchmark recomputation MATCH on AMZN/JPM; robustness verdicts re-derived from the artifact reproduce for all assets; determinism identical. Outcome: 6/10 assets lookback-ROBUST (positive REGIME_STABLE edge at >=2 lookbacks; MSFT/GOOGL/AMZN/META/TSLA at all three lookbacks), 0/10 lookback-SENSITIVE, 4/10 NO_EDGE. The NO_EDGE group = NVDA (uniformly negative medians across lookbacks, stable losses), JPM (REGIME_DEPENDENT but no robust positive edge), JNJ/XOM (small positives within the noise band). The remaining UNVERIFIED gap — real-data lookback parameter sensitivity — is closed: the momentum edge is not a single-point lookback optimum. Gates passed: leakage, regime-stability, independent-verification, determinism, real-data lookback-robustness. Caveats stand: the edge is short-horizon and mechanical; 3/10 assets show no robust edge; the synthetic generator has no momentum structure so it cannot test momentum robustness. | Tested (37394344201): the momentum edge generalizes to lookback 20 and 60 in magnitude; the 60-day regime-stability verdicts are reported as null-dispersion-sensitive rather than indicating an edge decay. Cell closed TESTED. |
++| Momentum (long the previous N-day return, hold 1 day, daily rebalance) on collected data | FALSIFIED (post-repair verification, agent 08, R-002, 2026-10-06) | Infrastructure defect: `momentum_signals` / `mean_reversion_signals` in `research/backtest/regime_stability.py` computed the mean of *log prices* `np.mean(np.log(closes[...]))` instead of the lookback-day log return `np.log(closes[i]) - np.log(closes[i - lookback])`; for any appreciably trending series (all 10 collected tickers) this made momentum permanently long the market (weight +1 everywhere) and reversal permanently short (weight -1 everywhere). The momentum "7/10 uniformly-positive REGIME_STABLE edge" and the reversal "systematic losses everywhere" verdict were both artifacts of this construction error. On the **corrected** signal: lookback-5 universe = 3/10 REGIME_STABLE (all with mixed-sign medians only; e.g. AAPL [+0.085,+0.035,-0.037,+0.054], META [-0.129,-0.041,+0.072], NVDA [-0.024,+0.092,+0.063]), 6/10 CONSISTENT_WITH_NOISE, 1/10 REGIME_DEPENDENT; synthetic perturbation baseline +0.013 within sample-calibrated null tolerance - no uniformly-positive REGIME_STABLE edge. Hold-period sensitivity (R-002, grid hold=(1,2,3,5)): **HORIZON_DESTROYED** - 0 positive edges at any hold, all 10 assets NO_EDGE; artifact written to `state/check_artifacts/momentum_hold_period_sensitivity_results.json`; independent recomputation MATCH across all sections; determinism r1==r2; leakage review PASS on AMZN/JPM at every hold; perturbation medians [0.013, -0.001, -0.009, 0.001] within null tolerance at every hold. Lookback sweep (3/5/10): ROBUST=0, SENSITIVE=0, NO_EDGE=10. Longer-horizon (20/60): ROBUST=0, SENSITIVE=5, NO_EDGE=5. Conclusion: the prior admission of momentum as candidate positive evidence was computed from a defective signal and is withdrawn; on the corrected signal the momentum class shows no robust positive edge at the lookback, horizon, or holding-period gates. | None - cell closed FALSIFIED (post-repair). See agent_08 record. |
++| Momentum: longer-horizon generalization (lookback 20 / 60) | FALSIFIED (post-repair, agent 08, R-002) | The longer-horizon run (37394344201) used the same defective signal. On the corrected signal: lookback-20 REGIME_STABLE=4 / lookback-60 REGIME_STABLE=3 (all mixed-sign medians); horizon-robustness ROBUST=0 (SENSITIVE=5, NO_EDGE=5). The "edge generalizes to the 60-day horizon in magnitude" claim was computed from a permanently-long signal and is withdrawn; no robust edge at either longer horizon. | None - cell closed FALSIFIED (post-repair); independent verifier `verify_momentum_longer_horizon.py` is stale and queued for repair (P-004). |
+ 
+ | Cross-sectional momentum (long top-3 / short bottom-3 by 63-day cumulative return, 1-day hold) on collected data | FALSIFIED (verified, current activation) | Independent verifier recomputed via a fresh engine walk-forward + coin-flip null path: regime gate segments/candidate medians/null medians/verdict MATCH; concentration gate (full-universe median +0.002, null tol +0.0305, best share 6.12%, NO_EDGE) MATCH; 9x4 perturbation sweep grid (36 medians candidate & null) MATCH; baseline candidate -0.014 vs null -0.013, within sample-calibrated tolerance; determinism identical. During verification a verifier defect was found and repaired (baseline_nulls populated from previous grid iteration). 9/10 sub-universes CONSISTENT_WITH_NOISE, 1/10 REGIME_DEPENDENT (JNJ, dispersion > 2x null), 1/10 REGIME_STABLE (XOM, small positive stable edge); full-universe spread median +0.002 within null tol +0.0305 (NO_EDGE concentration), sweep CONSISTENT_WITH_NOISE — no robust cross-sectional edge anywhere. | None — cell closed FALSIFIED |
+ | 20-day breakout continuation (long when close exceeds the highest close of the prior 20 trading days; hold 1 day) on collected data | FALSIFIED (executed, 37414038601) | A genuinely new signal class: threshold-activated momentum variant. Gate stack completed: manifest 10/10, preflight PASSED, leakage PASS (AMZN/JPM, equity-fill audit), regime-stability gate across all 10 tickers with matched coin-flip null, bounded lookback sensitivity {5, 10, 20}, determinism, and independent verifier (3 gates: AMZN/JPM fresh walk_forward MATCH, all-asset fresh medians/nulls + regenerated verdicts MATCH, determinism). New framework function `regime_stability.py::breakout_signals`, its export, the check, and the verifier all verified; 161/161 regression tests pass (5 new unit tests). Results: lookback 5 REGIME_STABLE=3 / CWN=7 / DEPENDENT=0; lookback 10 REGIME_STABLE=1 / CWN=8 / DEPENDENT=1; lookback 20 (canonical) REGIME_STABLE=1 / CWN=9 / DEPENDENT=0. Sensitivity: ROBUST=1 (TSLA, edges at lookbacks 5 and 20), SENSITIVE=2 (AAPL @5, NVDA @10), NO_EDGE=7. The three borderline REGIME_STABLE assets (AAPL @5 [0.039,0.021,0.063,0.021], TSLA @5 [0.038,0.013,0.068] + @20 [0.019,0.040,0.053], NVDA @10 [0.003,0.047,0.050]) are small in magnitude, non-lookback-robust (except TSLA), and absent from the momentum-asset list (MSFT/GOOGL/AMZN/META show NO_EDGE). The result matches the a-priori prediction: noise-like in most assets, small positive verdicts only among momentum assets — the breakout filter adds no robust evidence beyond momentum. | None — cell closed FALSIFIED |
+@@ -57,6 +57,7 @@ Prefer the highest-value unresolved frontier cell over repeating an equivalent e
+ | 37318950814 (2026-10-05) | Execute the momentum frontier cell (the competing hypothesis to the uniformly-negative reversal class: go LONG instead of SHORT the previous 5-day return) | VERIFIED: framework function `momentum_signals` added + exported; check ran end-to-end (manifest 10/10 OK, preflight passed, leakage PASS on AMZN/JPM, regime gate + 10-asset universe sweep + synthetic perturbation sweep + determinism); independent verifier MATCH on all per-asset/universe medians and verdicts + determinism r1==r2; 134/134 regression tests pass post-edit. Verdict: SUPPORTED — REGIME_STABLE uniformly-positive edge in 7/10 assets (AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA); 2/10 CONSISTENT_WITH_NOISE (JNJ, XOM); 1/10 REGIME_DEPENDENT (JPM). The a-priori falsification prediction was REJECTED: momentum mirrors the falsified reversal class with opposite sign (reversal lost everywhere; momentum wins 7/10), internally consistent with a genuine short-horizon positive return autocorrelation; internal check confirmed reversal and momentum daily P&Ls are strongly negatively correlated (-0.99) on identical folds, and the warmup+train equity compounding understates (never fakes) the edge, so the reported medians are a conservative lower bound. Caveat: the synthetic perturbation sweep baseline matches the null (CONSISTENT_WITH_NOISE) because the synthetic generator (regime-switching GBM, no return autocorrelation) contains no momentum structure — the sweep is a tooling-validity check, not an edge-robustness test for momentum; real-data regime-stability is the operative robustness evidence. | One signal class closed SUPPORTED instead of FALSIFIED — the first positive candidate of this series, independently verified and deterministic; the framework labels it correctly as REGIME_STABLE (uniformly positive) rather than REGIME_STABLE_LOSS; momentum is the first class to survive the regime-stability gate with a positive edge on this universe | UNVERIFIED (process delta) — the frontier-first selection operated (momentum was the recorded next hypothesis family) and produced a decisive non-falsified verdict, but the strategy-delta decision must be reconsidered in the next activation because the search direction's four original signal classes were all falsified and momentum now survives — the frontier is no longer exhausted, and the next frontier decision (admit momentum vs extend momentum testing) has not yet been recorded |
+ | 37394344201 (2026-10-06) | Execute the longer-horizon momentum frontier cell (lookback 20/60) through the same regime + independent-verification gates; then a null-dispersion-robust gap recharacterization | VERIFIED: (1) `momentum_longer_horizon.py` executed end-to-end (manifest 10/10 OK, PREFLIGHT PASSED, leakage PASS on AMZN/JPM): lookback-20 verdict counts REGIME_STABLE=6 / lookback-60 REGIME_STABLE=4; horizon-robustness ROBUST=3, SENSITIVE=3, NO_EDGE=4; determinism r1==r2; artifact written. (2) `verify_momentum_longer_horizon.py` executed: Gate 1 fresh walk_forward + noise_benchmark (AMZN/JPM lookbacks 20/60) MATCH; Gate 2 fresh medians/nulls for all 10 assets + regenerated regime/horizon verdicts MATCH; Gate 3 determinism identical. (3) `momentum_horizon_gap_analysis.py` executed: independent gap recharacterization -- candidate medians identical across lookbacks for all 10 assets, positive gaps in all segments at both horizons for every asset (2/3 for NVDA); determinism identical. 134/134 regression tests pass. Key finding: the momentum edge is horizon-stable in magnitude; the regime-stability verdicts at 60-day are null-dispersion-sensitive, not evidence of edge decay. | A positive candidate admission (lookback 5) is now qualified and strengthened by the horizon sweep: short-horizon momentum survives at the 60-day horizon in magnitude, and the framework's regime-stability verdict at longer lookbacks is reported with a null-dispersion caveat. Frontier-first selection operated correctly and closed the cell with a decisive, independently-verified nuanced verdict. | RETAIN (frontier-first delta demonstrated a fifth time: right cell selected, executed through the full gate stack, and closed with a decisive, independently-verified nuanced verdict) |
+ | 37414038601 (2026-10-06) | Execute the 20-day breakout continuation frontier cell (a genuinely new signal class: long when the close exceeds the highest close of the preceding 20 trading days; hold 1 day; daily rebalance) on the collected universe through the full gate stack | VERIFIED: check ran end-to-end (manifest 10/10 OK, preflight PASSED, leakage PASS on AMZN/JPM + equity-fill audit, regime-stability gate across all 10 tickers with a matched coin-flip null, bounded lookback sensitivity {5, 10, 20}, determinism r1==r2); independent verifier executed — Gate 1 (AMZN/JPM fresh walk_forward + noise_benchmark, lookbacks 5/10/20) MATCH, Gate 2 (all-asset fresh medians/nulls + regenerated regime/sensitivity verdicts from unrounded values) MATCH, Gate 3 determinism identical; 161/161 regression tests pass (156 existing + 5 new `breakout_signals` unit tests); new framework function `regime_stability.py::breakout_signals` and its export verified. Verdict: FALSIFIED — the breakout filter produces no robust edge: lookback-5 REGIME_STABLE=3 / CONSISTENT_WITH_NOISE=7, lookback-10 REGIME_STABLE=1 / CONSISTENT_WITH_NOISE=8 / REGIME_DEPENDENT=1, lookback-20 (canonical) REGIME_STABLE=1 / CONSISTENT_WITH_NOISE=9; sensitivity verdicts ROBUST=1 (TSLA, edges at lookbacks 5 and 20), SENSITIVE=2 (AAPL @5, NVDA @10), NO_EDGE=7. The small positive verdicts (AAPL @5, TSLA @5/@20, NVDA @10) are absent from the momentum-asset list (MSFT/GOOGL/AMZN/META show NO_EDGE) and are non-lookback-robust. The result matches the a-priori prediction (noise-like in most assets; small positive verdicts only among momentum assets) and closes the genuinely-new-signal-class frontier cell as FALSIFIED. | One genuinely new signal class tested and decisively closed (FALSIFIED) with full independent verification; frontier-first selection operated correctly a sixth time | RETAIN (frontier-first delta demonstrated: right cell selected, executed through the full gate stack, and closed with a decisive, independently-verified verdict) |
++ | 37461595229 (2026-10-06, agent 08) | R-002: holding-period sensitivity of lookback-5 momentum (hold grid=(1,2,3,5)) + discovery and repair of a momentum/reversal signal defect | Hold-period grid (R-002): HORIZON_DESTROYED - 0 positive edges at any hold (1/2/3/5); all 10 assets NO_EDGE; H=1 positive edges 0; no SINGULAR assets; stable-edge assets none; perturbation medians [0.013, -0.001, -0.009, 0.001] within null tolerance at every hold; determinism r1==r2; leakage PASS (AMZN/JPM) at every hold; artifact written to `state/check_artifacts/momentum_hold_period_sensitivity_results.json` and independently recomputed MATCH (all sections: target medians, universe medians, verdicts, perturbation, hold profiles, determinism, sanity). Infrastructure defect found and repaired: `momentum_signals` / `mean_reversion_signals` in `research/backtest/regime_stability.py` computed the mean of *log prices* instead of the lookback-day log return, making momentum permanently long (weight +1) and reversal permanently short (weight -1) on this trending universe. On the **corrected** signal: momentum = 3/10 REGIME_STABLE (all mixed-sign medians), 6/10 CONSISTENT_WITH_NOISE, 1/10 REGIME_DEPENDENT; momentum lookback sweep (3/5/10) = ROBUST=0, SENSITIVE=0, NO_EDGE=10; longer-horizon (20/60) = ROBUST=0, SENSITIVE=5, NO_EDGE=5; perturbation baseline +0.013 within sample-calibrated null tolerance; mean-reversion = 4/10 CONSISTENT_WITH_NOISE, 3/10 REGIME_STABLE-mixed, 3/10 REGIME_DEPENDENT, perturbation -0.013 within tol; regression suite 168/168. The momentum candidate-positive admission is withdrawn; momentum and reversal close FALSIFIED (no robust positive edge) - but the reversal's recorded falsification reason ("systematic losses / uniformly negative") is itself invalid (was an always-short artifact) and must be revised; the momentum/reversal independent verifiers (`verify_momentum*.py`, `verify_mean_reversion.py`, `verify_momentum_cost_sensitivity.py`) still embed the defective signal formula and are recorded as stale pending repair. | Momentum does not survive hold-period/lookback/horizon variation on the corrected signal; the prior positive momentum conclusion is withdrawn and both momentum and reversal are FALSIFIED (no robust edge). Residual: stale verifiers (P-004) and a signal-audit gate (P-005) pending. | VERIFIED_NEGATIVE_RESULT (methodology repair) |
+ 
+ ## Learning rules
+ 
+@@ -66,4 +67,4 @@ Prefer the highest-value unresolved frontier cell over repeating an equivalent e
+ 4. Do not use OOS results as a process-tuning oracle.
+ 5. Preserve negative and inconclusive evidence.
+ 6. Do not claim a strategy delta worked until its expected effect is actually observed.
+-7. When there is insufficient evidence, choose UNVERIFIED rather than forcing RETAIN or REVERT.
++7. When there is insufficient evidence, choose UNVERIFIED rather than forcing RETAIN or REVERT.
+\ No newline at end of file
+diff --git a/state/campaign/task_queue.json b/state/campaign/task_queue.json
+index d9375d0..a5749f8 100644
+--- a/state/campaign/task_queue.json
++++ b/state/campaign/task_queue.json
+@@ -3,257 +3,259 @@
+   "selection_principle": "qualitative_evidence_backed_priority",
+   "tasks": [
+     {
+-      "task_id": "P-001",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+       "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+-      "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+-      "scope": "Use LEARNING_STATE, STATE, activation records, and current controller state; produce one bounded process judgment.",
+-      "out_of_scope": "Do not redesign the controller architecture or add a numerical reward score.",
++      "complexity": "LOW",
+       "deliverable": "A durable process decision with evidence-backed examples from recent activations.",
+-      "success_criterion": "The assessment distinguishes a concrete selector advantage, no demonstrated advantage, or an unresolved result using actual durable evidence.",
+-      "stop_condition": "Stop once the selector decision is supported or the evidence is insufficient for a stronger conclusion.",
+-      "verification_requirement": "Controller-side validation plus inspection of cited durable evidence; no reliance on agent confidence.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "LEARNING_STATE documents the previous frontier-first selection gap and five recent frontier cells closed without equivalent retests.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
++      "out_of_scope": "Do not redesign the controller architecture or add a numerical reward score.",
++      "primary_question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Use LEARNING_STATE, STATE, activation records, and current controller state; produce one bounded process judgment.",
++      "selected_agent": 7,
++      "status": "RESOLVED",
++      "stop_condition": "Stop once the selector decision is supported or the evidence is insufficient for a stronger conclusion.",
++      "success_criterion": "The assessment distinguishes a concrete selector advantage, no demonstrated advantage, or an unresolved result using actual durable evidence.",
++      "task_id": "P-001",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Controller-side validation plus inspection of cited durable evidence; no reliance on agent confidence."
+     },
+     {
+-      "task_id": "P-002",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+       "bottleneck": "Research efficiency depends on preserving negative evidence strongly enough to redirect search.",
+-      "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
+-      "scope": "Inspect LEARNING_STATE, STATE, research checks, and campaign queue semantics; propose at most one minimal change.",
+-      "out_of_scope": "Do not rerun historical experiments or add broad metadata systems.",
++      "complexity": "LOW",
+       "deliverable": "A retain/reject/unverified process decision with concrete duplicate-avoidance evidence.",
+-      "success_criterion": "At least one evidence-backed conclusion about duplicate-work prevention is established.",
+-      "stop_condition": "Stop when the duplicate-work question is resolved or clearly unverified.",
+-      "verification_requirement": "Independent controller validation of any implementation change.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "LEARNING_EFFICIENCY already calls for a novelty guard and recent research cells were closed as FALSIFIED/TESTED.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
++      "out_of_scope": "Do not rerun historical experiments or add broad metadata systems.",
++      "primary_question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Inspect LEARNING_STATE, STATE, research checks, and campaign queue semantics; propose at most one minimal change.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the duplicate-work question is resolved or clearly unverified.",
++      "success_criterion": "At least one evidence-backed conclusion about duplicate-work prevention is established.",
++      "task_id": "P-002",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Independent controller validation of any implementation change."
+     },
+     {
+-      "task_id": "P-003",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the durable evidence layer preserve useful negative evidence strongly enough to redirect future research?",
+       "bottleneck": "Negative findings are valuable only if later agents can reliably see and use them.",
+-      "objective": "Audit whether recent falsified frontiers and rejected process decisions are discoverable and actually reflected in the current task queue.",
+-      "scope": "Use durable state only; compare a sample of falsified cells with current task candidates.",
+-      "out_of_scope": "Do not rewrite the entire state model or duplicate the research history.",
++      "complexity": "LOW",
+       "deliverable": "A bounded evidence-preservation assessment and, only if necessary, one minimal durable-state repair.",
+-      "success_criterion": "The audit either verifies preservation/reuse or identifies one specific failure that can be repaired and verified.",
+-      "stop_condition": "Stop after the sampled evidence is sufficient to classify the preservation mechanism.",
+-      "verification_requirement": "Controller-side schema validation plus inspection of the referenced durable records.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "The repository contains extensive FALSIFIED and TESTED frontier entries plus a dedicated LEARNING_STATE layer.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Audit whether recent falsified frontiers and rejected process decisions are discoverable and actually reflected in the current task queue.",
++      "out_of_scope": "Do not rewrite the entire state model or duplicate the research history.",
++      "primary_question": "Does the durable evidence layer preserve useful negative evidence strongly enough to redirect future research?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Use durable state only; compare a sample of falsified cells with current task candidates.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the sampled evidence is sufficient to classify the preservation mechanism.",
++      "success_criterion": "The audit either verifies preservation/reuse or identifies one specific failure that can be repaired and verified.",
++      "task_id": "P-003",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Controller-side schema validation plus inspection of the referenced durable records."
+     },
+     {
+-      "task_id": "P-004",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the odd/even role split add measurable learning value without creating unnecessary orchestration complexity?",
+       "bottleneck": "The ten-agent allocation is an experiment, not a success metric, so its process cost must be justified by evidence.",
+-      "objective": "Boundedly compare observed evidence from alternating process and research roles against a hypothetical single-track sequence and decide whether the split merits retention.",
+-      "scope": "Inspect campaign records only; use qualitative evidence and complexity observations.",
+-      "out_of_scope": "Do not add a quantitative reward score or duplicate workflow infrastructure.",
++      "complexity": "MEDIUM",
+       "deliverable": "A process decision supported by campaign evidence.",
+-      "success_criterion": "The role split is classified as RETAIN, REJECT, or UNVERIFIED using actual campaign evidence.",
+-      "stop_condition": "Stop when the current campaign contains enough observations to classify the split.",
+-      "verification_requirement": "Final controller synthesis must preserve disagreement and unverified evidence.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "The campaign explicitly alternates LEARNING_PROCESS and HIGHER_ORDER_OBJECTIVE roles to create a meta-learning loop.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Boundedly compare observed evidence from alternating process and research roles against a hypothetical single-track sequence and decide whether the split merits retention.",
++      "out_of_scope": "Do not add a quantitative reward score or duplicate workflow infrastructure.",
++      "primary_question": "Does the odd/even role split add measurable learning value without creating unnecessary orchestration complexity?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Inspect campaign records only; use qualitative evidence and complexity observations.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the current campaign contains enough observations to classify the split.",
++      "success_criterion": "The role split is classified as RETAIN, REJECT, or UNVERIFIED using actual campaign evidence.",
++      "task_id": "P-004",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Final controller synthesis must preserve disagreement and unverified evidence."
+     },
+     {
+-      "task_id": "P-005",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does an explicit stop condition reduce scope expansion enough to improve validated learning efficiency?",
+       "bottleneck": "Focused tasks lose efficiency if agents continue interesting side paths after the evidence gate is already satisfied.",
+-      "objective": "Audit the campaign contracts and agent records for scope expansion pressure and determine whether the explicit stop boundary should be retained or minimally strengthened.",
+-      "scope": "Inspect campaign contracts, agent records, and worker progress; propose at most one minimal process change.",
+-      "out_of_scope": "Do not redesign Kilo execution, add scoring, or pursue any secondary research experiment.",
++      "complexity": "LOW",
+       "deliverable": "A bounded process decision with evidence about scope control and stop-condition effectiveness.",
+-      "success_criterion": "The evidence supports RETAIN, REJECT, or UNVERIFIED for the explicit stop boundary.",
+-      "stop_condition": "Stop once observed scope behavior is sufficient to classify the stop-condition mechanism.",
+-      "verification_requirement": "Controller-side validation of the durable record and any changed process artifact.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "The campaign requires zero intentional scope expansion and exactly one stop condition per focused task.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Audit the campaign contracts and agent records for scope expansion pressure and determine whether the explicit stop boundary should be retained or minimally strengthened.",
++      "out_of_scope": "Do not redesign Kilo execution, add scoring, or pursue any secondary research experiment.",
++      "primary_question": "Does an explicit stop condition reduce scope expansion enough to improve validated learning efficiency?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Inspect campaign contracts, agent records, and worker progress; propose at most one minimal process change.",
++      "status": "OPEN",
++      "stop_condition": "Stop once observed scope behavior is sufficient to classify the stop-condition mechanism.",
++      "success_criterion": "The evidence supports RETAIN, REJECT, or UNVERIFIED for the explicit stop boundary.",
++      "task_id": "P-005",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Controller-side validation of the durable record and any changed process artifact."
+     },
+     {
+-      "task_id": "P-006",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does independent controller validation distinguish evidence quality from agent-reported confidence reliably enough for campaign decisions?",
+       "bottleneck": "The research system must not confuse a plausible explanation or successful session with validated learning.",
+-      "objective": "Inspect agent records and controller validation outputs to determine whether the current evidence hierarchy catches unsupported claims and whether one minimal safeguard is warranted.",
+-      "scope": "Audit controller validation outputs, durable records, and final synthesis semantics.",
+-      "out_of_scope": "Do not add a numeric reward score or duplicate an independent research engine.",
++      "complexity": "LOW",
+       "deliverable": "A bounded process decision about evidence-versus-confidence separation.",
+-      "success_criterion": "The sampled controller records support a clear process classification or expose one specific verifiable gap.",
+-      "stop_condition": "Stop when the sampled records are sufficient to classify the separation mechanism.",
+-      "verification_requirement": "Independent inspection of controller validation outputs and regression tests for any implementation change.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "The repository explicitly treats Kilo success status, activity, and confidence as insufficient evidence.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Inspect agent records and controller validation outputs to determine whether the current evidence hierarchy catches unsupported claims and whether one minimal safeguard is warranted.",
++      "out_of_scope": "Do not add a numeric reward score or duplicate an independent research engine.",
++      "primary_question": "Does independent controller validation distinguish evidence quality from agent-reported confidence reliably enough for campaign decisions?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Audit controller validation outputs, durable records, and final synthesis semantics.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the sampled records are sufficient to classify the separation mechanism.",
++      "success_criterion": "The sampled controller records support a clear process classification or expose one specific verifiable gap.",
++      "task_id": "P-006",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Independent inspection of controller validation outputs and regression tests for any implementation change."
+     },
+     {
+-      "task_id": "R-001",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+       "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+-      "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+-      "scope": "Use the existing 10-asset collected universe and existing momentum implementation/check framework.",
+-      "out_of_scope": "Do not tune signal rules after seeing cost results, expand the universe, or introduce leverage.",
++      "complexity": "LOW",
+       "deliverable": "A reproducible artifact and independent verification result classifying cost robustness.",
+-      "success_criterion": "The result is reproducible and independently verified, regardless of positive or negative outcome.",
+-      "stop_condition": "Stop after the predeclared cost grid is evaluated and the independent verifier agrees or records the exact discrepancy.",
+-      "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, and existing regression suite.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "LEARNING_STATE admits short-horizon momentum as candidate positive evidence but leaves execution-cost robustness as a meaningful qualification.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
++      "out_of_scope": "Do not tune signal rules after seeing cost results, expand the universe, or introduce leverage.",
++      "primary_question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "Use the existing 10-asset collected universe and existing momentum implementation/check framework.",
++      "status": "DEFERRED",
++      "stop_condition": "Stop after the predeclared cost grid is evaluated and the independent verifier agrees or records the exact discrepancy.",
++      "success_criterion": "The result is reproducible and independently verified, regardless of positive or negative outcome.",
++      "task_id": "R-001",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": true
++      "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, and existing regression suite."
+     },
+     {
+-      "task_id": "R-002",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does the qualified momentum effect survive a small predeclared holding-period variation without becoming a single-point timing artifact?",
+       "bottleneck": "The current evidence is strongest for one-day holding, so temporal robustness is still partly unresolved.",
+-      "objective": "Test a fixed lookback-5 momentum signal with a predeclared small holding-period set using the existing walk-forward/null methodology.",
+-      "scope": "Use only the existing 10-asset universe and a fixed hold-period grid declared before execution.",
+-      "out_of_scope": "Do not tune the lookback or choose a holding period after inspecting results.",
++      "complexity": "LOW",
+       "deliverable": "A reproducible robustness artifact plus independent verification.",
+-      "success_criterion": "The holding-period sensitivity is classified and any positive finding is reproducible.",
+-      "stop_condition": "Stop after the declared holding-period grid is complete and independently checked.",
+-      "verification_requirement": "Matched null, leakage review, independent recomputation, determinism, regression suite.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "Momentum is candidate positive evidence at a one-day hold and has already survived lookback and horizon robustness in magnitude.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Test a fixed lookback-5 momentum signal with a predeclared small holding-period set using the existing walk-forward/null methodology.",
++      "out_of_scope": "Do not tune the lookback or choose a holding period after inspecting results.",
++      "primary_question": "Does the qualified momentum effect survive a small predeclared holding-period variation without becoming a single-point timing artifact?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "Use only the existing 10-asset universe and a fixed hold-period grid declared before execution.",
++      "selected_agent": 8,
++      "status": "SELECTED",
++      "stop_condition": "Stop after the declared holding-period grid is complete and independently checked.",
++      "success_criterion": "The holding-period sensitivity is classified and any positive finding is reproducible.",
++      "task_id": "R-002",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": true
++      "verification_requirement": "Matched null, leakage review, independent recomputation, determinism, regression suite."
+     },
+     {
+-      "task_id": "R-003",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does a single past-only volatility gate create a predeclared robustness improvement for the qualified momentum effect?",
+       "bottleneck": "A candidate momentum effect may depend on market regime even after horizon robustness.",
+-      "objective": "Test one explicitly predeclared past-only volatility gate on lookback-5 momentum through the existing regime-stability and null framework.",
+-      "scope": "One volatility feature, one threshold rule declared before execution, existing 10-asset universe.",
+-      "out_of_scope": "Do not search a threshold grid or optimize the gate after seeing results.",
++      "complexity": "MEDIUM",
+       "deliverable": "A falsifiable regime-conditioned momentum result with independent verification.",
+-      "success_criterion": "The gate either demonstrates a reproducible improvement in robustness or is falsified/unsupported.",
+-      "stop_condition": "Stop after the one predeclared gate is evaluated and independently checked.",
+-      "verification_requirement": "Leakage gate, matched null, regime-stability, independent recomputation, determinism.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "MA regime filters were previously falsified; whether the same class of conditioning helps the different momentum mechanism remains unresolved.",
++      "execution_risk": "MEDIUM",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Test one explicitly predeclared past-only volatility gate on lookback-5 momentum through the existing regime-stability and null framework.",
++      "out_of_scope": "Do not search a threshold grid or optimize the gate after seeing results.",
++      "primary_question": "Does a single past-only volatility gate create a predeclared robustness improvement for the qualified momentum effect?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "One volatility feature, one threshold rule declared before execution, existing 10-asset universe.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the one predeclared gate is evaluated and independently checked.",
++      "success_criterion": "The gate either demonstrates a reproducible improvement in robustness or is falsified/unsupported.",
++      "task_id": "R-003",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "MEDIUM",
+-      "tests_preceding_process": true
++      "verification_requirement": "Leakage gate, matched null, regime-stability, independent recomputation, determinism."
+     },
+     {
+-      "task_id": "R-004",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does a fixed 20-day breakout continuation signal produce reproducible evidence beyond the currently qualified momentum family?",
+       "bottleneck": "The research frontier needs genuinely new signal classes rather than endless momentum variants.",
+-      "objective": "Test one fixed 20-day breakout continuation rule on the collected universe through the existing robustness gate stack.",
+-      "scope": "One predeclared breakout rule, existing data universe, existing walk-forward, regime, null, and independent-verification infrastructure.",
+-      "out_of_scope": "Do not sweep breakout lengths, tune after seeing results, or add new data dependencies.",
++      "complexity": "MEDIUM",
+       "deliverable": "A reproducible new-signal-class artifact with independent verification and a clear verdict.",
+-      "success_criterion": "The hypothesis is classified as falsified, supported, or unverified by the existing evidence standard.",
+-      "stop_condition": "Stop after the fixed rule completes the declared gate stack.",
+-      "verification_requirement": "Data preflight, leakage, regime stability, matched null, independent recomputation, determinism, regression suite.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "The current frontier explicitly calls for a genuinely new signal class or new data/method frontier after momentum qualification.",
++      "execution_risk": "MEDIUM",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Test one fixed 20-day breakout continuation rule on the collected universe through the existing robustness gate stack.",
++      "out_of_scope": "Do not sweep breakout lengths, tune after seeing results, or add new data dependencies.",
++      "primary_question": "Does a fixed 20-day breakout continuation signal produce reproducible evidence beyond the currently qualified momentum family?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "One predeclared breakout rule, existing data universe, existing walk-forward, regime, null, and independent-verification infrastructure.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the fixed rule completes the declared gate stack.",
++      "success_criterion": "The hypothesis is classified as falsified, supported, or unverified by the existing evidence standard.",
++      "task_id": "R-004",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "MEDIUM",
+-      "tests_preceding_process": true
++      "verification_requirement": "Data preflight, leakage, regime stability, matched null, independent recomputation, determinism, regression suite."
+     },
+     {
+-      "task_id": "R-005",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does a conservative volatility-normalized sizing variant preserve a positive momentum signal without creating leverage-dependent evidence?",
+       "bottleneck": "A research candidate should not depend on uncontrolled sizing assumptions.",
+-      "objective": "Evaluate one fixed volatility-normalized sizing rule for the already-qualified momentum signal without leverage and with the existing null.",
+-      "scope": "One fixed sizing rule, existing universe, existing research engine, no leverage.",
+-      "out_of_scope": "Do not optimize sizing parameters or compare many variants.",
++      "complexity": "MEDIUM",
+       "deliverable": "A bounded sizing robustness result and independent verification.",
+-      "success_criterion": "The result distinguishes signal robustness from sizing artifacts.",
+-      "stop_condition": "Stop after the fixed sizing rule is tested and independently checked.",
+-      "verification_requirement": "Leakage, cost assumptions, matched null, independent recomputation, determinism.",
++      "downstream_leverage": "MEDIUM",
++      "effort": "MEDIUM",
+       "evidence_basis": "The current candidate is mechanical and short-horizon; separating signal evidence from sizing effects is decision-relevant.",
++      "execution_risk": "MEDIUM",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "MEDIUM",
+       "falsification_power": "MEDIUM",
++      "objective": "Evaluate one fixed volatility-normalized sizing rule for the already-qualified momentum signal without leverage and with the existing null.",
++      "out_of_scope": "Do not optimize sizing parameters or compare many variants.",
++      "primary_question": "Does a conservative volatility-normalized sizing variant preserve a positive momentum signal without creating leverage-dependent evidence?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "One fixed sizing rule, existing universe, existing research engine, no leverage.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the fixed sizing rule is tested and independently checked.",
++      "success_criterion": "The result distinguishes signal robustness from sizing artifacts.",
++      "task_id": "R-005",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "MEDIUM",
+-      "tests_preceding_process": true
++      "verification_requirement": "Leakage, cost assumptions, matched null, independent recomputation, determinism."
+     }
+   ]
+ }
+diff --git a/state/check_artifacts/mean_reversion_results.json b/state/check_artifacts/mean_reversion_results.json
+index 8425261..216a42d 100644
+--- a/state/check_artifacts/mean_reversion_results.json
++++ b/state/check_artifacts/mean_reversion_results.json
+@@ -23,11 +23,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "mean_reversion": {
+-        "candidate_dispersion": 0.033,
++        "candidate_dispersion": 0.038,
+         "medians": [
+-          -0.202,
+-          -0.193,
+-          -0.128
++          0.041,
++          -0.003,
++          -0.052
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.019,
+@@ -36,7 +36,7 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE_LOSS"
++        "verdict": "REGIME_STABLE"
+       }
+     },
+     "JPM": {
+@@ -57,11 +57,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "mean_reversion": {
+-        "candidate_dispersion": 0.049,
++        "candidate_dispersion": 0.039,
+         "medians": [
+-          -0.132,
+-          -0.067,
+-          -0.187
++          0.038,
++          -0.021,
++          -0.057
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.012,
+@@ -75,14 +75,14 @@
+     }
+   },
+   "perturbation": {
+-    "baseline_median": 0.003,
++    "baseline_median": -0.013,
+     "compare_noise_default": true,
+     "compare_noise_fixed": true,
+     "effective_tolerance": 0.05,
+     "medians": [
+-      0.003,
+-      0.003,
+-      0.003
++      -0.015,
++      -0.013,
++      -0.005
+     ],
+     "n_folds": 52,
+     "noise_median": -0.001,
+@@ -113,12 +113,12 @@
+   "universe": {
+     "per_asset": {
+       "AAPL": {
+-        "candidate_dispersion": 0.089,
++        "candidate_dispersion": 0.1,
+         "medians": [
+-          -0.21,
+-          -0.093,
+-          -0.332,
+-          -0.145
++          -0.237,
++          -0.033,
++          0.035,
++          -0.058
+         ],
+         "null_dispersion": 0.028,
+         "null_medians": [
+@@ -136,11 +136,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "AMZN": {
+-        "candidate_dispersion": 0.033,
++        "candidate_dispersion": 0.038,
+         "medians": [
+-          -0.202,
+-          -0.193,
+-          -0.128
++          0.041,
++          -0.003,
++          -0.052
+         ],
+         "null_dispersion": 0.019,
+         "null_medians": [
+@@ -153,14 +153,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE_LOSS"
++        "verdict": "REGIME_STABLE"
+       },
+       "GOOGL": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.038,
+         "medians": [
+-          -0.096,
+-          -0.102,
+-          -0.206
++          -0.06,
++          0.013,
++          0.026
+         ],
+         "null_dispersion": 0.039,
+         "null_medians": [
+@@ -173,13 +173,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE_LOSS"
++        "verdict": "REGIME_STABLE"
+       },
+       "JNJ": {
+         "candidate_dispersion": 0.012,
+         "medians": [
+-          -0.067,
+-          -0.043
++          0.012,
++          -0.012
+         ],
+         "null_dispersion": 0.019,
+         "null_medians": [
+@@ -190,14 +190,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE_LOSS"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "JPM": {
+-        "candidate_dispersion": 0.049,
++        "candidate_dispersion": 0.039,
+         "medians": [
+-          -0.132,
+-          -0.067,
+-          -0.187
++          0.038,
++          -0.021,
++          -0.057
+         ],
+         "null_dispersion": 0.012,
+         "null_medians": [
+@@ -213,11 +213,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "META": {
+-        "candidate_dispersion": 0.048,
++        "candidate_dispersion": 0.037,
+         "medians": [
+-          -0.199,
+-          -0.115,
+-          -0.086
++          0.049,
++          0.029,
++          -0.037
+         ],
+         "null_dispersion": 0.055,
+         "null_medians": [
+@@ -230,13 +230,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE_LOSS"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "MSFT": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.003,
+         "medians": [
+-          -0.09,
+-          -0.145
++          0.033,
++          0.026
+         ],
+         "null_dispersion": 0.008,
+         "null_medians": [
+@@ -247,14 +247,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "NVDA": {
+-        "candidate_dispersion": 0.078,
++        "candidate_dispersion": 0.071,
+         "medians": [
+           0.022,
+-          0.018,
+-          -0.145
++          -0.12,
++          -0.134
+         ],
+         "null_dispersion": 0.06,
+         "null_medians": [
+@@ -270,11 +270,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "TSLA": {
+-        "candidate_dispersion": 0.026,
++        "candidate_dispersion": 0.069,
+         "medians": [
+-          -0.037,
+-          -0.063,
+-          0.001
++          0.093,
++          -0.027,
++          -0.07
+         ],
+         "null_dispersion": 0.034,
+         "null_medians": [
+@@ -287,13 +287,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "XOM": {
+-        "candidate_dispersion": 0.035,
++        "candidate_dispersion": 0.006,
+         "medians": [
+-          -0.014,
+-          -0.084
++          0.009,
++          -0.002
+         ],
+         "null_dispersion": 0.005,
+         "null_medians": [
+@@ -304,7 +304,7 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       }
+     },
+     "ticker_order": [
+@@ -320,10 +320,10 @@
+       "XOM"
+     ],
+     "verdict_counts": {
+-      "CONSISTENT_WITH_NOISE": 0,
+-      "REGIME_DEPENDENT": 4,
+-      "REGIME_STABLE": 2,
+-      "REGIME_STABLE_LOSS": 4
++      "CONSISTENT_WITH_NOISE": 4,
++      "REGIME_DEPENDENT": 3,
++      "REGIME_STABLE": 3,
++      "REGIME_STABLE_LOSS": 0
+     }
+   },
+   "warmup": 60,
+diff --git a/state/check_artifacts/momentum_longer_horizon_results.json b/state/check_artifacts/momentum_longer_horizon_results.json
+index 00a35d8..ada2b86 100644
+--- a/state/check_artifacts/momentum_longer_horizon_results.json
++++ b/state/check_artifacts/momentum_longer_horizon_results.json
+@@ -10,12 +10,12 @@
+   "per_asset": {
+     "AAPL": {
+       "20": {
+-        "candidate_dispersion": 0.014,
++        "candidate_dispersion": 0.03,
+         "medians": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.072,
++          0.035,
++          0.052,
++          -0.011
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.031,
+@@ -34,12 +34,12 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.014,
++        "candidate_dispersion": 0.017,
+         "medians": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.089,
++          0.045,
++          0.048,
++          0.054
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.016,
+@@ -58,23 +58,23 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "edge_counts": {
+-        "EDGE": 2,
++        "EDGE": 1,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 1
+       },
+-      "horizon_verdict": "ROBUST",
++      "horizon_verdict": "SENSITIVE",
+       "lookback_medians": {
+         "20": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.072,
++          0.035,
++          0.052,
++          -0.011
+         ],
+         "60": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.089,
++          0.045,
++          0.048,
++          0.054
+         ]
+       },
+       "lookback_null_medians": {
+@@ -94,11 +94,11 @@
+     },
+     "AMZN": {
+       "20": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.08,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          -0.133,
++          0.043,
++          0.032
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.033,
+@@ -112,14 +112,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "60": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.012,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          0.025,
++          0.023,
++          -0.001
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.013,
+@@ -133,24 +133,24 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+-        "EDGE": 2,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 2
+       },
+-      "horizon_verdict": "ROBUST",
++      "horizon_verdict": "NO_EDGE",
+       "lookback_medians": {
+         "20": [
+-          0.065,
+-          0.076,
+-          0.077
++          -0.133,
++          0.043,
++          0.032
+         ],
+         "60": [
+-          0.065,
+-          0.076,
+-          0.077
++          0.025,
++          0.023,
++          -0.001
+         ]
+       },
+       "lookback_null_medians": {
+@@ -168,11 +168,11 @@
+     },
+     "GOOGL": {
+       "20": {
+-        "candidate_dispersion": 0.015,
++        "candidate_dispersion": 0.026,
+         "medians": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.067,
++          0.004,
++          0.026
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.034,
+@@ -189,11 +189,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.015,
++        "candidate_dispersion": 0.031,
+         "medians": [
+-          0.069,
+-          0.071,
+-          0.101
++          -0.058,
++          0.004,
++          0.012
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.006,
+@@ -217,14 +217,14 @@
+       "horizon_verdict": "SENSITIVE",
+       "lookback_medians": {
+         "20": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.067,
++          0.004,
++          0.026
+         ],
+         "60": [
+-          0.069,
+-          0.071,
+-          0.101
++          -0.058,
++          0.004,
++          0.012
+         ]
+       },
+       "lookback_null_medians": {
+@@ -242,10 +242,10 @@
+     },
+     "JNJ": {
+       "20": {
+-        "candidate_dispersion": 0.002,
++        "candidate_dispersion": 0.024,
+         "medians": [
+-          0.05,
+-          0.046
++          -0.036,
++          0.013
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.015,
+@@ -260,10 +260,10 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.002,
++        "candidate_dispersion": 0.003,
+         "medians": [
+-          0.05,
+-          0.046
++          -0.011,
++          -0.005
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.035,
+@@ -285,12 +285,12 @@
+       "horizon_verdict": "NO_EDGE",
+       "lookback_medians": {
+         "20": [
+-          0.05,
+-          0.046
++          -0.036,
++          0.013
+         ],
+         "60": [
+-          0.05,
+-          0.046
++          -0.011,
++          -0.005
+         ]
+       },
+       "lookback_null_medians": {
+@@ -306,11 +306,11 @@
+     },
+     "JPM": {
+       "20": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.034,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          0.065,
++          -0.019,
++          0.024
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.018,
+@@ -327,11 +327,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.019,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          0.051,
++          0.008,
++          0.017
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.047,
+@@ -348,21 +348,21 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "edge_counts": {
+-        "EDGE": 2,
++        "EDGE": 1,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 1
+       },
+-      "horizon_verdict": "ROBUST",
++      "horizon_verdict": "SENSITIVE",
+       "lookback_medians": {
+         "20": [
+-          0.113,
+-          0.044,
+-          0.083
++          0.065,
++          -0.019,
++          0.024
+         ],
+         "60": [
+-          0.113,
+-          0.044,
+-          0.083
++          0.051,
++          0.008,
++          0.017
+         ]
+       },
+       "lookback_null_medians": {
+@@ -380,11 +380,11 @@
+     },
+     "META": {
+       "20": {
+-        "candidate_dispersion": 0.013,
++        "candidate_dispersion": 0.035,
+         "medians": [
+-          0.073,
+-          0.067,
+-          0.042
++          0.049,
++          -0.037,
++          0.011
+         ],
+         "n_folds": 19,
+         "null_dispersion": 0.017,
+@@ -398,14 +398,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.013,
++        "candidate_dispersion": 0.03,
+         "medians": [
+-          0.073,
+-          0.067,
+-          0.042
++          0.001,
++          0.001,
++          0.065
+         ],
+         "n_folds": 19,
+         "null_dispersion": 0.002,
+@@ -422,21 +422,21 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "edge_counts": {
+-        "EDGE": 1,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 1
++        "NO_EDGE": 2
+       },
+-      "horizon_verdict": "SENSITIVE",
++      "horizon_verdict": "NO_EDGE",
+       "lookback_medians": {
+         "20": [
+-          0.073,
+-          0.067,
+-          0.042
++          0.049,
++          -0.037,
++          0.011
+         ],
+         "60": [
+-          0.073,
+-          0.067,
+-          0.042
++          0.001,
++          0.001,
++          0.065
+         ]
+       },
+       "lookback_null_medians": {
+@@ -454,10 +454,10 @@
+     },
+     "MSFT": {
+       "20": {
+-        "candidate_dispersion": 0.01,
++        "candidate_dispersion": 0.025,
+         "medians": [
+-          0.052,
+-          0.072
++          -0.01,
++          -0.06
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.0,
+@@ -472,10 +472,10 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "60": {
+-        "candidate_dispersion": 0.01,
++        "candidate_dispersion": 0.001,
+         "medians": [
+-          0.052,
+-          0.072
++          0.008,
++          0.006
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.005,
+@@ -487,7 +487,7 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+         "EDGE": 0,
+@@ -497,12 +497,12 @@
+       "horizon_verdict": "NO_EDGE",
+       "lookback_medians": {
+         "20": [
+-          0.052,
+-          0.072
++          -0.01,
++          -0.06
+         ],
+         "60": [
+-          0.052,
+-          0.072
++          0.008,
++          0.006
+         ]
+       },
+       "lookback_null_medians": {
+@@ -518,11 +518,11 @@
+     },
+     "NVDA": {
+       "20": {
+-        "candidate_dispersion": 0.057,
++        "candidate_dispersion": 0.028,
+         "medians": [
+-          -0.038,
+-          0.015,
+-          0.1
++          0.027,
++          0.086,
++          0.026
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.022,
+@@ -536,14 +536,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "REGIME_STABLE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.057,
++        "candidate_dispersion": 0.008,
+         "medians": [
+-          -0.038,
+-          0.015,
+-          0.1
++          0.03,
++          0.048,
++          0.047
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.132,
+@@ -557,24 +557,24 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+-        "EDGE": 0,
++        "EDGE": 1,
+         "LOSS": 0,
+-        "NO_EDGE": 2
++        "NO_EDGE": 1
+       },
+-      "horizon_verdict": "NO_EDGE",
++      "horizon_verdict": "SENSITIVE",
+       "lookback_medians": {
+         "20": [
+-          -0.038,
+-          0.015,
+-          0.1
++          0.027,
++          0.086,
++          0.026
+         ],
+         "60": [
+-          -0.038,
+-          0.015,
+-          0.1
++          0.03,
++          0.048,
++          0.047
+         ]
+       },
+       "lookback_null_medians": {
+@@ -592,11 +592,11 @@
+     },
+     "TSLA": {
+       "20": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.018,
+         "medians": [
+-          0.132,
+-          0.016,
+-          0.107
++          0.11,
++          0.068,
++          0.079
+         ],
+         "n_folds": 24,
+         "null_dispersion": 0.603,
+@@ -613,11 +613,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.027,
+         "medians": [
+-          0.132,
+-          0.016,
+-          0.107
++          0.002,
++          -0.057,
++          0.001
+         ],
+         "n_folds": 24,
+         "null_dispersion": 0.013,
+@@ -641,14 +641,14 @@
+       "horizon_verdict": "SENSITIVE",
+       "lookback_medians": {
+         "20": [
+-          0.132,
+-          0.016,
+-          0.107
++          0.11,
++          0.068,
++          0.079
+         ],
+         "60": [
+-          0.132,
+-          0.016,
+-          0.107
++          0.002,
++          -0.057,
++          0.001
+         ]
+       },
+       "lookback_null_medians": {
+@@ -666,10 +666,10 @@
+     },
+     "XOM": {
+       "20": {
+-        "candidate_dispersion": 0.009,
++        "candidate_dispersion": 0.0,
+         "medians": [
+-          0.018,
+-          0.037
++          -0.027,
++          -0.027
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.016,
+@@ -684,10 +684,10 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.009,
++        "candidate_dispersion": 0.006,
+         "medians": [
+-          0.018,
+-          0.037
++          -0.031,
++          -0.042
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.048,
+@@ -709,12 +709,12 @@
+       "horizon_verdict": "NO_EDGE",
+       "lookback_medians": {
+         "20": [
+-          0.018,
+-          0.037
++          -0.027,
++          -0.027
+         ],
+         "60": [
+-          0.018,
+-          0.037
++          -0.031,
++          -0.042
+         ]
+       },
+       "lookback_null_medians": {
+@@ -734,42 +734,42 @@
+   "train": 252,
+   "universe": {
+     "horizon_counts": {
+-      "NO_EDGE": 4,
+-      "ROBUST": 3,
+-      "SENSITIVE": 3
++      "NO_EDGE": 5,
++      "ROBUST": 0,
++      "SENSITIVE": 5
+     },
+     "lookback_20_counts": {
+-      "CONSISTENT_WITH_NOISE": 2,
++      "CONSISTENT_WITH_NOISE": 3,
+       "REGIME_DEPENDENT": 2,
+-      "REGIME_STABLE": 6,
++      "REGIME_STABLE": 5,
+       "REGIME_STABLE_LOSS": 0
+     },
+     "lookback_60_counts": {
+-      "CONSISTENT_WITH_NOISE": 2,
+-      "REGIME_DEPENDENT": 4,
+-      "REGIME_STABLE": 4,
++      "CONSISTENT_WITH_NOISE": 5,
++      "REGIME_DEPENDENT": 3,
++      "REGIME_STABLE": 2,
+       "REGIME_STABLE_LOSS": 0
+     },
+     "per_asset": {
+       "AAPL": {
+         "edge_counts": {
+-          "EDGE": 2,
++          "EDGE": 1,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 1
+         },
+-        "horizon_verdict": "ROBUST",
++        "horizon_verdict": "SENSITIVE",
+         "lookback_medians": {
+           "20": [
+-            0.071,
+-            0.054,
+-            0.092,
+-            0.069
++            0.072,
++            0.035,
++            0.052,
++            -0.011
+           ],
+           "60": [
+-            0.071,
+-            0.054,
+-            0.092,
+-            0.069
++            0.089,
++            0.045,
++            0.048,
++            0.054
+           ]
+         },
+         "lookback_null_medians": {
+@@ -793,21 +793,21 @@
+       },
+       "AMZN": {
+         "edge_counts": {
+-          "EDGE": 2,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 2
+         },
+-        "horizon_verdict": "ROBUST",
++        "horizon_verdict": "NO_EDGE",
+         "lookback_medians": {
+           "20": [
+-            0.065,
+-            0.076,
+-            0.077
++            -0.133,
++            0.043,
++            0.032
+           ],
+           "60": [
+-            0.065,
+-            0.076,
+-            0.077
++            0.025,
++            0.023,
++            -0.001
+           ]
+         },
+         "lookback_null_medians": {
+@@ -824,8 +824,8 @@
+         },
+         "n_folds_20": 28,
+         "n_folds_60": 28,
+-        "verdicts_20": "REGIME_STABLE",
+-        "verdicts_60": "REGIME_STABLE"
++        "verdicts_20": "REGIME_DEPENDENT",
++        "verdicts_60": "CONSISTENT_WITH_NOISE"
+       },
+       "GOOGL": {
+         "edge_counts": {
+@@ -836,14 +836,14 @@
+         "horizon_verdict": "SENSITIVE",
+         "lookback_medians": {
+           "20": [
+-            0.069,
+-            0.071,
+-            0.101
++            0.067,
++            0.004,
++            0.026
+           ],
+           "60": [
+-            0.069,
+-            0.071,
+-            0.101
++            -0.058,
++            0.004,
++            0.012
+           ]
+         },
+         "lookback_null_medians": {
+@@ -872,12 +872,12 @@
+         "horizon_verdict": "NO_EDGE",
+         "lookback_medians": {
+           "20": [
+-            0.05,
+-            0.046
++            -0.036,
++            0.013
+           ],
+           "60": [
+-            0.05,
+-            0.046
++            -0.011,
++            -0.005
+           ]
+         },
+         "lookback_null_medians": {
+@@ -897,21 +897,21 @@
+       },
+       "JPM": {
+         "edge_counts": {
+-          "EDGE": 2,
++          "EDGE": 1,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 1
+         },
+-        "horizon_verdict": "ROBUST",
++        "horizon_verdict": "SENSITIVE",
+         "lookback_medians": {
+           "20": [
+-            0.113,
+-            0.044,
+-            0.083
++            0.065,
++            -0.019,
++            0.024
+           ],
+           "60": [
+-            0.113,
+-            0.044,
+-            0.083
++            0.051,
++            0.008,
++            0.017
+           ]
+         },
+         "lookback_null_medians": {
+@@ -933,21 +933,21 @@
+       },
+       "META": {
+         "edge_counts": {
+-          "EDGE": 1,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 1
++          "NO_EDGE": 2
+         },
+-        "horizon_verdict": "SENSITIVE",
++        "horizon_verdict": "NO_EDGE",
+         "lookback_medians": {
+           "20": [
+-            0.073,
+-            0.067,
+-            0.042
++            0.049,
++            -0.037,
++            0.011
+           ],
+           "60": [
+-            0.073,
+-            0.067,
+-            0.042
++            0.001,
++            0.001,
++            0.065
+           ]
+         },
+         "lookback_null_medians": {
+@@ -964,7 +964,7 @@
+         },
+         "n_folds_20": 19,
+         "n_folds_60": 19,
+-        "verdicts_20": "REGIME_STABLE",
++        "verdicts_20": "CONSISTENT_WITH_NOISE",
+         "verdicts_60": "REGIME_DEPENDENT"
+       },
+       "MSFT": {
+@@ -976,12 +976,12 @@
+         "horizon_verdict": "NO_EDGE",
+         "lookback_medians": {
+           "20": [
+-            0.052,
+-            0.072
++            -0.01,
++            -0.06
+           ],
+           "60": [
+-            0.052,
+-            0.072
++            0.008,
++            0.006
+           ]
+         },
+         "lookback_null_medians": {
+@@ -997,25 +997,25 @@
+         "n_folds_20": 75,
+         "n_folds_60": 75,
+         "verdicts_20": "REGIME_DEPENDENT",
+-        "verdicts_60": "REGIME_DEPENDENT"
++        "verdicts_60": "CONSISTENT_WITH_NOISE"
+       },
+       "NVDA": {
+         "edge_counts": {
+-          "EDGE": 0,
++          "EDGE": 1,
+           "LOSS": 0,
+-          "NO_EDGE": 2
++          "NO_EDGE": 1
+         },
+-        "horizon_verdict": "NO_EDGE",
++        "horizon_verdict": "SENSITIVE",
+         "lookback_medians": {
+           "20": [
+-            -0.038,
+-            0.015,
+-            0.1
++            0.027,
++            0.086,
++            0.026
+           ],
+           "60": [
+-            -0.038,
+-            0.015,
+-            0.1
++            0.03,
++            0.048,
++            0.047
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1032,8 +1032,8 @@
+         },
+         "n_folds_20": 28,
+         "n_folds_60": 28,
+-        "verdicts_20": "REGIME_DEPENDENT",
+-        "verdicts_60": "REGIME_STABLE"
++        "verdicts_20": "REGIME_STABLE",
++        "verdicts_60": "CONSISTENT_WITH_NOISE"
+       },
+       "TSLA": {
+         "edge_counts": {
+@@ -1044,14 +1044,14 @@
+         "horizon_verdict": "SENSITIVE",
+         "lookback_medians": {
+           "20": [
+-            0.132,
+-            0.016,
+-            0.107
++            0.11,
++            0.068,
++            0.079
+           ],
+           "60": [
+-            0.132,
+-            0.016,
+-            0.107
++            0.002,
++            -0.057,
++            0.001
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1080,12 +1080,12 @@
+         "horizon_verdict": "NO_EDGE",
+         "lookback_medians": {
+           "20": [
+-            0.018,
+-            0.037
++            -0.027,
++            -0.027
+           ],
+           "60": [
+-            0.018,
+-            0.037
++            -0.031,
++            -0.042
+           ]
+         },
+         "lookback_null_medians": {
+diff --git a/state/check_artifacts/momentum_lookback_sweep_results.json b/state/check_artifacts/momentum_lookback_sweep_results.json
+index 6dd8f6f..952dee4 100644
+--- a/state/check_artifacts/momentum_lookback_sweep_results.json
++++ b/state/check_artifacts/momentum_lookback_sweep_results.json
+@@ -11,12 +11,12 @@
+   "per_asset": {
+     "AAPL": {
+       "10": {
+-        "candidate_dispersion": 0.014,
++        "candidate_dispersion": 0.013,
+         "medians": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.02,
++          0.05,
++          0.02,
++          0.021
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.006,
+@@ -32,15 +32,15 @@
+           "turbulent",
+           "calm"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.014,
++        "candidate_dispersion": 0.069,
+         "medians": [
+-          0.071,
+           0.054,
+-          0.092,
+-          0.069
++          -0.027,
++          -0.087,
++          0.088
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.05,
+@@ -59,12 +59,12 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.014,
++        "candidate_dispersion": 0.045,
+         "medians": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.085,
++          0.035,
++          -0.037,
++          0.054
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.028,
+@@ -83,28 +83,28 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "edge_counts": {
+-        "EDGE": 2,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 1
++        "NO_EDGE": 3
+       },
+       "lookback_medians": {
+         "10": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.02,
++          0.05,
++          0.02,
++          0.021
+         ],
+         "3": [
+-          0.071,
+           0.054,
+-          0.092,
+-          0.069
++          -0.027,
++          -0.087,
++          0.088
+         ],
+         "5": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.085,
++          0.035,
++          -0.037,
++          0.054
+         ]
+       },
+       "lookback_null_medians": {
+@@ -127,15 +127,15 @@
+           0.032
+         ]
+       },
+-      "robustness_verdict": "ROBUST"
++      "robustness_verdict": "NO_EDGE"
+     },
+     "AMZN": {
+       "10": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.055,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          0.02,
++          0.029,
++          -0.093
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.04,
+@@ -152,11 +152,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.056,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          0.014,
++          0.009,
++          -0.106
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.037,
+@@ -173,11 +173,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.039,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          -0.05,
++          0.005,
++          0.046
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.019,
+@@ -191,28 +191,28 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+-        "EDGE": 3,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 3
+       },
+       "lookback_medians": {
+         "10": [
+-          0.065,
+-          0.076,
+-          0.077
++          0.02,
++          0.029,
++          -0.093
+         ],
+         "3": [
+-          0.065,
+-          0.076,
+-          0.077
++          0.014,
++          0.009,
++          -0.106
+         ],
+         "5": [
+-          0.065,
+-          0.076,
+-          0.077
++          -0.05,
++          0.005,
++          0.046
+         ]
+       },
+       "lookback_null_medians": {
+@@ -232,15 +232,15 @@
+           0.036
+         ]
+       },
+-      "robustness_verdict": "ROBUST"
++      "robustness_verdict": "NO_EDGE"
+     },
+     "GOOGL": {
+       "10": {
+-        "candidate_dispersion": 0.015,
++        "candidate_dispersion": 0.058,
+         "medians": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.08,
++          -0.058,
++          0.039
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.019,
+@@ -254,14 +254,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "3": {
+-        "candidate_dispersion": 0.015,
++        "candidate_dispersion": 0.029,
+         "medians": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.021,
++          -0.035,
++          0.031
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.04,
+@@ -275,14 +275,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.015,
++        "candidate_dispersion": 0.031,
+         "medians": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.045,
++          -0.011,
++          -0.027
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.039,
+@@ -296,28 +296,28 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+-        "EDGE": 3,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 3
+       },
+       "lookback_medians": {
+         "10": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.08,
++          -0.058,
++          0.039
+         ],
+         "3": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.021,
++          -0.035,
++          0.031
+         ],
+         "5": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.045,
++          -0.011,
++          -0.027
+         ]
+       },
+       "lookback_null_medians": {
+@@ -337,14 +337,14 @@
+           -0.008
+         ]
+       },
+-      "robustness_verdict": "ROBUST"
++      "robustness_verdict": "NO_EDGE"
+     },
+     "JNJ": {
+       "10": {
+-        "candidate_dispersion": 0.002,
++        "candidate_dispersion": 0.0,
+         "medians": [
+-          0.05,
+-          0.046
++          0.011,
++          0.01
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.004,
+@@ -359,10 +359,10 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.002,
++        "candidate_dispersion": 0.008,
+         "medians": [
+-          0.05,
+-          0.046
++          0.017,
++          0.001
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.03,
+@@ -377,10 +377,10 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.002,
++        "candidate_dispersion": 0.014,
+         "medians": [
+-          0.05,
+-          0.046
++          -0.011,
++          0.016
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.019,
+@@ -401,16 +401,16 @@
+       },
+       "lookback_medians": {
+         "10": [
+-          0.05,
+-          0.046
++          0.011,
++          0.01
+         ],
+         "3": [
+-          0.05,
+-          0.046
++          0.017,
++          0.001
+         ],
+         "5": [
+-          0.05,
+-          0.046
++          -0.011,
++          0.016
+         ]
+       },
+       "lookback_null_medians": {
+@@ -431,11 +431,11 @@
+     },
+     "JPM": {
+       "10": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.03,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          -0.036,
++          -0.01,
++          0.036
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.009,
+@@ -449,14 +449,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.038,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          0.046,
++          0.01,
++          -0.048
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.014,
+@@ -470,14 +470,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.031,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          -0.039,
++          0.028,
++          0.028
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.012,
+@@ -491,7 +491,7 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+         "EDGE": 0,
+@@ -500,19 +500,19 @@
+       },
+       "lookback_medians": {
+         "10": [
+-          0.113,
+-          0.044,
+-          0.083
++          -0.036,
++          -0.01,
++          0.036
+         ],
+         "3": [
+-          0.113,
+-          0.044,
+-          0.083
++          0.046,
++          0.01,
++          -0.048
+         ],
+         "5": [
+-          0.113,
+-          0.044,
+-          0.083
++          -0.039,
++          0.028,
++          0.028
+         ]
+       },
+       "lookback_null_medians": {
+@@ -536,11 +536,11 @@
+     },
+     "META": {
+       "10": {
+-        "candidate_dispersion": 0.013,
++        "candidate_dispersion": 0.108,
+         "medians": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.062,
++          -0.278,
++          -0.037
+         ],
+         "n_folds": 19,
+         "null_dispersion": 0.027,
+@@ -554,14 +554,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "3": {
+-        "candidate_dispersion": 0.013,
++        "candidate_dispersion": 0.091,
+         "medians": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.223,
++          -0.014,
++          -0.053
+         ],
+         "n_folds": 19,
+         "null_dispersion": 0.026,
+@@ -575,14 +575,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "5": {
+-        "candidate_dispersion": 0.013,
++        "candidate_dispersion": 0.072,
+         "medians": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.129,
++          -0.041,
++          0.047
+         ],
+         "n_folds": 19,
+         "null_dispersion": 0.055,
+@@ -599,25 +599,25 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "edge_counts": {
+-        "EDGE": 3,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 3
+       },
+       "lookback_medians": {
+         "10": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.062,
++          -0.278,
++          -0.037
+         ],
+         "3": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.223,
++          -0.014,
++          -0.053
+         ],
+         "5": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.129,
++          -0.041,
++          0.047
+         ]
+       },
+       "lookback_null_medians": {
+@@ -637,14 +637,14 @@
+           -0.09
+         ]
+       },
+-      "robustness_verdict": "ROBUST"
++      "robustness_verdict": "NO_EDGE"
+     },
+     "MSFT": {
+       "10": {
+-        "candidate_dispersion": 0.01,
++        "candidate_dispersion": 0.005,
+         "medians": [
+-          0.052,
+-          0.072
++          -0.004,
++          -0.013
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.037,
+@@ -656,13 +656,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.01,
++        "candidate_dispersion": 0.032,
+         "medians": [
+-          0.052,
+-          0.072
++          -0.006,
++          -0.07
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.016,
+@@ -674,13 +674,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "5": {
+-        "candidate_dispersion": 0.01,
++        "candidate_dispersion": 0.006,
+         "medians": [
+-          0.052,
+-          0.072
++          -0.041,
++          -0.03
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.008,
+@@ -692,25 +692,25 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+-        "EDGE": 3,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 3
+       },
+       "lookback_medians": {
+         "10": [
+-          0.052,
+-          0.072
++          -0.004,
++          -0.013
+         ],
+         "3": [
+-          0.052,
+-          0.072
++          -0.006,
++          -0.07
+         ],
+         "5": [
+-          0.052,
+-          0.072
++          -0.041,
++          -0.03
+         ]
+       },
+       "lookback_null_medians": {
+@@ -727,15 +727,15 @@
+           -0.029
+         ]
+       },
+-      "robustness_verdict": "ROBUST"
++      "robustness_verdict": "NO_EDGE"
+     },
+     "NVDA": {
+       "10": {
+-        "candidate_dispersion": 0.057,
++        "candidate_dispersion": 0.058,
+         "medians": [
+-          -0.038,
+-          0.014,
+-          0.1
++          0.008,
++          -0.056,
++          0.085
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.035,
+@@ -752,11 +752,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.057,
++        "candidate_dispersion": 0.059,
+         "medians": [
+-          -0.038,
+-          0.013,
+-          0.1
++          -0.003,
++          0.059,
++          -0.086
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.024,
+@@ -773,11 +773,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "5": {
+-        "candidate_dispersion": 0.057,
++        "candidate_dispersion": 0.049,
+         "medians": [
+-          -0.038,
+-          0.013,
+-          0.1
++          -0.024,
++          0.092,
++          0.063
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.06,
+@@ -800,19 +800,19 @@
+       },
+       "lookback_medians": {
+         "10": [
+-          -0.038,
+-          0.014,
+-          0.1
++          0.008,
++          -0.056,
++          0.085
+         ],
+         "3": [
+-          -0.038,
+-          0.013,
+-          0.1
++          -0.003,
++          0.059,
++          -0.086
+         ],
+         "5": [
+-          -0.038,
+-          0.013,
+-          0.1
++          -0.024,
++          0.092,
++          0.063
+         ]
+       },
+       "lookback_null_medians": {
+@@ -836,11 +836,11 @@
+     },
+     "TSLA": {
+       "10": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.109,
+         "medians": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.194,
++          0.02,
++          0.053
+         ],
+         "n_folds": 24,
+         "null_dispersion": 0.029,
+@@ -854,14 +854,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "3": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.021,
+         "medians": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.008,
++          -0.025,
++          0.025
+         ],
+         "n_folds": 24,
+         "null_dispersion": 0.236,
+@@ -875,14 +875,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.136,
+         "medians": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.254,
++          0.019,
++          0.049
+         ],
+         "n_folds": 24,
+         "null_dispersion": 0.034,
+@@ -896,28 +896,28 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "edge_counts": {
+-        "EDGE": 3,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 3
+       },
+       "lookback_medians": {
+         "10": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.194,
++          0.02,
++          0.053
+         ],
+         "3": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.008,
++          -0.025,
++          0.025
+         ],
+         "5": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.254,
++          0.019,
++          0.049
+         ]
+       },
+       "lookback_null_medians": {
+@@ -937,14 +937,14 @@
+           -0.019
+         ]
+       },
+-      "robustness_verdict": "ROBUST"
++      "robustness_verdict": "NO_EDGE"
+     },
+     "XOM": {
+       "10": {
+-        "candidate_dispersion": 0.009,
++        "candidate_dispersion": 0.006,
+         "medians": [
+-          0.018,
+-          0.037
++          -0.021,
++          -0.032
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.025,
+@@ -959,10 +959,10 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.009,
++        "candidate_dispersion": 0.02,
+         "medians": [
+-          0.018,
+-          0.037
++          -0.023,
++          0.017
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.035,
+@@ -977,10 +977,10 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.009,
++        "candidate_dispersion": 0.004,
+         "medians": [
+-          0.018,
+-          0.037
++          -0.008,
++          0.001
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.005,
+@@ -1001,16 +1001,16 @@
+       },
+       "lookback_medians": {
+         "10": [
+-          0.018,
+-          0.037
++          -0.021,
++          -0.032
+         ],
+         "3": [
+-          0.018,
+-          0.037
++          -0.023,
++          0.017
+         ],
+         "5": [
+-          0.018,
+-          0.037
++          -0.008,
++          0.001
+         ]
+       },
+       "lookback_null_medians": {
+@@ -1035,36 +1035,36 @@
+   "train": 252,
+   "universe": {
+     "lookback_5_counts": {
+-      "CONSISTENT_WITH_NOISE": 2,
++      "CONSISTENT_WITH_NOISE": 6,
+       "REGIME_DEPENDENT": 1,
+-      "REGIME_STABLE": 7,
++      "REGIME_STABLE": 3,
+       "REGIME_STABLE_LOSS": 0
+     },
+     "per_asset": {
+       "AAPL": {
+         "edge_counts": {
+-          "EDGE": 2,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 1
++          "NO_EDGE": 3
+         },
+         "lookback_medians": {
+           "10": [
+-            0.071,
+-            0.054,
+-            0.092,
+-            0.069
++            0.02,
++            0.05,
++            0.02,
++            0.021
+           ],
+           "3": [
+-            0.071,
+             0.054,
+-            0.092,
+-            0.069
++            -0.027,
++            -0.087,
++            0.088
+           ],
+           "5": [
+-            0.071,
+-            0.054,
+-            0.092,
+-            0.069
++            0.085,
++            0.035,
++            -0.037,
++            0.054
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1088,30 +1088,30 @@
+           ]
+         },
+         "n_folds_5": 28,
+-        "robustness_verdict": "ROBUST",
++        "robustness_verdict": "NO_EDGE",
+         "verdicts_5": "REGIME_STABLE"
+       },
+       "AMZN": {
+         "edge_counts": {
+-          "EDGE": 3,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 3
+         },
+         "lookback_medians": {
+           "10": [
+-            0.065,
+-            0.076,
+-            0.077
++            0.02,
++            0.029,
++            -0.093
+           ],
+           "3": [
+-            0.065,
+-            0.076,
+-            0.077
++            0.014,
++            0.009,
++            -0.106
+           ],
+           "5": [
+-            0.065,
+-            0.076,
+-            0.077
++            -0.05,
++            0.005,
++            0.046
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1132,30 +1132,30 @@
+           ]
+         },
+         "n_folds_5": 28,
+-        "robustness_verdict": "ROBUST",
+-        "verdicts_5": "REGIME_STABLE"
++        "robustness_verdict": "NO_EDGE",
++        "verdicts_5": "CONSISTENT_WITH_NOISE"
+       },
+       "GOOGL": {
+         "edge_counts": {
+-          "EDGE": 3,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 3
+         },
+         "lookback_medians": {
+           "10": [
+-            0.069,
+-            0.071,
+-            0.101
++            0.08,
++            -0.058,
++            0.039
+           ],
+           "3": [
+-            0.069,
+-            0.071,
+-            0.101
++            0.021,
++            -0.035,
++            0.031
+           ],
+           "5": [
+-            0.069,
+-            0.071,
+-            0.101
++            0.045,
++            -0.011,
++            -0.027
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1176,8 +1176,8 @@
+           ]
+         },
+         "n_folds_5": 28,
+-        "robustness_verdict": "ROBUST",
+-        "verdicts_5": "REGIME_STABLE"
++        "robustness_verdict": "NO_EDGE",
++        "verdicts_5": "CONSISTENT_WITH_NOISE"
+       },
+       "JNJ": {
+         "edge_counts": {
+@@ -1187,16 +1187,16 @@
+         },
+         "lookback_medians": {
+           "10": [
+-            0.05,
+-            0.046
++            0.011,
++            0.01
+           ],
+           "3": [
+-            0.05,
+-            0.046
++            0.017,
++            0.001
+           ],
+           "5": [
+-            0.05,
+-            0.046
++            -0.011,
++            0.016
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1225,19 +1225,19 @@
+         },
+         "lookback_medians": {
+           "10": [
+-            0.113,
+-            0.044,
+-            0.083
++            -0.036,
++            -0.01,
++            0.036
+           ],
+           "3": [
+-            0.113,
+-            0.044,
+-            0.083
++            0.046,
++            0.01,
++            -0.048
+           ],
+           "5": [
+-            0.113,
+-            0.044,
+-            0.083
++            -0.039,
++            0.028,
++            0.028
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1259,29 +1259,29 @@
+         },
+         "n_folds_5": 28,
+         "robustness_verdict": "NO_EDGE",
+-        "verdicts_5": "REGIME_DEPENDENT"
++        "verdicts_5": "CONSISTENT_WITH_NOISE"
+       },
+       "META": {
+         "edge_counts": {
+-          "EDGE": 3,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 3
+         },
+         "lookback_medians": {
+           "10": [
+-            0.073,
+-            0.067,
+-            0.042
++            -0.062,
++            -0.278,
++            -0.037
+           ],
+           "3": [
+-            0.073,
+-            0.067,
+-            0.042
++            -0.223,
++            -0.014,
++            -0.053
+           ],
+           "5": [
+-            0.073,
+-            0.067,
+-            0.042
++            -0.129,
++            -0.041,
++            0.047
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1302,27 +1302,27 @@
+           ]
+         },
+         "n_folds_5": 19,
+-        "robustness_verdict": "ROBUST",
++        "robustness_verdict": "NO_EDGE",
+         "verdicts_5": "REGIME_STABLE"
+       },
+       "MSFT": {
+         "edge_counts": {
+-          "EDGE": 3,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 3
+         },
+         "lookback_medians": {
+           "10": [
+-            0.052,
+-            0.072
++            -0.004,
++            -0.013
+           ],
+           "3": [
+-            0.052,
+-            0.072
++            -0.006,
++            -0.07
+           ],
+           "5": [
+-            0.052,
+-            0.072
++            -0.041,
++            -0.03
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1340,8 +1340,8 @@
+           ]
+         },
+         "n_folds_5": 75,
+-        "robustness_verdict": "ROBUST",
+-        "verdicts_5": "REGIME_STABLE"
++        "robustness_verdict": "NO_EDGE",
++        "verdicts_5": "CONSISTENT_WITH_NOISE"
+       },
+       "NVDA": {
+         "edge_counts": {
+@@ -1351,19 +1351,19 @@
+         },
+         "lookback_medians": {
+           "10": [
+-            -0.038,
+-            0.014,
+-            0.1
++            0.008,
++            -0.056,
++            0.085
+           ],
+           "3": [
+-            -0.038,
+-            0.013,
+-            0.1
++            -0.003,
++            0.059,
++            -0.086
+           ],
+           "5": [
+-            -0.038,
+-            0.013,
+-            0.1
++            -0.024,
++            0.092,
++            0.063
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1389,25 +1389,25 @@
+       },
+       "TSLA": {
+         "edge_counts": {
+-          "EDGE": 3,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 3
+         },
+         "lookback_medians": {
+           "10": [
+-            0.132,
+-            0.016,
+-            0.107
++            -0.194,
++            0.02,
++            0.053
+           ],
+           "3": [
+-            0.132,
+-            0.016,
+-            0.107
++            -0.008,
++            -0.025,
++            0.025
+           ],
+           "5": [
+-            0.132,
+-            0.016,
+-            0.107
++            -0.254,
++            0.019,
++            0.049
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1428,8 +1428,8 @@
+           ]
+         },
+         "n_folds_5": 24,
+-        "robustness_verdict": "ROBUST",
+-        "verdicts_5": "REGIME_STABLE"
++        "robustness_verdict": "NO_EDGE",
++        "verdicts_5": "REGIME_DEPENDENT"
+       },
+       "XOM": {
+         "edge_counts": {
+@@ -1439,16 +1439,16 @@
+         },
+         "lookback_medians": {
+           "10": [
+-            0.018,
+-            0.037
++            -0.021,
++            -0.032
+           ],
+           "3": [
+-            0.018,
+-            0.037
++            -0.023,
++            0.017
+           ],
+           "5": [
+-            0.018,
+-            0.037
++            -0.008,
++            0.001
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1471,8 +1471,8 @@
+       }
+     },
+     "robustness_counts": {
+-      "NO_EDGE": 4,
+-      "ROBUST": 6,
++      "NO_EDGE": 10,
++      "ROBUST": 0,
+       "SENSITIVE": 0
+     },
+     "ticker_order": [
+diff --git a/state/check_artifacts/momentum_results.json b/state/check_artifacts/momentum_results.json
+index afe16b2..4bcd35e 100644
+--- a/state/check_artifacts/momentum_results.json
++++ b/state/check_artifacts/momentum_results.json
+@@ -23,11 +23,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "momentum": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.039,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          -0.05,
++          0.005,
++          0.046
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.019,
+@@ -36,7 +36,7 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       }
+     },
+     "JPM": {
+@@ -57,11 +57,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "momentum": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.031,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          -0.039,
++          0.028,
++          0.028
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.012,
+@@ -70,19 +70,19 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       }
+     }
+   },
+   "perturbation": {
+-    "baseline_median": -0.004,
++    "baseline_median": 0.013,
+     "compare_noise_default": true,
+     "compare_noise_fixed": true,
+     "effective_tolerance": 0.05,
+     "medians": [
+-      -0.004,
+-      -0.004,
+-      -0.004
++      0.018,
++      0.013,
++      0.006
+     ],
+     "n_folds": 52,
+     "noise_median": -0.001,
+@@ -113,12 +113,12 @@
+   "universe": {
+     "per_asset": {
+       "AAPL": {
+-        "candidate_dispersion": 0.014,
++        "candidate_dispersion": 0.045,
+         "medians": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.085,
++          0.035,
++          -0.037,
++          0.054
+         ],
+         "null_dispersion": 0.028,
+         "null_medians": [
+@@ -136,11 +136,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "AMZN": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.039,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          -0.05,
++          0.005,
++          0.046
+         ],
+         "null_dispersion": 0.019,
+         "null_medians": [
+@@ -153,14 +153,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "GOOGL": {
+-        "candidate_dispersion": 0.015,
++        "candidate_dispersion": 0.031,
+         "medians": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.045,
++          -0.011,
++          -0.027
+         ],
+         "null_dispersion": 0.039,
+         "null_medians": [
+@@ -173,13 +173,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "JNJ": {
+-        "candidate_dispersion": 0.002,
++        "candidate_dispersion": 0.014,
+         "medians": [
+-          0.05,
+-          0.046
++          -0.011,
++          0.016
+         ],
+         "null_dispersion": 0.019,
+         "null_medians": [
+@@ -193,11 +193,11 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "JPM": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.031,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          -0.039,
++          0.028,
++          0.028
+         ],
+         "null_dispersion": 0.012,
+         "null_medians": [
+@@ -210,14 +210,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "META": {
+-        "candidate_dispersion": 0.013,
++        "candidate_dispersion": 0.072,
+         "medians": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.129,
++          -0.041,
++          0.047
+         ],
+         "null_dispersion": 0.055,
+         "null_medians": [
+@@ -233,10 +233,10 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "MSFT": {
+-        "candidate_dispersion": 0.01,
++        "candidate_dispersion": 0.006,
+         "medians": [
+-          0.052,
+-          0.072
++          -0.041,
++          -0.03
+         ],
+         "null_dispersion": 0.008,
+         "null_medians": [
+@@ -247,14 +247,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "NVDA": {
+-        "candidate_dispersion": 0.057,
++        "candidate_dispersion": 0.049,
+         "medians": [
+-          -0.038,
+-          0.013,
+-          0.1
++          -0.024,
++          0.092,
++          0.063
+         ],
+         "null_dispersion": 0.06,
+         "null_medians": [
+@@ -270,11 +270,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "TSLA": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.136,
+         "medians": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.254,
++          0.019,
++          0.049
+         ],
+         "null_dispersion": 0.034,
+         "null_medians": [
+@@ -287,13 +287,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "XOM": {
+-        "candidate_dispersion": 0.009,
++        "candidate_dispersion": 0.004,
+         "medians": [
+-          0.018,
+-          0.037
++          -0.008,
++          0.001
+         ],
+         "null_dispersion": 0.005,
+         "null_medians": [
+@@ -320,9 +320,9 @@
+       "XOM"
+     ],
+     "verdict_counts": {
+-      "CONSISTENT_WITH_NOISE": 2,
++      "CONSISTENT_WITH_NOISE": 6,
+       "REGIME_DEPENDENT": 1,
+-      "REGIME_STABLE": 7,
++      "REGIME_STABLE": 3,
+       "REGIME_STABLE_LOSS": 0
+     }
+   },
+diff --git a/state/worker_progress.md b/state/worker_progress.md
+index d6db99b..c76fe68 100644
+--- a/state/worker_progress.md
++++ b/state/worker_progress.md
+@@ -1,38 +1,9 @@
+ # Worker Progress
+ 
+-activation_id: 37414038601
+-phase: COMPLETE
++activation_id: 37461595229
++agent_number: 08
++task_id: R-002
++phase: AGENT_08_DONE
+ status: COMPLETE
+-last_verified_milestone: breakout_20day_cont cell closed FALSIFIED with full independent verification; 161/161 regression tests pass; state artifacts and frontier records updated
+-
+-This file is a liveness contract. Updated after the final verified milestone.
+-
+-## Objective completed (task R-004 from state/campaign/task_queue.json)
+-
+-**Test:** Does a fixed 20-day breakout continuation signal (long when the close exceeds the highest close of the preceding 20 trading days; hold 1 day; daily rebalance) produce reproducible evidence beyond the currently qualified momentum family?
+-
+-**Verdict: FALSIFIED.** Gate stack completed end-to-end (manifest 10/10 OK, preflight PASSED, leakage PASS on AMZN/JPM + equity-fill audit, walk-forward regime-stability gate across all 10 collected tickers with a matched coin-flip null, bounded lookback sensitivity {5, 10, 20}, determinism r1==r2, independent verifier 3 gates all MATCH). Results: canonical 20-day lookback = 9/10 CONSISTENT_WITH_NOISE, 1/10 REGIME_STABLE (TSLA, small edge); sensitivity = ROBUST=1 (TSLA @5/@20), SENSITIVE=2 (AAPL @5, NVDA @10), NO_EDGE=7. The small positive verdicts are absent from the momentum-asset list (MSFT/GOOGL/AMZN/META show NO_EDGE) and are non-lookback-robust. The result matches the a-priori prediction: noise-like in most assets, small positive verdicts only among momentum assets — the breakout filter adds no robust evidence beyond momentum.
+-
+-## Deliverables
+-- `research/backtest/regime_stability.py::breakout_signals` (new signal function, exported)
+-- `research/checks/breakout_20day_cont.py` (check)
+-- `research/checks/verify_breakout_20day_cont.py` (independent verifier)
+-- `research/checks/smoke_breakout_signals.py` (scratch smoke test; retained as a useful diagnostic)
+-- `tests/test_regime_stability.py` (5 new unit tests)
+-- `state/check_artifacts/breakout_20day_cont_results.json` (artifact)
+-- `state/STATE.md`, `state/LEARNING_STATE.md`, `state/activation_status.json`, `state/worker_progress.md`, `logs/ACTIVATION-2026-10-06.md` (records)
+-
+-## Post-change verification
+-- `python3 research/checks/smoke_breakout_signals.py`: exits 0.
+-- `python3 research/checks/breakout_20day_cont.py`: exits 0; all gates complete; artifact written.
+-- `python3 research/checks/verify_breakout_20day_cont.py`: GATE 1 PASS (AMZN/JPM MATCH), GATE 2 PASS (all-asset MATCH + verdicts MATCH), GATE 3 PASS (determinism identical).
+-- `python3 -m unittest discover -s tests -v`: 161 tests, all passing (156 existing + 5 new), no regressions.
+-- Py_compile on all edited modules: OK.
+-
+-## Unresolved / caveats
+-- The three borderline REGIME_STABLE verdicts (AAPL @5, TSLA @5/@20, NVDA @10) sit just above the framework's 0.05 noise band; their threshold sensitivity is not independently quantified (flagged in STATE.md).
+-- No per-checkpoint UTC timestamps captured (the `date` shell form is denied); run identity anchored to GITHUB_RUN_ID=37414038601.
+-- No KILO_RECOVERY_BRANCH present; no outstanding recovery work.
+-
+-## Next
+-Task R-001: cost-sensitivity test of the qualified momentum edge (fixed cost model, lookback 3/5/10, matched null) through the full gate stack; report whether costs erase the edge.
++last_verified_milestone: R-002 hold-period sensitivity complete (grid hold=(1,2,3,5)); independent verifier MATCH (all sections); determinism; leakage PASS; perturbation within null tol; regression suite 168/168; momentum signal defect discovered and repaired; momentum, lookback-sweep, longer-horizon, horizon-gap, and mean-reversion checks re-run on the corrected signal; agent_08.json record written
++next_bounded_action: P-004 repair and re-run the stale momentum/reversal independent verifiers so all artifacts are reproducible via independent recomputation; close momentum and reversal frontier cells as FALSIFIED (post-repair)
