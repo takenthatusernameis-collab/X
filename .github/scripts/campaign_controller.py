@@ -495,9 +495,9 @@ process_decision, research_result, decision, next, candidate_tasks,
 complexity_added, failure_class, task_selection_observation
 
 Controller-owned identity metadata (copy exactly; do not invent or omit):
-- agent_number: ${agent_number}
-- campaign_slot: ${agent_number}
-- global_agent_number: ${contract["global_agent_number"]}
+- agent_number: {agent_number}
+- campaign_slot: {agent_number}
+- global_agent_number: {contract["global_agent_number"]}
 
 Canonical decision values:
 {sorted(DECISIONS)}
