@@ -88,7 +88,7 @@ class CampaignArchitectureTests(unittest.TestCase):
             self.assertIn("python3 .github/scripts/scan_staged_secrets.py", workflow)
             self.assertNotIn("git diff --cached --binary | grep -E -n", workflow)
             self.assertNotIn("kilo_[A-Za-z0-9_-]{20,}", workflow)
-        self.assertIn('git diff", "--cached", "--name-only", "-z"', scanner)
+        self.assertIn('git diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR"', scanner)
         self.assertIn('git", "cat-file", "blob"', scanner)
 
     def test_global_identity_counter_is_durable(self):
