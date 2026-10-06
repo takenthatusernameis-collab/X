@@ -1438,6 +1438,24 @@ momentum, lookback 20/60) before declaring momentum robust across horizons.
 
 ---
 
+## Next activation
+
+**Selected frontier cell (frontier-first selection): regime-filtered momentum — a genuinely new signal class combining the supported momentum class with a regime gate.**
+
+Rationale: momentum is the only signal class in this series to carry candidate positive evidence (REGIME_STABLE, uniformly positive medians in 7/10 collected assets, lookback-robust at 3/5/10). The remaining unresolved questions are: (a) does the positive edge concentrate in particular regimes, and (b) can restricting trading to those regimes improve risk-adjusted robustness — or does it instead kill/reshape the edge, which would demote momentum from a regime-stable to a regime-dependent edge? This is materially different from the falsified regime-adaptive MA (which adapted windows and either killed the edge or kept the dependence): here the regime gate is a yes/no filter on a single fixed momentum signal, testing whether momentum's edge is regime-concentrated.
+
+**Hypothesis (a-priori, fixed design):** momentum remains a REGIME_STABLE positive edge even when restricted to the turbulent (high-volatility) regime blocks, OR restricting to turbulent regimes converts the class to CONSISTENT_WITH_NOISE / REGIME_STABLE_LOSS while calm-only momentum stays REGIME_STABLE. Either outcome is informative.
+
+**Falsification prediction:** if momentum's edge is purely short-horizon and regime-independent, a regime filter should not materially change the verdict (still REGIME_STABLE positive in both regimes); if the edge is regime-concentrated, filtering to turbulent regimes will produce CONSISTENT_WITH_NOISE or REGIME_STABLE_LOSS for the filtered class while calm-only momentum stays positive; if momentum is regime-dependent like the MA class, both filtered variants stay REGIME_DEPENDENT. The most falsifying outcome: both filtered variants are CONSISTENT_WITH_NOISE or REGIME_STABLE_LOSS -> momentum's positive edge in the unrestricted class is an artifact of regime mix, and momentum should be demoted from candidate evidence to regime-dependent/exploratory.
+
+**Method (fixed, not tuned to OOS):** seed 42; collected adjusted-close universe (dataset yf-ohlcv-universe-2009-to-2026-10-03); momentum = long the previous 5-day return, hold 1 day, daily rebalance; regime blocks = 4 contiguous volatility blocks from AAPL trailing-60d realized vol (past-only); walk-forward per segment train=252d/test=84d/warmup=60d/overlap=60d, min 400 bars/segment; compared vs coin-flip null on the same segments; three variants on AMZN and JPM: (1) no regime gate (base momentum, reference), (2) momentum active only in turbulent segments, (3) momentum active only in calm segments; then the same three variants via stress_segments_across_tickers across all 10 tickers; synthetic perturbation sweep (lookback 3/5/10 x top_k 3/5, canonical regime family, coin-flip null) for parameter robustness; internal determinism assertion; artifact to state/check_artifacts/regime_filtered_momentum_results.json; independent verifier `research/checks/verify_regime_filtered_momentum.py` recomputing every segment median and verdict via a fresh walk_forward path (not stress_segments).
+
+**Deliverables:** `research/checks/regime_filtered_momentum.py`, `research/checks/verify_regime_filtered_momentum.py`, `state/check_artifacts/regime_filtered_momentum_results.json`, updates to `state/STATE.md`, `state/LEARNING_STATE.md`, `state/worker_progress.md`, `state/activation_status.json`, `logs/ACTIVATION-2026-10-06.md`.
+
+**Acceptance criteria:** the check runs end-to-end (manifest 10/10 OK, PREFLIGHT PASSED, leakage PASS, sweep CONSISTENT_WITH_NOISE on the noise-free synthetic generator by construction, determinism asserted); the verifier MATCHes the artifact via the fresh path; 134/134 regression tests pass post-edit; the verdict (REGIME_STABLE / CONSISTENT_WITH_NOISE / REGIME_DEPENDENT / REGIME_STABLE_LOSS for each variant, with medians) folded into STATE.md and LEARNING_STATE.md with a RETAIN/REVERT/UNVERIFIED decision on the momentum admission.
+
+---
+
 ## Evidence standard
 
 Synthetic data validates tooling only; it is not evidence that any

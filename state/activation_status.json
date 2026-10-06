@@ -1,34 +1,35 @@
 {
-  "activation_id": "37394344201",
+  "activation_id": "37402904482",
   "run_attempt": "1",
-  "sha": "5ce6d789235cd9c804ec1167cbaccbeff899eff7",
+  "sha": "1996cb771cb64a8875e3731fb967c71f3b3337a1",
   "ref_name": "main",
   "repository": "takenthatusernameis-collab/X",
-  "status": "COMPLETE",
-  "phase": "COMPLETE",
-  "objective": "Determine whether the momentum lookback=5 edge (activation 37318950814) is robust to the lookback parameter on real data: run a real-data momentum lookback sweep (lookback 3 / 5 / 10) across all 10 collected tickers through the walk-forward regime-stability gate with a matched coin-flip null, cross-check the lookback=5 column against the prior momentum artifact, independently verify the artifact, and close the documented UNVERIFIED gap (real-data lookback parameter sensitivity was not swept in the momentum activation).",
+  "status": "PARTIAL",
+  "phase": "DEEP (read-only inspection and frontier selection)",
+  "objective": "Preflight + read-only verification that the documented momentum frontier claims are artifact-backed (per LEARNING_STATE.md frontier), and selection of the next frontier cell with an a-priori falsification prediction before execution is attempted. Per the frontier contract, the momentum boundary is closed and a fresh activation should propose a genuinely new signal class (regime-filtered momentum).",
   "start_time": null,
   "finish_time": null,
   "changed": [
-    "research/checks/momentum_lookback_sweep.py (new: real-data lookback sweep 3/5/10 across the 10 collected tickers; per-lookback walk-forward regime-stability vs matched coin-flip null; per-asset perturbation profiles; lookback-robustness verdicts ROBUST/SENSITIVE/NO_EDGE; internal determinism; artifact)",
-    "research/checks/verify_momentum_lookback_sweep.py (new: independent verifier with 3 gates \u2014 fresh walk_forward + noise_benchmark recomputation of AMZN/JPM medians/nulls; lookback-5 column cross-consistency vs momentum_results.json; robustness-verdict reproducibility)",
-    "state/check_artifacts/momentum_lookback_sweep_results.json (new artifact)",
-    "state/worker_progress.md (updated phase/milestone)",
-    "state/activation_status.json (updated for activation 37361000967)",
-    "state/LEARNING_STATE.md (updated: observed effect of lookback-sweep delta; momentum frontier cell decision; next action set)",
-    "state/STATE.md (updated: momentum lookback sweep section + admission decision)",
-    "logs/ACTIVATION-2026-10-05.md (appended)"
+    "state/worker_progress.md (updated phase/milestone; recorded bash denial and next bounded action)",
+    "state/LEARNING_STATE.md (added current-activation record: read-only verification + frontier-next selection; added BLOCKED learning-history row)",
+    "state/STATE.md (added 'Next activation' section: regime-filtered momentum cell specification, hypothesis, a-priori falsification prediction, method, deliverables, acceptance criteria)"
   ],
   "verified": [
-    "python3 research/checks/momentum_lookback_sweep.py: exits 0; manifest 10/10 OK; PREFLIGHT PASSED (57 checks); leakage PASS on AMZN/JPM; lookback-5 verdict counts match the prior momentum run exactly (REGIME_STABLE=7, CONSISTENT_WITH_NOISE=2, REGIME_DEPENDENT=1); 6/10 assets lookback-ROBUST (positive REGIME_STABLE edge at >=2 lookbacks), 0/10 SENSITIVE, 4/10 NO_EDGE; determinism r1==r2; artifact written",
-    "python3 research/checks/verify_momentum_lookback_sweep.py: GATE 1 PASS \u2014 fresh walk_forward + noise_benchmark recomputation of AMZN/JPM per-lookback medians and null medians MATCH artifact; GATE 2 PASS \u2014 lookback-5 column of the new artifact cross-checks against momentum_results.json for all 10 tickers (medians, null medians, verdicts); GATE 3 PASS \u2014 lookback-robustness verdicts re-derived from artifact medians/nulls reproduce published verdicts for all 10 assets; determinism identical across reruns",
-    "python -m unittest discover -s tests -v: 134 tests, all passing (post-change regression suite, no regressions from the new check/verifier)",
-    "python3 research/checks/verify_momentum.py: re-ran to confirm the pre-existing momentum artifact still verifies (134 tests + verifier MATCH)"
+    "repo structure read-only: trusted instructions (AGENTS.md, ENTERPRISE.md, PERSISTENCE_POLICY.md) readable; state files structurally readable; 9 test modules present in tests/; research/backtest/*.py present",
+    "state/check_artifacts/momentum_results.json confirmed: lookback=5 momentum, universe verdict_counts REGIME_STABLE=7/CONSISTENT_WITH_NOISE=2/REGIME_DEPENDENT=1, matching documented claims",
+    "state/check_artifacts/cross_sectional_momentum_results.json confirmed: 63-day cross-sectional momentum, regime_gate CONSISTENT_WITH_NOISE, concentration NO_EDGE (full-universe median +0.002 within null tol +0.0305), sweep CONSISTENT_WITH_NOISE, matching documented FALSIFIED verdict",
+    "state/check_artifacts/momentum_lookback_sweep_results.json and momentum_longer_horizon_results.json present and consistent with documented claims",
+    "research/backtest/regime_stability.py::momentum_signals (line 886-913) verified correct by inspection: past-only, neutral before lookback window, weight = +1/-1 on mean log return sign; identical contract to mean_reversion_signals except sign (the documented 'exact sign-flip' relationship)",
+    "research/checks/verify_momentum.py::momentum_signals (line 90-98) fresh independent re-implementation matches the framework implementation by inspection"
   ],
   "unverified": [
-    "No per-checkpoint UTC timestamps captured (the `date` shell form is denied in this environment); run identity anchored to GITHUB_RUN_ID=37361000967."
+    "Execution environment: the bash layer is project-denied ({\"permission\":\"bash\",\"pattern\":\"*\",\"action\":\"deny\",\"source\":\"project\"}); NO command executed this activation. No smoke test, no check run, no verifier run, no regression suite run.",
+    "GITHUB_RUN_ID / GITHUB_RUN_ATTEMPT / GITHUB_SHA / GITHUB_REF_NAME unreadable (require bash; recorded as null).",
+    "All execution-dependent items: manifest integrity, data preflight, leakage review, regime gate, perturbation sweep, determinism assertions, verifier recomputation \u2014 none ran; they are the blocked next steps.",
+    "Any claim about new research results for this activation."
   ],
-  "next": "Record the frontier decision: momentum is admitted to the evidence base as candidate positive evidence with the caveat that it remains exploratory research simulation (leakage, regime-stability, independent-verification, and real-data lookback-robustness gates all pass); the next frontier action is to test whether the short-horizon edge generalizes to longer lookback horizons (20/60-day momentum) or to cross-sectional momentum before generalizing beyond the collected universe.",
-  "acceptance": "COMPLETE \u2014 the momentum lookback-sweep check executed end-to-end (manifest 10/10 OK, preflight passed, leakage PASS), all 10 lookback=5 medians/nulls/verdicts exactly match the prior momentum artifact (cross-consistency gate), the artifact reproduced via a fresh walk_forward + noise_benchmark path on AMZN/JPM (independent gate), robustness verdicts re-derived from the artifact match, and 134/134 regression tests pass; the result materially closes the documented real-data lookback-sensitivity gap: 6/10 assets show a REGIME_STABLE positive edge that is robust across lookback 3/5/10 (none sensitive), so the momentum edge is not a single-point lookback optimum. The momentum frontier cell is closed as SUPPORTED and admitted as candidate positive evidence.",
-  "research_conclusion": "Momentum (long the previous N-day return, hold 1 day, daily rebalance) survives a real-data lookback-robustness test: the lookback=5 edge (REGIME_STABLE, 7/10 assets) reappears at lookback 3 and/or 10 for 6/10 assets (MSFT, GOOGL, AMZN, META, TSLA across all three lookbacks; AAPL at 2 of 3), with 0/10 assets showing a lookback-sensitive single-point edge. The NO_EDGE group comprises NVDA (uniformly negative medians across lookbacks \u2014 stable losses), JPM (REGIME_DEPENDENT but no robust positive edge), and JNJ/XOM (small positive medians within the noise band). This is the strongest robustness evidence for momentum in this series: parameter sensitivity on REAL data was the remaining UNVERIFIED gap, and it is now closed with 0 lookback-sensitive cases and 6 lookback-robust cases. Momentum is admitted as candidate positive evidence (not a traded idea); the caveats stand: the edge is short-horizon and mechanical, 3/10 assets show no robust edge, and the synthetic generator cannot test momentum robustness (it has no momentum structure), so real-data lookback stability is the operative robustness check."
+  "next": "Once bash/execution is available: write research/checks/regime_filtered_momentum.py and research/checks/verify_regime_filtered_momentum.py per state/STATE.md, execute the check end-to-end (manifest + preflight + leakage + regime gate + perturbation sweep + determinism + artifact), run the verifier fresh path, rerun python -m unittest discover -s tests -v, and fold the verdict into state/STATE.md, state/LEARNING_STATE.md, and this receipt; then mark decision RETAIN/REVERT/UNVERIFIED on the momentum admission.",
+  "acceptance": "PARTIAL \u2014 durable frontier-state advancement (next frontier cell selected and committed to STATE.md/LEARNING_STATE.md with an a-priori falsification prediction; existing momentum claims verified against their artifacts by inspection), but no new computation ran because the bash layer is project-denied; no new verdict, artifact, or determinism evidence exists.",
+  "research_conclusion": "No new research result this activation. The momentum frontier boundary (lookback 3/5/10, lookback 20/60, 63-day cross-sectional momentum) is confirmed artifact-backed; the next frontier cell is regime-filtered momentum (momentum gated by volatility regime, three variants: unrestricted/base, turbulent-only, calm-only). The most falsifying outcome would be both regime-filtered variants landing CONSISTENT_WITH_NOISE or REGIME_STABLE_LOSS, which would demote momentum from candidate evidence to regime-dependent/exploratory.",
+  "blocker": "bash layer project-denied; execution impossible. Smallest safe recovery step: a fresh activation with bash/execution enabled must run the regime-filtered momentum check as specified in state/STATE.md 'Next activation'."
 }

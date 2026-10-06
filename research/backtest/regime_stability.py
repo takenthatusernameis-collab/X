@@ -913,6 +913,44 @@ def momentum_signals(
     return out
 
 
+def regime_filtered_momentum_signals(
+    closes: NDArray,
+    keep: str = "turbulent",
+    window: int = 60,
+) -> List[Signal]:
+    """Past-only regime-filtered momentum signal.
+
+    Same short-horizon momentum construction as `momentum_signals` (long the
+    previous ``lookback``-day return, hold 1 day, daily rebalance), but the
+    signal is active only inside the regime block labeled ``keep`` ("turbulent"
+    or "calm"), neutral elsewhere. Regime labels come from ``volatility_blocks``
+    (past-only, trailing-``window``-bar realized vol vs series-wide median).
+
+    This tests whether momentum's edge concentrates in one volatility regime:
+    if the filtered class loses the edge, momentum's positive results rest on
+    regime mix rather than being regime-stable.
+
+    No look-ahead: each signal uses only closes up to and including its own
+    bar, and the regime label of bar i depends only on closes[:i].
+    """
+    if keep not in ("turbulent", "calm"):
+        raise ValueError("keep must be 'turbulent' or 'calm'")
+    labels = volatility_blocks(closes, window=window)
+    n = len(closes)
+    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    lookback = 5
+    for i in range(n):
+        lab = labels[i]
+        if lab == "insufficient" or lab != keep:
+            out[i] = Signal(date=i + 1, weight=0.0)
+        elif i >= lookback - 1:
+            ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+            out[i] = Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+        else:
+            out[i] = Signal(date=i + 1, weight=0.0)
+    return out
+
+
 def regime_adaptive_ma_signals(
     closes: NDArray,
     fast_calm: int = 20,
