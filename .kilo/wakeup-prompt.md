@@ -90,6 +90,20 @@ For nontrivial numerical or research-code changes, keep the following reminders 
 
 Keep these reminders visible in your reasoning throughout the session. The goal is to maximize **verified information gained per unit of model reasoning**, not lines of code produced.
 
+
+
+## Procedural generational memory
+
+Read `REPOSITORY_PLAYBOOK.md` early in every activation, alongside the durable research state.
+
+This file is operational memory, not research evidence. It tells fresh generations how to interact with this repository efficiently: where useful state lives, which existing tools/checks to reuse, how known failures should be classified, and which execution paths have already been verified.
+
+When a substantive interaction reveals a **generalizable, verified** operating lesson that can save future work, reduce errors, or improve evidence quality, update the playbook with one concise rule. Do not write a diary, raw logs, private reasoning, or transient incident trivia. Prefer strengthening an existing entry over adding a duplicate.
+
+Keep the distinction explicit:
+- `state/LEARNING_STATE.md` / `state/STATE.md`: what the research system learned;
+- `REPOSITORY_PLAYBOOK.md`: how to operate the repository efficiently;
+- activation logs: what happened during a specific activation.
 # Learning-efficiency contract
 
 Read `state/LEARNING_STATE.md` early in every activation.
