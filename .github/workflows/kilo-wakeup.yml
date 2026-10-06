@@ -554,6 +554,9 @@ jobs:
           campaign_successes=0
           semantic_progress_seen=0
 
+          # Capture immutable controller-owned prompt content before any worker starts.
+          cp .kilo/wakeup-prompt.md /tmp/kilo-trusted-wakeup-prompt.md
+
           roles=(
             "FORENSICS"
             "HYPOTHESIS_EXPANSION"
@@ -586,8 +589,7 @@ jobs:
             before_checkpoint="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo 0)"
             before_head="$(git rev-parse --short=12 HEAD)"
             before_status="$(git status --short)"
-            printf '%s
-' "$before_status" > "state/campaign/agent_${agent_id}_before_status.txt"
+            printf '%s\\n' "$before_status" > "state/campaign/agent_${agent_id}_before_status.txt"
 
             cat > "/tmp/kilo-agent-${agent_id}.prompt" <<EOF
           CAMPAIGN_AGENT_NUMBER=${agent_id}
@@ -605,12 +607,12 @@ jobs:
           Do not launch another Kilo session, workflow, recursive agent, or hidden
           sub-campaign. Do not commit or push. Do not modify trusted control-plane files.
 
-          The campaign's governing prompt follows:
-          $(cat .kilo/wakeup-prompt.md)
+          The campaign's immutable controller-approved prompt follows:
+          $(cat /tmp/kilo-trusted-wakeup-prompt.md)
           EOF
 
             : > "$log_path"
-            stdbuf -oL -eL timeout --foreground --signal=TERM 28m               kilo run --model openai-compatible/free-kilo --auto "$(cat "/tmp/kilo-agent-${agent_id}.prompt")"               > >(tee "$log_path") 2>&1
+            stdbuf -oL -eL timeout --foreground --signal=TERM --kill-after=60s 28m kilo run --model openai-compatible/free-kilo --auto "$(cat "/tmp/kilo-agent-${agent_id}.prompt")" > >(tee "$log_path") 2>&1
             status=$?
 
             after_checkpoint="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo 0)"
@@ -644,20 +646,27 @@ jobs:
               echo "- observed_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
               echo
               echo "STATUS_START"
-              printf '%s
-' "$after_status"
+              printf '%s\\n' "$after_status"
               echo "STATUS_END"
               echo
               echo "DIFF_NAMES_START"
-              printf '%s
-' "$diff_names"
+              printf '%s\\n' "$diff_names"
               echo "DIFF_NAMES_END"
               echo
               echo "This record reports controller-observed execution only; it does not certify research claims."
             } > "$record_path"
 
-            printf '%s
-' "$after_status" > "state/campaign/agent_${agent_id}_after_status.txt"
+            printf '%s\\n' "$after_status" > "state/campaign/agent_${agent_id}_after_status.txt"
+
+            protected_tamper=0
+            if git diff --name-only -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md | grep -q .; then
+              protected_tamper=1
+              campaign_failed=1
+              echo "::error::Campaign agent ${agent_id} modified a protected control-plane path; controller is restoring it before the next fresh session."
+              echo "CONTROL_PLANE_TAMPER_ATTEMPT=1" >> "$GITHUB_ENV"
+            fi
+            git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
+            git reset -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
 
             echo "CAMPAIGN_AGENT_${agent_id}_STATUS=${agent_status}" >> "$GITHUB_ENV"
             echo "CAMPAIGN_SUCCESS_COUNT=${campaign_successes}" >> "$GITHUB_ENV"
