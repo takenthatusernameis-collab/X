@@ -446,7 +446,6 @@ def main() -> int:
     if args.command == "select":
         contract = select_task(args.run_id, args.agent_number)
         print(json.dumps(contract, indent=2, sort_keys=True))
-        print(f"TASK_ID={contract['task_id']}")
         return 0
     if args.command == "render-prompt":
         print(render_prompt(args.run_id, args.agent_number))
