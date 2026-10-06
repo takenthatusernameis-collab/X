@@ -188,6 +188,8 @@ def main() -> int:
     failure_class = classify_failure(output, return_code, liveness)
     runtime = {
         "agent_number": args.agent_number,
+        "campaign_slot": args.agent_number,
+        "global_agent_number": contract["global_agent_number"],
         "run_id": str(args.run_id),
         "task_id": contract["task_id"],
         "fresh_session": True,
