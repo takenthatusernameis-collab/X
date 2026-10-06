@@ -29,7 +29,6 @@ def load_json(path: Path) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--baseline", required=True)
     ap.add_argument("--campaign", default="state/campaign/campaign_status.json")
     ap.add_argument("--verify-outcome", required=True)
     ap.add_argument("--worker-outcome", required=True)
@@ -37,7 +36,14 @@ def main() -> int:
     ap.add_argument("--output", default="state/campaign/process_evaluation.json")
     args = ap.parse_args()
 
-    baseline = load_json(Path(args.baseline))
+    baseline = {}
+    import subprocess
+    for name in ["state/LEARNING_STATE.md", "state/STATE.md", "state/activation_status.json", "state/worker_progress.md"]:
+        try:
+            blob = subprocess.check_output(["git", "show", f"HEAD:{name}"])
+            baseline[name] = hashlib.sha256(blob).hexdigest()
+        except subprocess.CalledProcessError:
+            baseline[name] = None
     campaign_path = Path(args.campaign)
     campaign = load_json(campaign_path) if campaign_path.exists() else {}
 
@@ -59,9 +65,9 @@ def main() -> int:
     except Exception:
         pass
 
-    learning_changed = current["learning_state"] != baseline.get("learning_state")
-    research_state_changed = current["research_state"] != baseline.get("research_state")
-    worker_progress_changed = current["worker_progress"] != baseline.get("worker_progress")
+    learning_changed = current["learning_state"] != baseline.get("state/LEARNING_STATE.md")
+    research_state_changed = current["research_state"] != baseline.get("state/STATE.md")
+    worker_progress_changed = current["worker_progress"] != baseline.get("state/worker_progress.md")
     research_code_changed = any(
         p.startswith("research/") or p.startswith("tests/") or p.startswith("examples/")
         for p in changes
