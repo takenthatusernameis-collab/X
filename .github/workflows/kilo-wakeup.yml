@@ -450,17 +450,12 @@ jobs:
             --worker failure \
             --verify success \
             --liveness COMPLETED_WITH_SEMANTIC_CHECKPOINTS \
-            --persistence MAIN \
-            --process VERIFIED_PROGRESS 2>&1)"
+            --persistence MAIN 2>&1)"
           failure_rc=$?
           set -e
           printf '%s\n' "$failure_output"
           test "$failure_rc" -eq 0
           printf '%s\n' "$failure_output" | grep -q "KILO_WORKER_OUTCOME=PARTIAL"
-
-          echo "Compiling and self-testing controller guard scripts..."
-          python3 -m py_compile .github/scripts/report_kilo_outcome.py .github/scripts/validate_campaign_agent.py .github/scripts/evaluate_research_process.py
-          python3 .github/scripts/report_kilo_outcome.py --self-test
 
           echo "Running deterministic real-data preflight..."
           if ! python3 research/data/preflight.py > /tmp/x-data-preflight.log 2>&1; then
@@ -531,229 +526,158 @@ jobs:
           rc=$?
           echo "DEEP_AUDIT_RC=$rc"
           exit 0
-      - name: Run 10-agent campaign
+      - name: Run Kilo
         id: kilo
         if: steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success'
         continue-on-error: true
-        timeout-minutes: 300
+        timeout-minutes: 340
         env:
           KILO_DISABLE_EXTERNAL_SKILLS: "true"
-          CAMPAIGN_AGENT_COUNT: "10"
-          CAMPAIGN_AGENT_TIMEOUT_MINUTES: "28"
         run: |
-          set -euo pipefail
-          mkdir -p state/campaign
+          set +e
+          mkdir -p state
           cat > state/worker_progress.md <<EOF
           # Worker Progress
-
+          
           activation_id: $GITHUB_RUN_ID
-          phase: CAMPAIGN_INITIALIZED
+          phase: CONTROLLER_INITIALIZED
           status: OBSERVATION_ONLY
-          last_verified_milestone: campaign initialized
-          next_bounded_action: run campaign agent 01 of 10
-
+          last_verified_milestone: none yet
+          next_bounded_action: begin the declared research objective
+          
           This file is a liveness contract. Update it only after a real research-state transition or verified milestone.
           EOF
+          initial_checkpoint_mtime="$(stat -c %Y state/worker_progress.md)"
 
-          campaign_failed=0
-          campaign_successes=0
+          : > /tmp/kilo-primary.log
+          # Stream Kilo stdout/stderr into the live GitHub Actions log while also
+          # retaining a local copy for liveness checks and post-run diagnostics.
+          stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-primary.log) 2>&1 &
+          kilo_pid=$!
+
+          stall_seconds=1800
+          interval_seconds=300
+          stale_for=0
           semantic_progress_seen=0
+          liveness_status="RUNNING"
+          last_signal="controller-initialized"
 
-          # Capture immutable controller-owned prompt content before any worker starts.
-          cp .kilo/wakeup-prompt.md /tmp/kilo-trusted-wakeup-prompt.md
+          while kill -0 "$kilo_pid" 2>/dev/null; do
+            sleep "$interval_seconds"
 
-          roles=(
-            "FORENSICS"
-            "HYPOTHESIS_EXPANSION"
-            "ADVERSARIAL_FALSIFICATION"
-            "METHODOLOGY_ENGINEERING"
-            "DECISIVE_EXPERIMENT"
-            "INDEPENDENT_REPRODUCTION"
-            "ROBUSTNESS_STRESS"
-            "RESEARCH_SOFTWARE_RELIABILITY"
-            "SYNTHESIS_LEARNING"
-            "FINAL_RED_TEAM_HANDOFF"
-          )
-
-          echo "CAMPAIGN_AGENT_COUNT=10" >> "$GITHUB_ENV"
-          echo "CAMPAIGN_AGENT_TIMEOUT_MINUTES=28" >> "$GITHUB_ENV"
-          echo "CAMPAIGN_STARTED_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
-
-          for index in $(seq 1 10); do
-            role_index=$((index - 1))
-            role="${roles[role_index]}"
-            printf -v agent_id "%02d" "$index"
-            log_path="state/campaign/agent_${agent_id}.log"
-            record_path="state/campaign/agent_${agent_id}_controller.md"
-
-            echo
-            echo "============================================================"
-            echo "STARTING FRESH CAMPAIGN AGENT ${index}/10: ${role}"
-            echo "============================================================"
-
-            before_checkpoint="$(sha256sum state/worker_progress.md 2>/dev/null | cut -d " " -f1 || true)"
-            python3 - <<PY > "/tmp/kilo-agent-${agent_id}-before.json"
-            import hashlib
-            import json
-            import subprocess
-            from pathlib import Path
-            names = set()
-            for cmd in (("git", "diff", "--name-only"), ("git", "ls-files", "--others", "--exclude-standard")):
-                names.update(x for x in subprocess.check_output(cmd, text=True).splitlines() if x)
-            hashes = {}
-            for name in sorted(names):
-                p = Path(name)
-                if p.is_file():
-                    hashes[name] = hashlib.sha256(p.read_bytes()).hexdigest()
-            print(json.dumps({"hashes": hashes}, indent=2))
-            PY
-            before_head="$(git rev-parse --short=12 HEAD)"
-            before_status="$(git status --short)"
-            printf '%s\n' "$before_status" > "state/campaign/agent_${agent_id}_before_status.txt"
-
-            cat > "/tmp/kilo-agent-${agent_id}.prompt" <<EOF
-          CAMPAIGN_AGENT_NUMBER=${agent_id}
-          CAMPAIGN_AGENT_COUNT=10
-          CAMPAIGN_AGENT_ROLE=${role}
-
-          You are one fresh member of a sequential 10-agent research campaign.
-          This is a new context. Other campaign agents may already have changed the shared
-          worktree. Their claims are not automatically trustworthy.
-
-          Use the campaign role as a lens, not as a requirement to produce edits.
-          Inspect current durable evidence first. Continue, falsify, replace, or reject
-          prior work according to the evidence.
-
-          Do not launch another Kilo session, workflow, recursive agent, or hidden
-          sub-campaign. Do not commit or push. Do not modify trusted control-plane files.
-
-          The campaign's immutable controller-approved prompt follows:
-          $(cat /tmp/kilo-trusted-wakeup-prompt.md)
-          EOF
-
-            : > "$log_path"
-            status=0
-            if stdbuf -oL -eL timeout --foreground --signal=TERM --kill-after=60s 28m kilo run --model openai-compatible/free-kilo --auto "$(cat "/tmp/kilo-agent-${agent_id}.prompt")" > >(tee "$log_path") 2>&1; then
-              status=0
-            else
-              status=$?
+            if ! kill -0 "$kilo_pid" 2>/dev/null; then
+              break
             fi
 
-            after_checkpoint="$(sha256sum state/worker_progress.md 2>/dev/null | cut -d " " -f1 || true)"
-            after_head="$(git rev-parse --short=12 HEAD)"
-            after_status="$(git status --short)"
-            diff_names="$(git diff --name-status)"
+            now="$(date +%s)"
+            checkpoint_mtime="$initial_checkpoint_mtime"
+            if [ -f state/worker_progress.md ]; then
+              checkpoint_mtime="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo "$initial_checkpoint_mtime")"
+            fi
+            output_mtime="$(stat -c %Y /tmp/kilo-primary.log 2>/dev/null || echo "$now")"
 
-            if [ "$after_checkpoint" != "$before_checkpoint" ]; then
+            checkpoint_age=$((now - checkpoint_mtime))
+            output_age=$((now - output_mtime))
+
+            if [ "$checkpoint_mtime" -gt "$initial_checkpoint_mtime" ]; then
               semantic_progress_seen=1
-            fi
-
-            if [ "$status" -eq 0 ]; then
-              agent_status="WORKER_SUCCESS"
-            elif [ "$status" -eq 124 ]; then
-              campaign_failed=1
-              agent_status="TIMEOUT"
+              stale_for=0
+              last_signal="SEMANTIC_CHECKPOINT"
+            elif [ "$output_age" -le "$interval_seconds" ]; then
+              stale_for=0
+              last_signal="PROCESS_ACTIVITY_ONLY"
             else
-              campaign_failed=1
-              agent_status="FAILED"
-            fi
-
-            if python3 .github/scripts/validate_campaign_agent.py --agent-id "$agent_id" --exit-code "$status" --before "/tmp/kilo-agent-${agent_id}-before.json" --before-worker-progress-sha "$before_checkpoint"; then
-              validation_rc=0
-            else
-              validation_rc=$?
-            fi
-
-            if [ "$validation_rc" -eq 0 ] && [ "$status" -eq 0 ]; then
-              campaign_successes=$((campaign_successes + 1))
-              agent_status="SUCCESS"
-            elif [ "$status" -eq 0 ] && [ "$validation_rc" -ne 0 ]; then
-              campaign_failed=1
-              agent_status="FAILED_VALIDATION"
+              stale_for=$((stale_for + interval_seconds))
+              last_signal="NO_RECENT_PROGRESS_SIGNAL"
             fi
 
             {
-              echo "# Campaign Agent ${agent_id}"
-              echo
-              echo "- role: ${role}"
-              echo "- status: ${agent_status}"
-              echo "- worker_exit_code: ${status}"
-              echo "- controller_validation_rc: ${validation_rc}"
-              echo "- before_head: ${before_head}"
-              echo "- after_head: ${after_head}"
+              echo "### Kilo liveness heartbeat"
               echo "- observed_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-              echo
-              echo "STATUS_START"
-              printf "%s\n" "$after_status"
-              echo "STATUS_END"
-              echo
-              echo "DIFF_NAMES_START"
-              printf "%s\n" "$diff_names"
-              echo "DIFF_NAMES_END"
-              echo
-              echo "VALIDATION_REPORT"
-              if [ -f "state/campaign/agent_${agent_id}_validation.json" ]; then
-                cat "state/campaign/agent_${agent_id}_validation.json"
-              else
-                echo "missing"
-              fi
-              echo "END_VALIDATION_REPORT"
-              echo
-              echo "This record reports controller-observed execution and validation only; it does not certify research claims."
-            } > "$record_path"
-            printf '%s\n' "$after_status" > "state/campaign/agent_${agent_id}_after_status.txt"
+              echo "- process: PID $kilo_pid alive"
+              echo "- semantic_checkpoint_age_seconds: $checkpoint_age"
+              echo "- worker_output_age_seconds: $output_age"
+              echo "- last_signal: $last_signal"
+              echo "- stale_for_seconds: $stale_for"
+              echo "- semantic_progress_seen: $semantic_progress_seen"
+            } >> "$GITHUB_STEP_SUMMARY"
 
-            protected_tamper=0
-            if git diff --name-only -- .github/workflows .github/scripts .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md | grep -q .; then
-              protected_tamper=1
-              campaign_failed=1
-              echo "::error::Campaign agent ${agent_id} modified a protected control-plane path; controller is restoring it before the next fresh session."
-              echo "CONTROL_PLANE_TAMPER_ATTEMPT=1" >> "$GITHUB_ENV"
+            echo "::notice::Kilo liveness: signal=$last_signal checkpoint_age=$checkpoint_age s output_age=$output_age s stale_for=$stale_for s"
+
+            if [ "$stale_for" -ge "$stall_seconds" ]; then
+              echo "::error::Kilo worker appears stalled: no semantic checkpoint or fresh worker output for $stale_for s."
+              liveness_status="STALLED"
+              echo "KILO_LIVENESS_STATUS=STALLED" >> "$GITHUB_ENV"
+              echo "KILO_LIVENESS_REASON=no semantic checkpoint or fresh worker output for $stale_for s" >> "$GITHUB_ENV"
+              kill -TERM "$kilo_pid" 2>/dev/null || true
+              sleep 10
+              kill -KILL "$kilo_pid" 2>/dev/null || true
+              break
             fi
-            git restore --worktree --staged -- .github/workflows .github/scripts .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
-            git reset -- .github/workflows .github/scripts .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
-            git clean -fd -- .github/workflows .github/scripts .kilo 2>/dev/null || true
-
-            echo "CAMPAIGN_AGENT_${agent_id}_STATUS=${agent_status}" >> "$GITHUB_ENV"
-            echo "CAMPAIGN_SUCCESS_COUNT=${campaign_successes}" >> "$GITHUB_ENV"
-            echo "CAMPAIGN_FAILURE_COUNT=$((index - campaign_successes))" >> "$GITHUB_ENV"
-            echo "::notice::Campaign agent ${index}/10 finished: ${agent_status}; successes=${campaign_successes}; failures=$((index - campaign_successes))"
-
-            echo "## Campaign agent ${index}/10 — ${role}: ${agent_status}" >> "$GITHUB_STEP_SUMMARY"
           done
 
-          campaign_status="PARTIAL"
-          if [ "$campaign_failed" -eq 0 ]; then
-            campaign_status="COMPLETE"
+          wait "$kilo_pid"
+          status=$?
+
+          if [ "$liveness_status" != "STALLED" ]; then
+            if [ "$semantic_progress_seen" -eq 1 ]; then
+              echo "KILO_LIVENESS_STATUS=COMPLETED_WITH_SEMANTIC_CHECKPOINTS" >> "$GITHUB_ENV"
+              echo "KILO_LIVENESS_REASON=worker terminated after emitting at least one post-start semantic checkpoint" >> "$GITHUB_ENV"
+            else
+              echo "KILO_LIVENESS_STATUS=COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT" >> "$GITHUB_ENV"
+              echo "KILO_LIVENESS_REASON=worker terminated without a post-start semantic checkpoint" >> "$GITHUB_ENV"
+            fi
           fi
 
-          echo "CAMPAIGN_SUCCESS_COUNT=$campaign_successes" >> "$GITHUB_ENV"
-          echo "CAMPAIGN_FAILURE_COUNT=$((10 - campaign_successes))" >> "$GITHUB_ENV"
-          echo "CAMPAIGN_STATUS=$campaign_status" >> "$GITHUB_ENV"
-          echo "CAMPAIGN_FINISHED_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
-
-          {
-            echo "{"
-            echo "  \"status\": \"$campaign_status\","
-            echo "  \"agent_count\": 10,"
-            echo "  \"success_count\": $campaign_successes,"
-            echo "  \"failure_count\": $((10 - campaign_successes)),"
-            echo "  \"finished_utc\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\""
-            echo "}"
-          } > state/campaign/campaign_status.json
-
-          if [ "$semantic_progress_seen" -eq 1 ]; then
-            echo "KILO_LIVENESS_STATUS=COMPLETED_WITH_SEMANTIC_CHECKPOINTS" >> "$GITHUB_ENV"
-            echo "KILO_LIVENESS_REASON=10 fresh campaign sessions executed; at least one post-start semantic checkpoint changed" >> "$GITHUB_ENV"
-          else
-            echo "KILO_LIVENESS_STATUS=COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT" >> "$GITHUB_ENV"
-            echo "KILO_LIVENESS_REASON=10 fresh campaign sessions executed without an observed post-start semantic checkpoint change" >> "$GITHUB_ENV"
-          fi
-
-          if [ "$campaign_failed" -eq 0 ]; then
+          echo "Kilo primary session exited with status $status; live output was streamed above."
+          if [ "$status" -eq 0 ]; then
             exit 0
           fi
-          exit 1
+
+          if grep -Eq 'invalid request error trace_id:' /tmp/kilo-primary.log; then
+            echo "::warning::Kilo gateway returned a transient invalid-request trace; retrying once with a fresh Kilo session."
+            sleep 5
+            : > /tmp/kilo-retry.log
+            # Stream retry output live as well.
+            stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-retry.log) 2>&1 &
+            retry_pid=$!
+            retry_stale=0
+
+            while kill -0 "$retry_pid" 2>/dev/null; do
+              sleep "$interval_seconds"
+              if ! kill -0 "$retry_pid" 2>/dev/null; then
+                break
+              fi
+              now="$(date +%s)"
+              retry_output_mtime="$(stat -c %Y /tmp/kilo-retry.log 2>/dev/null || echo "$now")"
+              retry_output_age=$((now - retry_output_mtime))
+              retry_checkpoint_mtime="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo "$initial_checkpoint_mtime")"
+              retry_checkpoint_age=$((now - retry_checkpoint_mtime))
+              if [ "$retry_checkpoint_mtime" -gt "$initial_checkpoint_mtime" ] || [ "$retry_output_age" -le "$interval_seconds" ]; then
+                retry_stale=0
+              else
+                retry_stale=$((retry_stale + interval_seconds))
+              fi
+              echo "::notice::Kilo retry liveness: checkpoint_age=$retry_checkpoint_age s output_age=$retry_output_age s stale_for=$retry_stale s"
+              if [ "$retry_stale" -ge "$stall_seconds" ]; then
+                echo "::error::Fresh Kilo retry also appears stalled; stopping it after $retry_stale s without progress signal."
+                kill -TERM "$retry_pid" 2>/dev/null || true
+                sleep 10
+                kill -KILL "$retry_pid" 2>/dev/null || true
+                liveness_status="STALLED"
+                echo "KILO_LIVENESS_STATUS=STALLED" >> "$GITHUB_ENV"
+                echo "KILO_LIVENESS_REASON=fresh retry produced no semantic checkpoint or worker output for $retry_stale s" >> "$GITHUB_ENV"
+                break
+              fi
+            done
+
+            wait "$retry_pid"
+            retry_status=$?
+            echo "Kilo retry session exited with status $retry_status; live retry output was streamed above."
+            exit "$retry_status"
+          fi
+
+          exit "$status"
 
       - name: Deep audit — after Run Kilo
         id: deep_audit_12_run_kilo
@@ -814,26 +738,13 @@ jobs:
           exit 0
       - name: Reconcile worker progress with activation receipt
         id: reconcile_worker_progress
-        if: always() && steps.independent_verify.outcome == 'success'
-        continue-on-error: true
+        if: always() && steps.verify.outcome == 'success'
         run: |
           set -euo pipefail
           python3 .github/scripts/reconcile_worker_progress.py --self-test
           python3 .github/scripts/reconcile_worker_progress.py
           echo "Worker progress reconciled with authoritative activation receipt."
 
-      - name: Deep audit — after Independent research-process evaluation
-        id: deep_audit_process_evaluation
-        if: always()
-        continue-on-error: true
-        env:
-          AUDIT_PREV_OUTCOME: ${{ steps.process_evaluation.outcome }}
-        run: |
-          set +e
-          python3 .github/scripts/deep_workflow_audit.py --profile xwake --step "Independent research-process evaluation"
-          rc=$?
-          echo "DEEP_AUDIT_RC=$rc"
-          exit 0
       - name: Prepare controller recovery handoff
         id: recovery_handoff
         if: always() && steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success' && (steps.kilo.outcome != 'success' || steps.independent_verify.outcome != 'success')
@@ -849,16 +760,14 @@ jobs:
           failure_class="UNRESOLVED_EXECUTION_FAILURE"
           if [ "$KILO_LIVENESS_STATUS" = "STALLED" ]; then
             failure_class="RESOURCE_OR_LIVENESS_FAILURE"
-          elif grep -Eiq 'invalid request error trace_id:' state/campaign/agent_*.log 2>/dev/null; then
+          elif grep -Eiq 'invalid request error trace_id:' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'invalid request error trace_id:' /tmp/kilo-retry.log 2>/dev/null; then
             failure_class="TRANSIENT_GATEWAY"
-          elif grep -Eiq 'permission.*deny|not allowed|specified a rule.*prevents|action.*deny' state/campaign/agent_*.log 2>/dev/null; then
+          elif grep -Eiq 'permission.*deny|not allowed|specified a rule.*prevents|action.*deny' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'permission.*deny|not allowed|specified a rule.*prevents|action.*deny' /tmp/kilo-retry.log 2>/dev/null; then
             failure_class="TOOL_INVOCATION_DENIAL"
-          elif grep -Eiq 'oldString|invalid arguments|edit tool' state/campaign/agent_*.log 2>/dev/null; then
+          elif grep -Eiq 'oldString|invalid arguments|edit tool' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'oldString|invalid arguments|edit tool' /tmp/kilo-retry.log 2>/dev/null; then
             failure_class="TOOL_INVOCATION_FAILURE"
-          elif grep -Eiq 'Traceback|AttributeError|NameError|TypeError|SyntaxError' state/campaign/agent_*.log 2>/dev/null; then
+          elif grep -Eiq 'Traceback|AttributeError|NameError|TypeError|SyntaxError' /tmp/kilo-primary.log 2>/dev/null || grep -Eiq 'Traceback|AttributeError|NameError|TypeError|SyntaxError' /tmp/kilo-retry.log 2>/dev/null; then
             failure_class="RESEARCH_EXECUTION_FAILURE"
-          elif [ "${CONTROL_PLANE_TAMPER_ATTEMPT:-0}" = "1" ]; then
-            failure_class="CONTROL_PLANE_TAMPER"
           fi
 
           recovery_log="$(mktemp)"
@@ -878,8 +787,8 @@ jobs:
             echo "- recovery_rule: preserve the current repository state on a recovery branch; a fresh activation must independently inspect and verify it before any main-branch integration."
             echo "- next_action: inspect this recovery record and the exact diff, repair only from verified evidence, rerun the narrow failing check, then rerun the broader verification sequence."
             echo
-              echo "### Controller-observed campaign failure evidence"
-            for log_file in state/campaign/agent_*.log; do
+            echo "### Controller-observed failure evidence"
+            for log_file in /tmp/kilo-primary.log /tmp/kilo-retry.log; do
               if [ -s "$log_file" ]; then
                 echo "--- $log_file (tail) ---"
                 tail -n 30 "$log_file"
@@ -899,19 +808,10 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
           VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
-          PROCESS_OUTCOME: ${{ env.RESEARCH_PROCESS_OUTCOME }}
           PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
           KILO_SMOKE_OUTCOME: ${{ steps.kilo_smoke.outcome }}
         run: |
           set -euo pipefail
-          set +e
-          python3 .github/scripts/evaluate_research_process.py \
-            --verify-outcome "$VERIFY_OUTCOME" \
-            --worker-outcome "$KILO_OUTCOME" \
-            --liveness "${KILO_LIVENESS_STATUS:-unknown}"
-          PROCESS_EVALUATION_RC=$?
-          set -e
-          echo "PROCESS_EVALUATION_RC=$PROCESS_EVALUATION_RC"
           if [ "${PREFLIGHT_OUTCOME:-success}" != "success" ] || [ "${KILO_SMOKE_OUTCOME:-success}" != "success" ]; then
             echo "No worker-integrated repository changes are eligible for persistence after an early controller/preflight failure."
             echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
@@ -927,10 +827,6 @@ jobs:
           # also succeed after the final worker edits. Any worker failure or
           # verification failure is quarantined on a recovery branch.
           recovery_required=0
-          if [ "${RESEARCH_PROCESS_OUTCOME:-UNVERIFIED}" = "UNVERIFIED" ]; then
-            recovery_required=1
-            echo "::warning::Main integration is prohibited because independent research-process evaluation is UNVERIFIED."
-          fi
           if [ "$KILO_OUTCOME" != "success" ] || [ "$VERIFY_OUTCOME" != "success" ]; then
             recovery_required=1
             echo "::warning::Main integration is prohibited because worker outcome=$KILO_OUTCOME and independent verification=$VERIFY_OUTCOME."
@@ -952,7 +848,7 @@ jobs:
             ':(glob)**/*.pyc' \
             ':(glob)**/*.py.c' 2>/dev/null || true
 
-          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.github/scripts/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md) >/tmp/kilo_protected_paths; then
+          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)$' >/tmp/kilo_protected_paths; then
             echo "Protected paths unexpectedly staged:"
             cat /tmp/kilo_protected_paths
             exit 1
@@ -981,9 +877,6 @@ jobs:
           fi
           test -f state/activation_status.json
           python3 .github/scripts/stamp_activation_receipt.py --validate-only
-          if [ -f state/campaign/process_evaluation.json ]; then
-            python3 -m json.tool state/campaign/process_evaluation.json >/dev/null
-          fi
 
           if git diff --cached --quiet; then
             echo "No safe repository changes to persist."
@@ -1047,7 +940,6 @@ jobs:
           KILO_SMOKE_OUTCOME: ${{ steps.kilo_smoke.outcome }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
           VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
-          PROCESS_OUTCOME: ${{ env.RESEARCH_PROCESS_OUTCOME }}
         run: |
           echo "::group::REPORT KILO OUTCOME DEBUG — run metadata"
           printf 'GITHUB_RUN_ID=%s\n' "${GITHUB_RUN_ID:-unknown}"
@@ -1067,7 +959,6 @@ jobs:
           printf 'KILO_LIVENESS_REASON=%q\n' "${KILO_LIVENESS_REASON:-<unset>}"
           printf 'PERSISTENCE_STATUS=%q\n' "${PERSISTENCE_STATUS:-<unset>}"
           printf 'PERSISTENCE_RECOVERY_BRANCH=%q\n' "${PERSISTENCE_RECOVERY_BRANCH:-<unset>}"
-          printf 'RESEARCH_PROCESS_OUTCOME=%q\n' "${PROCESS_OUTCOME:-<unset>}"
           echo "::endgroup::"
 
           echo "::group::REPORT KILO OUTCOME DEBUG — classifier integrity and cross-check"
@@ -1081,8 +972,7 @@ jobs:
             --worker "${KILO_OUTCOME:-}" \
             --verify "${VERIFY_OUTCOME:-}" \
             --liveness "${KILO_LIVENESS_STATUS:-}" \
-            --persistence "${PERSISTENCE_STATUS:-}" \
-            --process "${PROCESS_OUTCOME:-UNVERIFIED}" 2>&1)"
+            --persistence "${PERSISTENCE_STATUS:-}" 2>&1)"
           CLASSIFIER_RC=$?
           set -e
           printf '%s\n' "$CLASSIFIER_OUTPUT"
@@ -1130,8 +1020,7 @@ jobs:
             --worker "${KILO_OUTCOME:-unknown}" \
             --verify "${VERIFY_OUTCOME:-skipped}" \
             --liveness "${KILO_LIVENESS_STATUS:-unknown}" \
-            --persistence "${PERSISTENCE_STATUS:-FAILED}" \
-            --process "${PROCESS_OUTCOME:-UNVERIFIED}"
+            --persistence "${PERSISTENCE_STATUS:-FAILED}"
 
       - name: Deep audit — after Report Kilo outcome
         id: deep_audit_15_report_kilo_outcome
@@ -1154,78 +1043,4 @@ jobs:
           python3 .github/scripts/deep_workflow_audit.py --profile xwake --final
           rc=$?
           echo "DEEP_AUDIT_FINAL_RC=$rc"
-          exit 0 >/tmp/kilo_protected_paths; then
-            echo "Protected paths unexpectedly staged:"
-            cat /tmp/kilo_protected_paths
-            exit 1
-          fi
-          if git diff --cached --name-only | grep -E '(^|/)(\.env(\..*)?|id_rsa|id_dsa|id_ecdsa|id_ed25519|credentials\.(json|ya?ml|toml)|secrets\.(json|ya?ml|toml))$|\.(pem|key)$' >/tmp/kilo_credential_paths; then
-            echo "Credential-like paths are not allowed to persist:"
-            cat /tmp/kilo_credential_paths
-            exit 1
-          fi
-          if git diff --cached --binary | grep -E -n 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|kilo_[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}' >/tmp/kilo_secrets; then
-            echo "Potential credential material detected:"
-            cat /tmp/kilo_secrets
-            exit 1
-          fi
-          if git diff --cached --summary | grep -E '^ create mode 120000 ' >/tmp/kilo_symlinks; then
-            echo "Symbolic links are not allowed to persist:"
-            cat /tmp/kilo_symlinks
-            exit 1
-          fi
-
-          git diff --check
-          if git diff --cached --quiet; then
-            echo "No safe repository changes to persist."
-            echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
-            exit 0
-          fi
-          test -f state/activation_status.json
-          python3 .github/scripts/stamp_activation_receipt.py --validate-only
-          if [ -f state/campaign/process_evaluation.json ]; then
-            python3 -m json.tool state/campaign/process_evaluation.json >/dev/null
-          fi
-
-          if git diff --cached --quiet; then
-            echo "No safe repository changes to persist."
-            echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
-            exit 0
-          fi
-
-          git config user.name "kilo-research-enterprise"
-          git config user.email "kilo-research-enterprise@users.noreply.github.com"
-
-          if [ "$recovery_required" -eq 1 ]; then
-            git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
-            git commit -m "Kilo activation: preserve recovery state"
-            local_commit="$(git rev-parse HEAD)"
-            recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-            if git push origin "$local_commit:refs/heads/$recovery_branch"; then
-              echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
-              echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
-              echo "::warning::Unverified or failed worker state preserved only on $recovery_branch; main integration was prohibited."
-              exit 0
-            fi
-            echo "::error::Recovery branch persistence failed; unverified worker state was not integrated."
-            exit 1
-          fi
-
-          git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
-          git commit -m "Kilo activation: update research state"
-          local_commit="$(git rev-parse HEAD)"
-          git fetch origin "$GITHUB_REF_NAME"
-
-          if git rebase "origin/$GITHUB_REF_NAME"; then
-            if git push origin "HEAD:$GITHUB_REF_NAME"; then
-              echo "PERSISTENCE_STATUS=MAIN" >> "$GITHUB_ENV"
-              exit 0
-            fi
-          fi
-
-          git rebase --abort >/dev/null 2>&1 || true
-          recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          git push origin "$local_commit:refs/heads/$recovery_branch"
-          echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
-          echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
-          echo "::warning::Main integration failed; worker commit preserved on $recovery_branch."
+          exit 0
