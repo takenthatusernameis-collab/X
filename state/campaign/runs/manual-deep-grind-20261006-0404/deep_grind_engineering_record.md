@@ -169,3 +169,18 @@ These remain explicitly UNVERIFIED rather than being treated as failures.
 ## Highest-value next action
 
 Run one fresh campaign on the current `main` head and inspect the complete path from preflight through persistence and terminal classification. Treat only that run as live verification of this deep-grind repair set.
+
+## Final adaptive verification pass
+
+After the adaptive patches, verification found one transient patching defect in the one-shot shell block: the helper invocation had initially been inserted before the enclosing credential-path check was closed. That defect was corrected immediately in commit `04218e1561618ff2afc04d2194a75e364bd635f9`.
+
+Verification performed after correction:
+
+- `bash -n` passed on the one-shot persistence shell block.
+- Main campaign workflow delegates staged credential scanning to the canonical helper and contains no legacy diff-based credential scanner.
+- Manual one-shot workflow delegates to the same helper and contains no legacy `kilo_...` scanner.
+- Dedicated scanner reads staged blob content via `git diff --cached --name-only -z` plus `git cat-file blob`.
+- Architecture test now validates delegation for both workflows.
+- Controller protection covers both campaign architecture and staged-secret regression tests.
+
+The current X main head is `04218e1561618ff2afc04d2194a75e364bd635f9`.
