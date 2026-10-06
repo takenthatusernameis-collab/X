@@ -818,24 +818,6 @@ jobs:
           python3 .github/scripts/reconcile_worker_progress.py
           echo "Worker progress reconciled with authoritative activation receipt."
 
-      - name: Independent research-process evaluation
-        id: process_evaluation
-        if: always() && steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success' && steps.kilo.outcome != 'skipped'
-        continue-on-error: true
-        env:
-          VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
-          WORKER_OUTCOME: ${{ steps.kilo.outcome }}
-          LIVENESS_STATUS: ${{ env.KILO_LIVENESS_STATUS }}
-        run: |
-          set +e
-          python3 .github/scripts/evaluate_research_process.py \
-            --verify-outcome "$VERIFY_OUTCOME" \
-            --worker-outcome "$WORKER_OUTCOME" \
-            --liveness "$LIVENESS_STATUS"
-          rc=$?
-          echo "PROCESS_EVALUATION_RC=$rc"
-          exit 0
-
       - name: Deep audit — after Independent research-process evaluation
         id: deep_audit_process_evaluation
         if: always()
@@ -913,10 +895,19 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
           VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
+          PROCESS_OUTCOME: ${{ env.RESEARCH_PROCESS_OUTCOME }}
           PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
           KILO_SMOKE_OUTCOME: ${{ steps.kilo_smoke.outcome }}
         run: |
           set -euo pipefail
+          set +e
+          python3 .github/scripts/evaluate_research_process.py \
+            --verify-outcome "$VERIFY_OUTCOME" \
+            --worker-outcome "$KILO_OUTCOME" \
+            --liveness "${KILO_LIVENESS_STATUS:-unknown}"
+          PROCESS_EVALUATION_RC=$?
+          set -e
+          echo "PROCESS_EVALUATION_RC=$PROCESS_EVALUATION_RC"
           if [ "${PREFLIGHT_OUTCOME:-success}" != "success" ] || [ "${KILO_SMOKE_OUTCOME:-success}" != "success" ]; then
             echo "No worker-integrated repository changes are eligible for persistence after an early controller/preflight failure."
             echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
@@ -932,6 +923,10 @@ jobs:
           # also succeed after the final worker edits. Any worker failure or
           # verification failure is quarantined on a recovery branch.
           recovery_required=0
+          if [ "${RESEARCH_PROCESS_OUTCOME:-UNVERIFIED}" = "UNVERIFIED" ]; then
+            recovery_required=1
+            echo "::warning::Main integration is prohibited because independent research-process evaluation is UNVERIFIED."
+          fi
           if [ "$KILO_OUTCOME" != "success" ] || [ "$VERIFY_OUTCOME" != "success" ]; then
             recovery_required=1
             echo "::warning::Main integration is prohibited because worker outcome=$KILO_OUTCOME and independent verification=$VERIFY_OUTCOME."
