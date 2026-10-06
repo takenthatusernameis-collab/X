@@ -52,6 +52,12 @@ class StagedSecretScanTests(unittest.TestCase):
             self.scanner.scan_text("TOKEN=ghp_" + "A" * 30),
         )
 
+    def test_openai_style_key_is_detected(self):
+        self.assertIn(
+            "openai_style_key",
+            self.scanner.scan_text("OPENAI_KEY=sk-" + "A" * 20),
+        )
+
     def test_private_key_marker_is_detected(self):
         self.assertIn(
             "private_key",

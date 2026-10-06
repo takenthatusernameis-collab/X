@@ -82,13 +82,17 @@ class CampaignArchitectureTests(unittest.TestCase):
             )
         )
 
+    def test_campaign_uses_configured_kilo_model_alias(self):
+        self.assertNotIn('--model "$KILO_FREE_MODEL_ID"', self.workflow)
+        self.assertEqual(self.workflow.count("--model openai-compatible/free-kilo"), 11)
+
     def test_credential_scan_uses_dedicated_staged_content_helper(self):
         scanner = (ROOT / ".github" / "scripts" / "scan_staged_secrets.py").read_text(encoding="utf-8")
         for workflow in (self.workflow, self.oneshot):
             self.assertIn("python3 .github/scripts/scan_staged_secrets.py", workflow)
             self.assertNotIn("git diff --cached --binary | grep -E -n", workflow)
             self.assertNotIn("kilo_[A-Za-z0-9_-]{20,}", workflow)
-        self.assertIn('git diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR"', scanner)
+        self.assertIn('"git", "diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR"', scanner)
         self.assertIn('git", "cat-file", "blob"', scanner)
 
     def test_global_identity_counter_is_durable(self):

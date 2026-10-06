@@ -5,8 +5,6 @@ from __future__ import annotations
 
 import re
 import subprocess
-import sys
-from pathlib import Path
 from typing import Iterable
 
 
@@ -19,11 +17,11 @@ PATTERNS = (
     (
         "kilo_jwt_key",
         re.compile(
-            r"(?i)(?:KILO_API_KEY\\s*[:=]\\s*|Authorization\\s*:\\s*Bearer\\s+)"
-            r"(eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+)"
+            r"(?i)(?:KILO_API_KEY\s*[:=]\s*|Authorization\s*:\s*Bearer\s+)"
+            r"(eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)"
         ),
     ),
-    ("openai_style_key", re.compile(r"sk-[A-Za-z0-9_-]{24,}")),
+    ("openai_style_key", re.compile(r"sk-[A-Za-z0-9_-]{20,}")),
 )
 
 
