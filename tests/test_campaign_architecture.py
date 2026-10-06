@@ -82,11 +82,14 @@ class CampaignArchitectureTests(unittest.TestCase):
             )
         )
 
-    def test_credential_scan_reads_staged_content_not_filenames(self):
-        marker = "if git diff --cached --name-only -z --diff-filter=AM |"
-        self.assertIn(marker, self.workflow)
-        self.assertIn('git cat-file blob ":$path"', self.workflow)
-        self.assertNotIn("git diff --cached --binary | grep -E -n", self.workflow)
+    def test_credential_scan_uses_dedicated_staged_content_helper(self):
+        scanner = (ROOT / ".github" / "scripts" / "scan_staged_secrets.py").read_text(encoding="utf-8")
+        for workflow in (self.workflow, self.oneshot):
+            self.assertIn("python3 .github/scripts/scan_staged_secrets.py", workflow)
+            self.assertNotIn("git diff --cached --binary | grep -E -n", workflow)
+            self.assertNotIn("kilo_[A-Za-z0-9_-]{20,}", workflow)
+        self.assertIn('git diff", "--cached", "--name-only", "-z"', scanner)
+        self.assertIn('git", "cat-file", "blob"', scanner)
 
     def test_global_identity_counter_is_durable(self):
         import json
