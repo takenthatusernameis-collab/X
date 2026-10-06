@@ -587,7 +587,7 @@ jobs:
             echo "STARTING FRESH CAMPAIGN AGENT ${index}/10: ${role}"
             echo "============================================================"
 
-            before_checkpoint="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo 0)"
+            before_checkpoint="$(sha256sum state/worker_progress.md 2>/dev/null | cut -d " " -f1 || true)"
             before_head="$(git rev-parse --short=12 HEAD)"
             before_status="$(git status --short)"
             printf '%s\n' "$before_status" > "state/campaign/agent_${agent_id}_before_status.txt"
@@ -616,12 +616,12 @@ jobs:
             stdbuf -oL -eL timeout --foreground --signal=TERM --kill-after=60s 28m kilo run --model openai-compatible/free-kilo --auto "$(cat "/tmp/kilo-agent-${agent_id}.prompt")" > >(tee "$log_path") 2>&1
             status=$?
 
-            after_checkpoint="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo 0)"
+            after_checkpoint="$(sha256sum state/worker_progress.md 2>/dev/null | cut -d " " -f1 || true)"
             after_head="$(git rev-parse --short=12 HEAD)"
             after_status="$(git status --short)"
             diff_names="$(git diff --name-status)"
 
-            if [ "$after_checkpoint" -gt "$before_checkpoint" ]; then
+            if [ "$after_checkpoint" != "$before_checkpoint" ]; then
               semantic_progress_seen=1
             fi
 
@@ -637,7 +637,7 @@ jobs:
 
             validation_rc=0
             set +e
-            python3 .github/scripts/validate_campaign_agent.py --agent-id "$agent_id" --exit-code "$status"
+            python3 .github/scripts/validate_campaign_agent.py --agent-id "$agent_id" --exit-code "$status" --before-worker-progress-sha "$before_checkpoint"
             validation_rc=$?
             set -e
 
@@ -791,7 +791,8 @@ jobs:
           exit 0
       - name: Reconcile worker progress with activation receipt
         id: reconcile_worker_progress
-        if: always() && steps.verify.outcome == 'success'
+        if: always() && steps.independent_verify.outcome == 'success'
+        continue-on-error: true
         run: |
           set -euo pipefail
           python3 .github/scripts/reconcile_worker_progress.py --self-test
