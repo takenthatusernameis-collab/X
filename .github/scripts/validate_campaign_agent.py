@@ -221,6 +221,17 @@ def main() -> int:
             record_path.write_text(json.dumps(raw_record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             warnings.append("invalid_agent_record_replaced_with_UNVERIFIED_fallback")
 
+    expected_record = f"state/campaign/runs/{args.run_id}/agents/agent_{args.agent_number:02d}.json"
+    unexpected_campaign_paths = [
+        p for p in touched
+        if p.startswith("state/campaign/")
+        and p not in {expected_record}
+        and not p.startswith(f"state/campaign/runs/{args.run_id}/agents/agent_{args.agent_number:02d}_")
+    ]
+    if unexpected_campaign_paths:
+        failures.append("controller_state_modified")
+        warnings.extend(f"unexpected_campaign_path:{p}" for p in unexpected_campaign_paths)
+
     if protected:
         failures.append("protected_control_plane_modified")
     if args.worker_exit_code != 0:
