@@ -1,0 +1,157 @@
+name: Kilo Campaign Dummy Smoke
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "state/smoke/kilo_campaign_dummy_trigger.txt"
+
+concurrency:
+  group: kilo-research-enterprise-dummy-smoke
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  dummy-campaign:
+    name: Dummy 10-agent controller smoke
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run instant 10-agent failure-isolation campaign
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf state/campaign
+          mkdir -p state/campaign
+          cat > state/worker_progress.md <<'EOF'
+          # Worker Progress
+
+          activation_id: dummy-smoke
+          phase: CAMPAIGN_INITIALIZED
+          status: OBSERVATION_ONLY
+          last_verified_milestone: dummy campaign initialized
+          next_bounded_action: run dummy agent 01 of 10
+          EOF
+
+          campaign_failed=0
+          campaign_successes=0
+          executed=0
+          expected_failures="03 06"
+
+          for index in $(seq 1 10); do
+            printf -v agent_id "%02d" "$index"
+            before_checkpoint="$(sha256sum state/worker_progress.md | cut -d ' ' -f1)"
+
+            python3 - <<PY > "/tmp/dummy-agent-$agent_id-before.json"
+import hashlib
+import json
+import subprocess
+from pathlib import Path
+
+names = set()
+for cmd in (("git", "diff", "--name-only"), ("git", "ls-files", "--others", "--exclude-standard")):
+    names.update(x for x in subprocess.check_output(cmd, text=True).splitlines() if x)
+
+hashes = {}
+for name in sorted(names):
+    p = Path(name)
+    if p.is_file():
+        hashes[name] = hashlib.sha256(p.read_bytes()).hexdigest()
+
+print(json.dumps({"hashes": hashes}, indent=2))
+PY
+
+            printf '\nagent: %s\n' "$agent_id" >> state/worker_progress.md
+            printf 'last_verified_milestone: dummy agent %s checkpoint\n' "$agent_id" >> state/worker_progress.md
+
+            worker_status=0
+            if [ "$agent_id" = "03" ] || [ "$agent_id" = "06" ]; then
+              echo "INTENTIONAL_DUMMY_ERROR agent=$agent_id"
+              worker_status=42
+            fi
+
+            executed=$((executed + 1))
+
+            if python3 .github/scripts/validate_campaign_agent.py               --agent-id "$agent_id"               --exit-code "$worker_status"               --before "/tmp/dummy-agent-$agent_id-before.json"               --before-worker-progress-sha "$before_checkpoint"; then
+              validation_rc=0
+            else
+              validation_rc=$?
+            fi
+
+            if [ "$worker_status" -eq 0 ] && [ "$validation_rc" -eq 0 ]; then
+              campaign_successes=$((campaign_successes + 1))
+              agent_status="SUCCESS"
+            else
+              campaign_failed=1
+              if [ "$worker_status" -ne 0 ]; then
+                agent_status="EXPECTED_DUMMY_FAILURE"
+              else
+                agent_status="FAILED_VALIDATION"
+              fi
+            fi
+
+            printf '%s status=%s worker_exit=%s validation_rc=%s\n'               "$agent_id" "$agent_status" "$worker_status" "$validation_rc"               | tee "state/campaign/dummy_agent_$agent_id.txt"
+
+            echo "## Dummy agent $agent_id: $agent_status" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          expected_failure_count=2
+          actual_failure_count=0
+          for agent_id in $expected_failures; do
+            if grep -q 'EXPECTED_DUMMY_FAILURE' "state/campaign/dummy_agent_$agent_id.txt"; then
+              actual_failure_count=$((actual_failure_count + 1))
+            fi
+          done
+
+          campaign_status="PARTIAL"
+          if [ "$campaign_failed" -eq 0 ]; then
+            campaign_status="COMPLETE"
+          fi
+
+          cat > state/campaign/campaign_status.json <<EOF
+          {
+            "status": "$campaign_status",
+            "agent_count": 10,
+            "success_count": $campaign_successes,
+            "failure_count": $((10 - campaign_successes)),
+            "executed_count": $executed,
+            "expected_dummy_failure_count": $expected_failure_count,
+            "observed_expected_failure_count": $actual_failure_count
+          }
+          EOF
+
+          echo "CAMPAIGN_SUCCESS_COUNT=$campaign_successes" >> "$GITHUB_ENV"
+          echo "CAMPAIGN_FAILURE_COUNT=$((10 - campaign_successes))" >> "$GITHUB_ENV"
+          echo "CAMPAIGN_STATUS=$campaign_status" >> "$GITHUB_ENV"
+          echo "KILO_LIVENESS_STATUS=COMPLETED_WITH_SEMANTIC_CHECKPOINTS" >> "$GITHUB_ENV"
+
+          test "$executed" -eq 10
+          test "$actual_failure_count" -eq "$expected_failure_count"
+          test -f state/campaign/dummy_agent_10.txt
+          grep -q 'SUCCESS' state/campaign/dummy_agent_10.txt
+
+          echo "Dummy smoke passed: 10/10 agents executed despite 2 intentional worker errors."
+
+      - name: Independent process evaluation
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/evaluate_research_process.py             --campaign state/campaign/campaign_status.json             --verify-outcome success             --worker-outcome partial             --liveness COMPLETED_WITH_SEMANTIC_CHECKPOINTS
+
+      - name: Final controller assertion
+        run: |
+          set -euo pipefail
+          test -f state/campaign/dummy_agent_10.txt
+          grep -q 'EXPECTED_DUMMY_FAILURE' state/campaign/dummy_agent_03.txt
+          grep -q 'EXPECTED_DUMMY_FAILURE' state/campaign/dummy_agent_06.txt
+          grep -q 'SUCCESS' state/campaign/dummy_agent_10.txt
+          echo "CONTROLLER_SMOKE=PASS"
+          echo "No per-agent failure threshold terminated the 10-agent campaign."
