@@ -87,3 +87,7 @@ The controller selects exactly one bounded task per session from durable reposit
 The campaign treats validated information gained and uncertainty reduction as the evidence hierarchy. Workflow completion, edits, token use, experiments started, and agent confidence are not learning metrics. Gateway failures are recorded as diagnostic events with no automatic retry; failed sessions are quarantined so later agents start from validated state plus durable evidence.
 
 Per-agent records are durable controller inputs, and the final synthesis independently evaluates process improvement, research progress, rejected or negative evidence, unresolved uncertainty, added complexity, and the single highest-value next action. A 2-agent miniature mode uses the exact same architecture for cheap structural testing.
+
+### Cross-campaign agent identity
+
+A campaign always contains 10 production agents. The workflow's local campaign slots remain 01–10 only as execution positions. Each production session also receives a durable global agent number from `state/campaign/global_agent_counter.json`: campaign 1 uses 01–10, campaign 2 uses 11–20, campaign 3 uses 21–30, and so on. This prevents cross-session identity reset and makes long-run learning history easier to reconstruct. Structural miniature runs use `MINI-01`, `MINI-02`, etc. and do not consume production identities.
