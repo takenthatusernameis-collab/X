@@ -1027,10 +1027,22 @@ jobs:
           git restore --worktree --staged -- .github/workflows/kilo-wakeup.yml .github/scripts AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
           git add -A
           git diff --check
-          if git diff --cached --name-only | grep -E '(^|/)\.github/scripts/|^\.github/workflows/kilo-wakeup\.yml$|^\.kilo/(?!wakeup-prompt\.md$)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)
-            echo "::error::Credential-like paths are staged."
-            exit 1
-          fi
+          python3 - <<'PY'
+          import subprocess
+          paths = [p for p in subprocess.check_output(["git", "diff", "--cached", "--name-only"], text=True).splitlines() if p]
+          protected = []
+          for p in paths:
+              if (
+                  p == ".github/workflows/kilo-wakeup.yml"
+                  or p.startswith(".github/scripts/")
+                  or (p.startswith(".kilo/") and p != ".kilo/wakeup-prompt.md")
+                  or p in {"AGENTS.md", "ENTERPRISE.md", "MANUAL_SETUP.md", "PERSISTENCE_POLICY.md"}
+              ):
+                  protected.append(p)
+          if protected:
+              raise SystemExit("Immutable supervisor/control-plane paths are staged: " + ", ".join(protected))
+          PY
+          python3 .github/scripts/validate_autonomous_workflow_changes.py
           python3 .github/scripts/scan_staged_secrets.py
           if git diff --cached --summary | grep -E '^ create mode 120000 '; then
             echo "::error::Symbolic links are not allowed to persist."
