@@ -52,23 +52,23 @@ jobs:
             before_checkpoint="$(sha256sum state/worker_progress.md | cut -d ' ' -f1)"
 
             python3 - <<PY > "/tmp/dummy-agent-$agent_id-before.json"
-import hashlib
-import json
-import subprocess
-from pathlib import Path
+          import hashlib
+          import json
+          import subprocess
+          from pathlib import Path
 
-names = set()
-for cmd in (("git", "diff", "--name-only"), ("git", "ls-files", "--others", "--exclude-standard")):
-    names.update(x for x in subprocess.check_output(cmd, text=True).splitlines() if x)
+          names = set()
+          for cmd in (("git", "diff", "--name-only"), ("git", "ls-files", "--others", "--exclude-standard")):
+              names.update(x for x in subprocess.check_output(cmd, text=True).splitlines() if x)
 
-hashes = {}
-for name in sorted(names):
-    p = Path(name)
-    if p.is_file():
-        hashes[name] = hashlib.sha256(p.read_bytes()).hexdigest()
+          hashes = {}
+          for name in sorted(names):
+              p = Path(name)
+              if p.is_file():
+                  hashes[name] = hashlib.sha256(p.read_bytes()).hexdigest()
 
-print(json.dumps({"hashes": hashes}, indent=2))
-PY
+          print(json.dumps({"hashes": hashes}, indent=2))
+          PY
 
             printf '\nagent: %s\n' "$agent_id" >> state/worker_progress.md
             printf 'last_verified_milestone: dummy agent %s checkpoint\n' "$agent_id" >> state/worker_progress.md
