@@ -121,13 +121,13 @@ def main() -> int:
     ]
     process_improvement = [
         r["agent_number"] for r in records
-        if r.get("role") == "LEARNING_PROCESS"
+        if r.get("role") in {"LEARNING_PROCESS", "AUTONOMOUS_RESEARCH"}
         and r.get("process_decision") == "IMPROVE"
         and r.get("decision") in {"USEFUL_CHANGE", "VERIFIED_NEGATIVE_RESULT", "RETAIN"}
     ]
     research_progress = [
         r["agent_number"] for r in records
-        if r.get("role") == "HIGHER_ORDER_OBJECTIVE"
+        if r.get("role") in {"HIGHER_ORDER_OBJECTIVE", "AUTONOMOUS_RESEARCH"}
         and r.get("decision") in {"USEFUL_CHANGE", "VERIFIED_NEGATIVE_RESULT", "RETAIN"}
         and r.get("uncertainty_reduced") not in {"", "none", "none demonstrated", None}
     ]
@@ -199,8 +199,8 @@ def main() -> int:
         "verified": sorted({x for r in records for x in r.get("verified", [])})[:100],
         "unverified": sorted({x for r in records for x in r.get("unverified", [])})[:100],
         "next": next_task,
-        "research_conclusion": [r.get("research_result") for r in records if r.get("role") == "HIGHER_ORDER_OBJECTIVE" and r.get("research_result")],
-        "process_conclusion": [r.get("observed_effect") for r in records if r.get("role") == "LEARNING_PROCESS" and r.get("observed_effect")],
+        "research_conclusion": [r.get("research_result") for r in records if r.get("role") in {"HIGHER_ORDER_OBJECTIVE", "AUTONOMOUS_RESEARCH"} and r.get("research_result")],
+        "process_conclusion": [r.get("observed_effect") for r in records if r.get("role") in {"LEARNING_PROCESS", "AUTONOMOUS_RESEARCH"} and r.get("observed_effect")],
         "campaign_outcome": outcome,
         "persistence_decision": persistence,
     }
