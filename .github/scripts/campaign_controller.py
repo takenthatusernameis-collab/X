@@ -21,7 +21,6 @@ CURRENT_TASK = ROOT / "state" / "campaign" / "current_task.json"
 GLOBAL_COUNTER_PATH = ROOT / "state" / "campaign" / "global_agent_counter.json"
 
 ROLE_BY_AGENT = {n: ("LEARNING_PROCESS" if n % 2 else "HIGHER_ORDER_OBJECTIVE") for n in range(1, 11)}
-AUTONOMOUS_ROLE = "AUTONOMOUS_RESEARCH"
 TASK_STATUSES = {"OPEN", "SELECTED", "RESOLVED", "REJECTED", "DEFERRED"}
 DECISIONS = {
     "USEFUL_CHANGE",
@@ -226,20 +225,17 @@ def candidate_tasks_for_role(tasks: list[dict[str, Any]], role: str) -> list[dic
     )
 
 
-def init_campaign(run_id: str, agent_count: int, identity_mode: str = "PERSISTENT", campaign_mode: str = "LEGACY") -> dict[str, Any]:
+def init_campaign(run_id: str, agent_count: int, identity_mode: str = "PERSISTENT") -> dict[str, Any]:
     if agent_count not in {2, 10}:
         raise SystemExit("agent_count must be 2 or 10")
-    if campaign_mode not in {"LEGACY", "AUTONOMOUS"}:
-        raise SystemExit("campaign_mode must be LEGACY or AUTONOMOUS")
-    tasks = load_queue() if campaign_mode == "LEGACY" else []
-    if campaign_mode == "LEGACY":
-        for role in sorted(set(ROLE_BY_AGENT[n] for n in range(1, agent_count + 1))):
-            if not any(t["role"] == role for t in tasks):
-                raise SystemExit(f"durable task queue has no tasks for role {role}")
-        for task in tasks:
-            if task["status"] == "SELECTED":
-                task["status"] = "OPEN"
-        save_queue(tasks)
+    tasks = load_queue()
+    for role in sorted(set(ROLE_BY_AGENT[n] for n in range(1, agent_count + 1))):
+        if not any(t["role"] == role for t in tasks):
+            raise SystemExit(f"durable task queue has no tasks for role {role}")
+    for task in tasks:
+        if task["status"] == "SELECTED":
+            task["status"] = "OPEN"
+    save_queue(tasks)
     global_agent_numbers = allocate_global_agent_numbers(run_id, agent_count, identity_mode)
 
     d = run_dir(run_id)
@@ -250,7 +246,6 @@ def init_campaign(run_id: str, agent_count: int, identity_mode: str = "PERSISTEN
         "run_id": str(run_id),
         "agent_count": agent_count,
         "identity_mode": identity_mode,
-        "campaign_mode": campaign_mode,
         "global_agent_numbers": global_agent_numbers,
         "global_agent_start": list(global_agent_numbers.values())[0],
         "status": "IN_PROGRESS",
@@ -276,68 +271,13 @@ def select_task(run_id: str, agent_number: int) -> dict[str, Any]:
     if not d.exists():
         raise SystemExit("campaign has not been initialized")
     campaign_status = load_json(d / "campaign_status.json")
+    expected_role = ROLE_BY_AGENT.get(agent_number)
     campaign_count = int(campaign_status["agent_count"])
     global_agent_number = campaign_status["global_agent_numbers"].get(str(agent_number))
-    if agent_number < 1 or agent_number > campaign_count:
+    if expected_role is None or agent_number > campaign_count:
         raise SystemExit("agent number is outside campaign")
     if global_agent_number is None:
         raise SystemExit("global agent identity is missing for campaign slot")
-
-    campaign_mode = str(campaign_status.get("campaign_mode", "LEGACY")).upper()
-    if campaign_mode == "AUTONOMOUS":
-        task_id = f"autonomous-{run_id}-{agent_number:02d}"
-        previous = None
-        if agent_number > 1:
-            prev_path = d / "agents" / f"agent_{agent_number-1:02d}_contract.json"
-            if prev_path.exists():
-                previous = load_json(prev_path)
-        contract = {
-            "task_id": task_id,
-            "agent_number": agent_number,
-            "campaign_slot": agent_number,
-            "global_agent_number": global_agent_number,
-            "role": AUTONOMOUS_ROLE,
-            "primary_question": "What is the highest-leverage improvement to the quantitative research process that this session can establish or validate?",
-            "bottleneck": "Determine the current process bottleneck from durable repository evidence rather than from a predefined task list.",
-            "objective": "Continuously improve the quantitative research process.",
-            "scope": "Any repository work that materially improves research design, hypothesis generation, data quality, experimentation, validation, falsification, reproducibility, tooling, knowledge transfer, workflow, or research decision quality.",
-            "out_of_scope": "Live trading, production execution, credential access, recursive workflow dispatch, fabricated evidence, and changes that weaken the immutable execution safeguards.",
-            "deliverable": "A durable, verified process improvement or a high-value negative result that improves future research decisions.",
-            "success_criterion": "Leave durable evidence that the chosen intervention materially improves research capability or resolves an important process uncertainty.",
-            "stop_condition": "Stop when additional work has lower expected information value than preserving the current evidence and handing off the next unresolved bottleneck.",
-            "verification_requirement": "Verify important claims with tests, reproduction, independent calculation, or another appropriate second check before treating them as established.",
-            "evidence_basis": "Current repository state, research history, tests, experiments, and prior activation evidence.",
-            "tests_preceding_process": False,
-            "selection_basis": {
-                "mode": "AUTONOMOUS",
-                "reason": "The agent chooses the intervention; the controller supplies only the highest-order objective and safety boundary.",
-                "compared_against": []
-            },
-            "preceding_agent": previous,
-        }
-        write_json(d / "agents" / f"agent_{agent_number:02d}_contract.json", contract)
-        write_json(CURRENT_TASK, contract)
-
-        status = load_json(d / "campaign_status.json")
-        status["phase"] = f"AGENT_{agent_number:02d}_SELECTED"
-        status["selected_tasks"].append({
-            "agent_number": agent_number,
-            "global_agent_number": global_agent_number,
-            "task_id": task_id,
-        })
-        status["selection_history"].append({
-            "agent_number": agent_number,
-            "global_agent_number": global_agent_number,
-            "role": AUTONOMOUS_ROLE,
-            "task_id": task_id,
-            "compared_against": [],
-        })
-        write_json(d / "campaign_status.json", status)
-        return contract
-
-    expected_role = ROLE_BY_AGENT.get(agent_number)
-    if expected_role is None:
-        raise SystemExit("agent number is outside legacy role map")
     tasks = load_queue()
 
     if agent_number > 1:
@@ -423,24 +363,43 @@ def select_task(run_id: str, agent_number: int) -> dict[str, Any]:
 
     status = load_json(d / "campaign_status.json")
     status["phase"] = f"AGENT_{agent_number:02d}_SELECTED"
-    status["selected_tasks"].append({
-        "agent_number": agent_number,
-        "global_agent_number": global_agent_number,
-        "task_id": selected["task_id"],
-    })
-    status["selection_history"].append({
-        "agent_number": agent_number,
-        "global_agent_number": global_agent_number,
-        "role": expected_role,
-        "task_id": selected["task_id"],
-        "compared_against": [x["task_id"] for x in candidates[:5]],
-    })
+    status["selected_tasks"].append(
+        {
+            "agent_number": agent_number,
+            "global_agent_number": global_agent_number,
+            "task_id": selected["task_id"],
+        }
+    )
+    status["selection_history"].append(
+        {
+            "agent_number": agent_number,
+            "global_agent_number": global_agent_number,
+            "role": expected_role,
+            "task_id": selected["task_id"],
+            "compared_against": [x["task_id"] for x in candidates[:5]],
+        }
+    )
     write_json(d / "campaign_status.json", status)
     return contract
 
 
 def render_prompt(run_id: str, agent_number: int) -> str:
     contract = current_contract(run_id, agent_number)
+    role = contract["role"]
+    if role == "LEARNING_PROCESS":
+        role_guidance = (
+            "Improve, test, or challenge the research-learning process. A no-change "
+            "RETAIN/REJECT/UNVERIFIED outcome is valid. Do not change the process without "
+            "observed evidence of a bottleneck or capability gain."
+        )
+    else:
+        role_guidance = (
+            "Advance the highest-value unresolved quantitative-research frontier using the "
+            "current process. Explicitly evaluate whether the preceding learning-process "
+            "decision helped; record what uncertainty changed; do not optimize a local "
+            "result merely because it is already underway."
+        )
+
     activation_environment = {
         "execution_layer": "GitHub Actions Linux runner executing a fresh Kilo Code CLI process",
         "repository_root": str(ROOT),
@@ -451,42 +410,109 @@ def render_prompt(run_id: str, agent_number: int) -> str:
         "ref": os.environ.get("GITHUB_REF_NAME", "unknown"),
         "campaign_slot": agent_number,
         "global_agent_number": contract["global_agent_number"],
-        "research_mode": "quantitative research and simulation only; no live trading or production execution",
+        "research_mode": "research/simulation only; no live trading or production execution",
     }
+    return f"""You are Global Agent {contract["global_agent_number"]} (campaign slot {agent_number:02d}) in a controlled sequential quantitative-research campaign.
+This is a genuinely fresh Kilo session. Do not rely on prior live Kilo context or on another agent's conversational state.
+The repository's durable state is the only cross-agent communication medium.
 
-    prompt_path = ROOT / ".kilo" / "wakeup-prompt.md"
-    base_prompt = prompt_path.read_text(encoding="utf-8").strip() if prompt_path.exists() else ""
+EXECUTION ENVIRONMENT AWARENESS:
+You are running inside the workflow's disposable computing environment, not on the user's personal computer, a production trading system, or an external research platform.
+Treat the following as orchestration/infrastructure observations unless independently connected to research evidence:
+- GitHub Actions job/step status, runner behavior, workflow logs, environment variables, filesystem mounts, Git operations, and persistence operations.
+- Kilo gateway/model transport behavior, gateway errors, timeouts, and tool-permission failures.
+- Controller-generated task/validation state and worker-liveness signals.
+- Python/package/OS/network errors caused by the runner or tooling.
 
-    result_path = f"state/campaign/runs/{run_id}/agents/agent_{agent_number:02d}.json"
-    return f"""
-{base_prompt}
+Do not confuse infrastructure interactions with the research subject:
+- A tool/permission/network failure is an execution-environment signal first; do not reinterpret it as evidence about a market, asset, dataset, or hypothesis.
+- Successful tool execution is execution evidence, not research validity.
+- Repository/file-system state is durable process evidence, not external-world truth unless a task explicitly establishes that link.
+- Verify data-source identity, dataset provenance, timestamps, and calculation results independently before making quantitative claims.
+- Never infer live-market conditions, trading availability, or external-system behavior from the runner environment.
+- If the environment prevents a computation, preserve the exact blocker and distinguish it from a falsified research hypothesis.
 
 CURRENT ACTIVATION ENVIRONMENT:
 {json.dumps(activation_environment, indent=2, sort_keys=True)}
 
-AUTONOMOUS SESSION:
-You decide the workflow, priorities, organization, experiments, validation, tooling, and process improvements.
-Treat the contract below as the highest-order objective and safety boundary, not as a preselected research task.
+HIGHER-ORDER OBJECTIVE:
+Improve the system's ability to choose what is worth learning, learn it efficiently, falsify it, validate it independently, preserve the evidence, and choose what to learn next.
 
-CONTRACT:
+ROLE:
+{role}
+
+ROLE GUIDANCE:
+{role_guidance}
+
+AUTHORITATIVE FOCUSED-TASK CONTRACT:
 {json.dumps(contract, indent=2, sort_keys=True)}
 
-RESULT CONTRACT:
-Before ending the session, write the machine-readable durable result to:
-{result_path}
+MANDATORY SESSION FIREWALL:
+- Exactly one primary learning question.
+- Exactly one bounded objective.
+- Exactly one meaningful deliverable.
+- Exactly one evidence gate.
+- Exactly one explicit stop condition.
+- Zero intentional scope expansion.
+- Secondary ideas become candidate_tasks in the durable record; they are NOT current work.
+- Do not redefine the campaign objective.
+- Do not dispatch another workflow.
+- Do not create hidden retries or another Kilo session.
+- Do not modify .github/workflows/**, .github/scripts/**, .kilo/**, AGENTS.md, ENTERPRISE.md, MANUAL_SETUP.md, or PERSISTENCE_POLICY.md.
+- Do not add cosmetic changes.
+- Do not treat commands executed, files edited, workflow success, tokens, runtime, or confidence as learning evidence.
 
-Required fields:
-agent_number, global_agent_number, campaign_slot, role, task_id, objective, bottleneck, question,
-action, changed, verified, unverified, observed_effect, uncertainty_targeted, uncertainty_reduced,
-process_decision, research_result, decision, next, candidate_tasks, complexity_added, failure_class,
-task_selection_observation.
+BEFORE SUBSTANTIVE WORK, ANSWER CONCISELY IN YOUR NOTES:
+1. What is the system ultimately trying to become better at learning?
+2. What currently most constrains useful learning?
+3. What uncertainty prevents a better decision?
+4. What single bounded action is most likely to reduce it?
+5. Why is that action worth its effort, complexity, and execution risk?
 
-Use only canonical status tokens already defined by the repository. Do not fabricate evidence.
+EXECUTION:
+- Inspect actual durable evidence before changing anything.
+- Stay within the contract's scope and out_of_scope boundaries.
+- Prefer existing deterministic research infrastructure.
+- Use the narrowest relevant validation.
+- Independently inspect resulting evidence rather than trusting your own interpretation.
+- Stop when the success criterion or stop condition is reached, or when the task is no longer the highest-value use of effort.
+- Preserve negative and inconclusive evidence.
 
-IMMUTABLE SAFETY BOUNDARY:
-Do not modify the supervisor/controller safeguards in .github/scripts/, the scheduled supervisor workflow .github/workflows/kilo-wakeup.yml, credential/secret controls, or recursion safeguards.
-Do not dispatch another workflow or create uncontrolled self-triggering schedules.
+DURABLE HANDOFF:
+Write exactly one JSON record to:
+state/campaign/runs/{run_id}/agents/agent_{agent_number:02d}.json
+
+Required record fields:
+agent_number, role, task_id, objective, bottleneck, question, action, changed, verified,
+unverified, observed_effect, uncertainty_targeted, uncertainty_reduced,
+process_decision, research_result, decision, next, candidate_tasks,
+complexity_added, failure_class, task_selection_observation
+
+Canonical decision values:
+{sorted(DECISIONS)}
+
+Canonical process_decision values:
+{sorted(PROCESS_DECISIONS)}
+
+Canonical task_selection_observation values:
+{sorted(SELECTION_OBSERVATIONS)}
+
+Canonical failure_class values:
+{sorted(FAILURE_CLASSES)}
+
+Rules:
+- decision must reflect evidence, not effort.
+- next must contain exactly ONE bounded next action.
+- candidate_tasks may contain zero or more future tasks, each with the same focused-task schema as the current contract.
+- changed/verified/unverified must be arrays.
+- failure_class must be NONE when no failure occurred.
+- task_selection_observation must state whether the selected task improved the learning process, remained unchanged, worsened it, or is unverified.
+- Do not erase contradictory evidence.
+- Update state/worker_progress.md only at genuine semantic milestones.
+
+When the evidence gate is satisfied, STOP.
 """
+
 
 def main() -> int:
     ap = argparse.ArgumentParser()
@@ -496,7 +522,6 @@ def main() -> int:
     p.add_argument("--run-id", required=True)
     p.add_argument("--agent-count", type=int, required=True, choices=(2, 10))
     p.add_argument("--identity-mode", choices=("PERSISTENT", "EPHEMERAL"), default="PERSISTENT")
-    p.add_argument("--campaign-mode", choices=("LEGACY", "AUTONOMOUS"), default="LEGACY")
 
     p = sub.add_parser("select")
     p.add_argument("--run-id", required=True)
@@ -508,7 +533,7 @@ def main() -> int:
 
     args = ap.parse_args()
     if args.command == "init":
-        init_campaign(args.run_id, args.agent_count, args.identity_mode, args.campaign_mode)
+        init_campaign(args.run_id, args.agent_count, args.identity_mode)
         print(f"CAMPAIGN_INITIALIZED={args.run_id}")
         return 0
     if args.command == "select":
