@@ -72,6 +72,31 @@ class CampaignArchitectureTests(unittest.TestCase):
             )
         )
 
+    def test_global_identity_counter_is_durable(self):
+        import json
+        counter = json.loads((ROOT / "state" / "campaign" / "global_agent_counter.json").read_text(encoding="utf-8"))
+        self.assertEqual(counter["schema_version"], 1)
+        self.assertGreaterEqual(counter["next_global_agent_number"], 1)
+
+        original = self.controller.GLOBAL_COUNTER_PATH
+        try:
+            from tempfile import TemporaryDirectory
+            with TemporaryDirectory() as tmp:
+                self.controller.GLOBAL_COUNTER_PATH = Path(tmp) / "counter.json"
+                first = self.controller.allocate_global_agent_numbers("run-a", 10, "PERSISTENT")
+                second = self.controller.allocate_global_agent_numbers("run-b", 10, "PERSISTENT")
+                self.assertEqual(first["1"], 1)
+                self.assertEqual(first["10"], 10)
+                self.assertEqual(second["1"], 11)
+                self.assertEqual(second["10"], 20)
+                mini = self.controller.allocate_global_agent_numbers("mini", 2, "EPHEMERAL")
+                self.assertEqual(mini["1"], "MINI-01")
+                self.assertEqual(mini["2"], "MINI-02")
+                saved = json.loads(self.controller.GLOBAL_COUNTER_PATH.read_text(encoding="utf-8"))
+                self.assertEqual(saved["next_global_agent_number"], 21)
+        finally:
+            self.controller.GLOBAL_COUNTER_PATH = original
+
     def test_role_mapping(self):
         for n in range(1, 11):
             expected = "LEARNING_PROCESS" if n % 2 else "HIGHER_ORDER_OBJECTIVE"
