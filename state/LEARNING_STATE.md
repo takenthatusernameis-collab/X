@@ -67,3 +67,16 @@ Prefer the highest-value unresolved frontier cell over repeating an equivalent e
 5. Preserve negative and inconclusive evidence.
 6. Do not claim a strategy delta worked until its expected effect is actually observed.
 7. When there is insufficient evidence, choose UNVERIFIED rather than forcing RETAIN or REVERT.
+
+
+## Sequential campaign 37426042713
+- **Validated process improvement:** agents NONE
+- **Validated research progress:** agents NONE
+- **Validated negative/rejected evidence:** agents NONE
+- **Unresolved uncertainty:** agents [1, 2]
+- **Odd/even process observations:** [{"even_agent": 2, "even_observation": "UNVERIFIED", "even_task": "R-001", "even_uncertainty_reduced": "none demonstrated", "odd_agent": 1, "odd_process_decision": "UNVERIFIED", "odd_task": "P-001"}]
+- **Task-selection observation:** {"1": "UNVERIFIED", "2": "UNVERIFIED"}
+- **Highest-value unresolved next task:** P-001
+- **New complexity introduced:** [{"agent_number": 1, "complexity_added": "UNVERIFIED"}, {"agent_number": 2, "complexity_added": "UNVERIFIED"}]
+- **Campaign persistence decision:** RECOVERY_BRANCH
+- **Contradictory/unverified evidence:** ['agent_01:UNVERIFIED', 'agent_02:UNVERIFIED']
