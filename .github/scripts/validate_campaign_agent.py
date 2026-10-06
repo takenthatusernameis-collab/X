@@ -16,10 +16,8 @@ sys.path.insert(0, str(SCRIPT_DIR))
 import campaign_controller as controller  # noqa: E402
 
 
-PROTECTED_PREFIXES = (".github/scripts/",)
-MUTABLE_CONTROL_FILES = {".kilo/wakeup-prompt.md"}
+PROTECTED_PREFIXES = (".github/workflows/", ".github/scripts/", ".kilo/")
 PROTECTED_FILES = {
-    ".github/workflows/kilo-wakeup.yml",
     "AGENTS.md",
     "ENTERPRISE.md",
     "MANUAL_SETUP.md",
@@ -192,11 +190,7 @@ def main() -> int:
     touched = [path for path in after_paths if before_hashes.get(path) != sha(Path(path))]
     protected = sorted(
         p for p in after_paths
-        if (
-            p in PROTECTED_FILES
-            or any(p.startswith(prefix) for prefix in PROTECTED_PREFIXES)
-            or (p.startswith(".kilo/") and p not in MUTABLE_CONTROL_FILES)
-        )
+        if p in PROTECTED_FILES or any(p.startswith(prefix) for prefix in PROTECTED_PREFIXES)
     )
     failures: list[str] = []
     warnings: list[str] = []
