@@ -231,14 +231,15 @@ def init_campaign(run_id: str, agent_count: int, identity_mode: str = "PERSISTEN
         raise SystemExit("agent_count must be 2 or 10")
     if campaign_mode not in {"LEGACY", "AUTONOMOUS"}:
         raise SystemExit("campaign_mode must be LEGACY or AUTONOMOUS")
-    tasks = load_queue()
-    for role in sorted(set(ROLE_BY_AGENT[n] for n in range(1, agent_count + 1))):
-        if not any(t["role"] == role for t in tasks):
-            raise SystemExit(f"durable task queue has no tasks for role {role}")
-    for task in tasks:
-        if task["status"] == "SELECTED":
-            task["status"] = "OPEN"
-    save_queue(tasks)
+    tasks = load_queue() if campaign_mode == "LEGACY" else []
+    if campaign_mode == "LEGACY":
+        for role in sorted(set(ROLE_BY_AGENT[n] for n in range(1, agent_count + 1))):
+            if not any(t["role"] == role for t in tasks):
+                raise SystemExit(f"durable task queue has no tasks for role {role}")
+        for task in tasks:
+            if task["status"] == "SELECTED":
+                task["status"] = "OPEN"
+        save_queue(tasks)
     global_agent_numbers = allocate_global_agent_numbers(run_id, agent_count, identity_mode)
 
     d = run_dir(run_id)
