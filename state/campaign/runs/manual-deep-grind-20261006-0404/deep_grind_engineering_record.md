@@ -184,3 +184,9 @@ Verification performed after correction:
 - Controller protection covers both campaign architecture and staged-secret regression tests.
 
 The current X main head is `04218e1561618ff2afc04d2194a75e364bd635f9`.
+
+## Additional security-boundary refinement
+
+An adversarial review of the dedicated scanner found that `--diff-filter=AM` was narrower than the actual persisted-object boundary. Staged renamed or copied paths could be omitted from the scan. The scanner now uses `--diff-filter=ACMR`, and the architecture test pins that contract.
+
+This is a security-completeness refinement, not a claim that the scanner detects every possible secret format.
