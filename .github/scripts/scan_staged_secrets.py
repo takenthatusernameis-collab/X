@@ -29,7 +29,7 @@ PATTERNS = (
 
 def staged_paths() -> list[str]:
     raw = subprocess.check_output(
-        ["git", "diff", "--cached", "--name-only", "-z", "--diff-filter=AM"],
+        ["git", "diff", "--cached", "--name-only", "-z", "--diff-filter=ACMR"],
     )
     return [p.decode("utf-8") for p in raw.split(b"\0") if p]
 
