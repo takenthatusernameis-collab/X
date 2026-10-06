@@ -16,7 +16,7 @@ Treat every substantive activation as this control loop:
 
 **Preflight -> Smoke Test -> Deep Session -> Failure Classification -> Bounded Fresh-Session Recovery -> Independent Verification -> Commit/Reject**
 
-The workflow/job's success status is never sufficient evidence that research work is correct.
+The workflow/job's success status is never sufficient evidence that research work is correct. Likewise, an individual campaign agent exiting 0 is only an execution fact; the controller validates the resulting worktree before counting that session as verified.
 
 A useful distinction is:
 
@@ -89,7 +89,12 @@ For the current activation, record in `state/LEARNING_STATE.md`:
 
 Update the research frontier only with durable evidence. Do not reset the frontier merely to make an area look unexplored.
 
-The strategy delta is about improving the research process, not tuning a trading strategy to observed OOS performance. Prefer changes that increase hypothesis diversity, falsification power, independent verification, or information gained per unit of research effort.
+The strategy delta is about improving the research process, not tuning a trading strategy to observed OOS performance.
+
+## Controller acceptance gate
+
+The controller independently runs `validate_campaign_agent.py` after each fresh campaign session and `evaluate_research_process.py` after the campaign and post-worker verification. These gates are authoritative for process quality. A successful Kilo session with no durable frontier/state advancement must finish as `NO_SUBSTANTIVE_ACTION`, not be converted into an artificial research success.
+ Prefer changes that increase hypothesis diversity, falsification power, independent verification, or information gained per unit of research effort.
 
 A long activation with many commands but no meaningful uncertainty reduction is low learning efficiency. Do not count activity as learning.
 
@@ -97,14 +102,15 @@ A long activation with many commands but no meaningful uncertainty reduction is 
 
 At activation start:
 
-1. Inspect the current repository, recent Git history, recent activation log, and durable state.
-2. Inspect the most recent relevant activation outcome, especially any explicit UNVERIFIED, failure, or recovery item.
-3. Record the current activation identity when available:
+1. Read `state/LEARNING_STATE.md` first to recover the research frontier, prior strategy delta, and exactly one bounded next action before broad repository exploration.
+2. Inspect the current repository, recent Git history, recent activation log, and durable state.
+3. Inspect the most recent relevant activation outcome, especially any explicit UNVERIFIED, failure, or recovery item.
+4. Record the current activation identity when available:
    - GITHUB_RUN_ID
    - GITHUB_RUN_ATTEMPT
    - GITHUB_SHA
    - GITHUB_REF_NAME
-4. Create or update the single authoritative machine-readable activation receipt `state/activation_status.json`.
+5. Create or update the worker candidate activation receipt `state/activation_status.json`. The controller may later override the terminal interpretation; never treat a worker-authored COMPLETE token as proof.
 
 The receipt must contain at least:
 - `activation_id` matching `GITHUB_RUN_ID` when available;
