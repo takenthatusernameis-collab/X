@@ -158,20 +158,25 @@ def save_queue(tasks: list[dict[str, Any]]) -> None:
     )
 
 
-def severity_order(value: str) -> int:
+def benefit_order(value: str) -> int:
     return {"HIGH": 0, "MEDIUM": 1, "LOW": 2}[value]
 
 
+def cost_order(value: str) -> int:
+    return {"LOW": 0, "MEDIUM": 1, "HIGH": 2}[value]
+
+
 def task_rank(task: dict[str, Any]) -> tuple[Any, ...]:
-    # Ordinal qualitative ordering, not a fabricated score.
+    # Ordinal qualitative ordering, not a fabricated score:
+    # maximize information/leverage/falsification/verifiability and minimize cost.
     return (
-        severity_order(task["expected_information_gain"]),
-        severity_order(task["downstream_leverage"]),
-        severity_order(task["falsification_power"]),
-        severity_order(task["verifiability"]),
-        severity_order(task["effort"]),
-        severity_order(task["complexity"]),
-        severity_order(task["execution_risk"]),
+        benefit_order(task["expected_information_gain"]),
+        benefit_order(task["downstream_leverage"]),
+        benefit_order(task["falsification_power"]),
+        benefit_order(task["verifiability"]),
+        cost_order(task["effort"]),
+        cost_order(task["complexity"]),
+        cost_order(task["execution_risk"]),
         task["task_id"],
     )
 
