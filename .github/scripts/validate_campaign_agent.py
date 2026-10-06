@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 
-PROTECTED_PREFIXES = (".github/workflows/", ".kilo/")
+PROTECTED_PREFIXES = (".github/workflows/", ".github/scripts/", ".kilo/")
 PROTECTED_FILES = {
     "AGENTS.md",
     "ENTERPRISE.md",
