@@ -18,6 +18,7 @@ ROOT = Path.cwd()
 RUNS_ROOT = ROOT / "state" / "campaign" / "runs"
 QUEUE_PATH = ROOT / "state" / "campaign" / "task_queue.json"
 CURRENT_TASK = ROOT / "state" / "campaign" / "current_task.json"
+GLOBAL_COUNTER_PATH = ROOT / "state" / "campaign" / "global_agent_counter.json"
 
 ROLE_BY_AGENT = {n: ("LEARNING_PROCESS" if n % 2 else "HIGHER_ORDER_OBJECTIVE") for n in range(1, 11)}
 TASK_STATUSES = {"OPEN", "SELECTED", "RESOLVED", "REJECTED", "DEFERRED"}
@@ -81,6 +82,40 @@ def write_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, sort_keys=True) + "
 ", encoding="utf-8")
+
+
+
+def allocate_global_agent_numbers(run_id: str, agent_count: int, identity_mode: str) -> dict[str, Any]:
+    if identity_mode not in {"PERSISTENT", "EPHEMERAL"}:
+        raise SystemExit("identity_mode must be PERSISTENT or EPHEMERAL")
+    if agent_count < 1:
+        raise SystemExit("agent_count must be positive")
+    if identity_mode == "EPHEMERAL":
+        return {str(slot): f"MINI-{slot:02d}" for slot in range(1, agent_count + 1)}
+
+    state: dict[str, Any] = {
+        "schema_version": 1,
+        "next_global_agent_number": 1,
+        "campaigns": [],
+    }
+    if GLOBAL_COUNTER_PATH.exists():
+        state = load_json(GLOBAL_COUNTER_PATH)
+    next_number = int(state.get("next_global_agent_number", 1))
+    if next_number < 1:
+        raise SystemExit("global agent counter is invalid")
+    numbers = {str(slot): next_number + slot - 1 for slot in range(1, agent_count + 1)}
+    state["next_global_agent_number"] = next_number + agent_count
+    state.setdefault("campaigns", [])
+    state["campaigns"].append(
+        {
+            "run_id": str(run_id),
+            "global_start": next_number,
+            "global_end": next_number + agent_count - 1,
+            "agent_count": agent_count,
+        }
+    )
+    write_json(GLOBAL_COUNTER_PATH, state)
+    return numbers
 
 
 def question_is_single(question: str) -> bool:
@@ -188,9 +223,10 @@ def candidate_tasks_for_role(tasks: list[dict[str, Any]], role: str) -> list[dic
     )
 
 
-def init_campaign(run_id: str, agent_count: int) -> dict[str, Any]:
+def init_campaign(run_id: str, agent_count: int, identity_mode: str = "PERSISTENT") -> dict[str, Any]:
     if agent_count not in {2, 10}:
         raise SystemExit("agent_count must be 2 or 10")
+    global_agent_numbers = allocate_global_agent_numbers(run_id, agent_count, identity_mode)
     tasks = load_queue()
     for role in sorted(set(ROLE_BY_AGENT[n] for n in range(1, agent_count + 1))):
         if not any(t["role"] == role for t in tasks):
@@ -207,6 +243,9 @@ def init_campaign(run_id: str, agent_count: int) -> dict[str, Any]:
         "schema_version": 1,
         "run_id": str(run_id),
         "agent_count": agent_count,
+        "identity_mode": identity_mode,
+        "global_agent_numbers": global_agent_numbers,
+        "global_agent_start": list(global_agent_numbers.values())[0],
         "status": "IN_PROGRESS",
         "phase": "SETUP",
         "completed_agents": [],
@@ -229,10 +268,14 @@ def select_task(run_id: str, agent_number: int) -> dict[str, Any]:
     d = run_dir(run_id)
     if not d.exists():
         raise SystemExit("campaign has not been initialized")
+    campaign_status = load_json(d / "campaign_status.json")
     expected_role = ROLE_BY_AGENT.get(agent_number)
-    campaign_count = int(load_json(d / "campaign_status.json")["agent_count"])
+    campaign_count = int(campaign_status["agent_count"])
+    global_agent_number = campaign_status["global_agent_numbers"].get(str(agent_number))
     if expected_role is None or agent_number > campaign_count:
         raise SystemExit("agent number is outside campaign")
+    if global_agent_number is None:
+        raise SystemExit("global agent identity is missing for campaign slot")
     tasks = load_queue()
 
     if agent_number > 1:
@@ -277,6 +320,8 @@ def select_task(run_id: str, agent_number: int) -> dict[str, Any]:
     contract = {
         "task_id": selected["task_id"],
         "agent_number": agent_number,
+        "campaign_slot": agent_number,
+        "global_agent_number": global_agent_number,
         "role": expected_role,
         "primary_question": selected["primary_question"],
         "bottleneck": selected["bottleneck"],
@@ -316,10 +361,17 @@ def select_task(run_id: str, agent_number: int) -> dict[str, Any]:
 
     status = load_json(d / "campaign_status.json")
     status["phase"] = f"AGENT_{agent_number:02d}_SELECTED"
-    status["selected_tasks"].append({"agent_number": agent_number, "task_id": selected["task_id"]})
+    status["selected_tasks"].append(
+        {
+            "agent_number": agent_number,
+            "global_agent_number": global_agent_number,
+            "task_id": selected["task_id"],
+        }
+    )
     status["selection_history"].append(
         {
             "agent_number": agent_number,
+            "global_agent_number": global_agent_number,
             "role": expected_role,
             "task_id": selected["task_id"],
             "compared_against": [x["task_id"] for x in candidates[:5]],
@@ -346,7 +398,7 @@ def render_prompt(run_id: str, agent_number: int) -> str:
             "result merely because it is already underway."
         )
 
-    return f"""You are Agent {agent_number:02d} in a controlled sequential quantitative-research campaign.
+    return f"""You are Global Agent {contract["global_agent_number"]} (campaign slot {agent_number:02d}) in a controlled sequential quantitative-research campaign.
 This is a genuinely fresh Kilo session. Do not rely on prior live Kilo context or on another agent's conversational state.
 The repository's durable state is the only cross-agent communication medium.
 
@@ -436,6 +488,7 @@ def main() -> int:
     p = sub.add_parser("init")
     p.add_argument("--run-id", required=True)
     p.add_argument("--agent-count", type=int, required=True, choices=(2, 10))
+    p.add_argument("--identity-mode", choices=("PERSISTENT", "EPHEMERAL"), default="PERSISTENT")
 
     p = sub.add_parser("select")
     p.add_argument("--run-id", required=True)
@@ -447,7 +500,7 @@ def main() -> int:
 
     args = ap.parse_args()
     if args.command == "init":
-        init_campaign(args.run_id, args.agent_count)
+        init_campaign(args.run_id, args.agent_count, args.identity_mode)
         print(f"CAMPAIGN_INITIALIZED={args.run_id}")
         return 0
     if args.command == "select":
