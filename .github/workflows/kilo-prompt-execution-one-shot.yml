@@ -1,3 +1,606 @@
+name: Kilo Manual One-Shot Diagnostic
+
+on:
+  push:
+    paths:
+      - ".kilo/wakeup-prompt.md"
+      - "research/data/preflight.py"
+
+concurrency:
+  group: kilo-research-enterprise-v3
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  kilo:
+    name: Autonomous Kilo activation
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+
+    steps:
+      - name: Checkout repository
+        id: audit_source_1_checkout_repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Deep audit — after Checkout repository
+        id: deep_audit_1_checkout_repository
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.audit_source_1_checkout_repository.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Checkout repository"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
+      - name: Install Kilo Code CLI
+        id: audit_source_2_install_kilo_code_cli
+        run: npm install -g @kilocode/cli
+
+      - name: Deep audit — after Install Kilo Code CLI
+        id: deep_audit_2_install_kilo_code_cli
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.audit_source_2_install_kilo_code_cli.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Install Kilo Code CLI"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
+      - name: Verify Kilo installation
+        id: verify_install
+        run: kilo --version
+
+      - name: Deep audit — after Verify Kilo installation
+        id: deep_audit_3_verify_kilo_installation
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.verify_install.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Verify Kilo installation"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
+      - name: Install research Python dependencies
+        id: research_python
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/x-python"
+          "$RUNNER_TEMP/x-python/bin/python" -m pip install --disable-pip-version-check --no-cache-dir -r research/backtest/requirements.txt \
+            pytest
+          "$RUNNER_TEMP/x-python/bin/python" - <<'PY'
+          import numpy
+          print(f"Research Python environment ready; NumPy {numpy.__version__}.")
+          PY
+          echo "$RUNNER_TEMP/x-python/bin" >> "$GITHUB_PATH"
+      - name: Deep audit — after Install research Python dependencies
+        id: deep_audit_4_install_research_python_dependencies
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.research_python.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Install research Python dependencies"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
+      - name: Diagnose Kilo API key
+        id: kilo_auth
+        continue-on-error: true
+        env:
+          KILO_API_KEY: ${{ secrets.KILO_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$KILO_API_KEY" ]; then
+            echo "KILO_API_KEY_CHECK=NOT_CONFIGURED"
+            {
+              echo "### Kilo API key diagnostic"
+              echo "KILO_API_KEY: **not configured**"
+              echo
+              echo "The research workflow does not require the key because the selected model is free."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          status="$(curl --silent --show-error --connect-timeout 10 --max-time 20 \
+            --output /tmp/kilo-profile-response --write-out '%{http_code}' \
+            -H "Authorization: Bearer $KILO_API_KEY" \
+            -H "Accept: application/json" \
+            https://api.kilo.ai/api/profile || true)"
+
+          case "$status" in
+            200)
+              echo "KILO_API_KEY_CHECK=VALID"
+              {
+                echo "### Kilo API key diagnostic"
+                echo "KILO_API_KEY: **valid** — authenticated Kilo profile request returned HTTP 200."
+                echo
+                echo "The key itself was not printed or persisted."
+              } >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            401)
+              echo "::error::KILO_API_KEY_CHECK=INVALID"
+              {
+                echo "### Kilo API key diagnostic"
+                echo "KILO_API_KEY: **invalid or rejected** — Kilo returned HTTP 401."
+                echo
+                echo "The key itself was not printed or persisted."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+              ;;
+            *)
+              echo "::warning::KILO_API_KEY_CHECK=UNVERIFIED"
+              {
+                echo "### Kilo API key diagnostic"
+                echo "KILO_API_KEY: **unverified** — Kilo profile endpoint returned HTTP $status rather than 200 or 401."
+                echo
+                echo "The key itself was not printed or persisted."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+              ;;
+          esac
+
+      - name: Deep audit — after Diagnose Kilo API key
+        id: deep_audit_5_diagnose_kilo_api_key
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.kilo_auth.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Diagnose Kilo API key"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
+      - name: Discover a currently available free model
+        id: discover_model
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from urllib.request import Request, urlopen
+
+          url = "https://api.kilo.ai/api/gateway/models"
+          request = Request(url, headers={"Accept": "application/json"})
+          with urlopen(request, timeout=20) as response:
+              payload = json.load(response)
+
+          models = payload.get("data", [])
+          free = [
+              m for m in models
+              if isinstance(m.get("id"), str) and m["id"].endswith(":free")
+          ]
+
+          preferred = [
+              "minimax/minimax-m2.1:free",
+              "z-ai/glm-5:free",
+          ]
+
+          selected = None
+          for model_id in preferred:
+              candidate = next((m for m in free if m.get("id") == model_id), None)
+              if candidate:
+                  selected = candidate
+                  break
+
+          if selected is None:
+              def tool_capable(model):
+                  values = model.get("supported_parameters") or []
+                  return bool(
+                      model.get("tool_calling")
+                      or model.get("tool_call")
+                      or any(str(v).lower() in {"tools", "tool_choice"} for v in values)
+                  )
+
+              candidates = [m for m in free if tool_capable(m)]
+              candidates.sort(key=lambda m: m.get("id", ""))
+              if candidates:
+                  selected = candidates[0]
+
+          if selected is None:
+              ids = sorted(str(m.get("id")) for m in free if m.get("id"))
+              raise SystemExit(
+                  "No suitable tool-capable free Kilo model was found. "
+                  f"Available free IDs: {ids[:40]}"
+              )
+
+          model_id = selected["id"]
+          model_name = selected.get("name") or model_id
+
+          with open("/tmp/kilo-free-model-id", "w", encoding="utf-8") as f:
+              f.write(model_id)
+
+          with open("/tmp/kilo-free-model-name", "w", encoding="utf-8") as f:
+              f.write(model_name)
+
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as f:
+              f.write(f"KILO_FREE_MODEL_ID={model_id}\n")
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
+              f.write("### Free model discovery\n")
+              f.write(f"Selected current free model: `{model_id}`\n")
+              f.write("Model selection came from Kilo's live `/models` catalogue.\n")
+
+          print(f"Selected current free model: {model_id}")
+          PY
+
+      - name: Deep audit — after Discover a currently available free model
+        id: deep_audit_6_discover_a_currently_available_free_model
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.discover_model.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Discover a currently available free model"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
+      - name: Prepare trusted Kilo research configuration
+        id: audit_source_7_prepare_trusted_kilo_research_configuration
+        run: |
+          set -euo pipefail
+          test -n "$KILO_FREE_MODEL_ID"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          model_id = os.environ["KILO_FREE_MODEL_ID"]
+          model_name = Path("/tmp/kilo-free-model-name").read_text(encoding="utf-8")
+
+          config = {
+              "$schema": "https://app.kilo.ai/config.json",
+              "enabled_providers": ["openai-compatible"],
+              "model": "openai-compatible/free-kilo",
+              "small_model": "openai-compatible/free-kilo",
+              "subagent_model": "openai-compatible/free-kilo",
+              "provider": {
+                  "openai-compatible": {
+                      "options": {
+                          "baseURL": "https://api.kilo.ai/api/gateway"
+                      },
+                      "models": {
+                          "free-kilo": {
+                              "id": model_id,
+                              "name": model_name,
+                              "tool_call": True
+                          }
+                      }
+                  }
+              },
+              "sandbox": {
+                  "enabled": False,
+                  "network": "allow",
+                  "allowed_hosts": [
+                      "github.com:443",
+                      "api.github.com:443",
+                      "raw.githubusercontent.com:443",
+                      "api.kilo.ai:443",
+                      "pypi.org:443",
+                      "files.pythonhosted.org:443",
+                      "registry.npmjs.org:443"
+                  ]
+              }
+          }
+
+          path = Path(os.environ["HOME"]) / ".config" / "kilo" / "kilo.json"
+          path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+          os.chmod(path, 0o600)
+
+          print(f"Prepared secretless Kilo research config for {model_id}.")
+          PY
+
+      - name: Deep audit — after Prepare trusted Kilo research configuration
+        id: deep_audit_7_prepare_trusted_kilo_research_configuration
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.audit_source_7_prepare_trusted_kilo_research_configuration.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Prepare trusted Kilo research configuration"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
+      - name: Validate trusted Kilo configuration
+        id: audit_source_8_validate_trusted_kilo_configuration
+        run: |
+          set -euo pipefail
+          test "$(stat -c '%a' "$HOME/.config/kilo/kilo.json")" = "600"
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          path = Path(os.environ["HOME"]) / ".config" / "kilo" / "kilo.json"
+          config = json.loads(path.read_text(encoding="utf-8"))
+
+          assert config["enabled_providers"] == ["openai-compatible"]
+          assert config["model"] == "openai-compatible/free-kilo"
+          assert config["small_model"] == "openai-compatible/free-kilo"
+          assert config["subagent_model"] == "openai-compatible/free-kilo"
+
+          gateway = config["provider"]["openai-compatible"]
+          assert gateway["options"]["baseURL"] == "https://api.kilo.ai/api/gateway"
+          assert "apiKey" not in gateway["options"]
+
+          model = gateway["models"]["free-kilo"]
+          assert model["id"].endswith(":free")
+          assert model["tool_call"] is True
+
+          assert config["sandbox"]["enabled"] is False
+          print(f"Trusted Kilo configuration validated for {model['id']}.")
+          PY
+
+      - name: Deep audit — after Validate trusted Kilo configuration
+        id: deep_audit_8_validate_trusted_kilo_configuration
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.audit_source_8_validate_trusted_kilo_configuration.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Validate trusted Kilo configuration"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
+      - name: Research readiness preflight
+        id: preflight
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+
+          echo "=== Research readiness preflight ==="
+          # actions/checkout normally uses detached HEAD; validate the exact checked-out
+          # commit/ref instead of requiring a local branch to be attached.
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git show-ref --verify --quiet "refs/remotes/origin/$GITHUB_REF_NAME"
+          test -z "$(git status --porcelain)"
+          test ! -e .git/index.lock
+
+          for required in             AGENTS.md             ENTERPRISE.md             PERSISTENCE_POLICY.md             .kilo/wakeup-prompt.md             research/METHODOLOGY.md             research/data/manifest.json             research/data/preflight.py             state/STATE.md             state/activation_status.json             logs/README.md; do
+            test -s "$required"
+          done
+
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          manifest = json.loads(Path("research/data/manifest.json").read_text())
+          universe = manifest.get("universe")
+          entries = manifest.get("entries")
+          if not isinstance(universe, list) or not universe:
+              raise SystemExit("research manifest has no universe")
+          if not isinstance(entries, list) or len(entries) != len(universe):
+              raise SystemExit("research manifest universe/entry cardinality mismatch")
+          entry_tickers = [e.get("ticker") for e in entries]
+          if sorted(entry_tickers) != sorted(universe):
+              raise SystemExit("research manifest ticker set mismatch")
+          receipt = json.loads(Path("state/activation_status.json").read_text())
+          required_receipt = {"activation_id","status","objective","phase","changed","verified","unverified","next"}
+          missing = required_receipt - set(receipt)
+          if missing:
+              raise SystemExit(f"activation receipt missing fields: {sorted(missing)}")
+          if not isinstance(receipt["changed"], list) or not isinstance(receipt["verified"], list) or not isinstance(receipt["unverified"], list):
+              raise SystemExit("activation receipt list fields have invalid types")
+          print(f"Manifest preflight OK: {len(universe)}-asset fixed universe.")
+          print(f"Existing receipt status: {receipt['status']}; prior activation {receipt['activation_id']}.")
+          PY
+
+          echo "Testing deterministic Kilo outcome reporting, including the prior worker-failure case..."
+          set +e
+          failure_output="$(python3 .github/scripts/report_kilo_outcome.py \
+            --preflight success \
+            --smoke success \
+            --worker failure \
+            --verify success \
+            --liveness COMPLETED_WITH_SEMANTIC_CHECKPOINTS \
+            --persistence MAIN 2>&1)"
+          failure_rc=$?
+          set -e
+          printf '%s\n' "$failure_output"
+          test "$failure_rc" -eq 0
+          printf '%s\n' "$failure_output" | grep -q "KILO_WORKER_OUTCOME=PARTIAL"
+
+          echo "Running deterministic real-data preflight..."
+          if ! python3 research/data/preflight.py > /tmp/x-data-preflight.log 2>&1; then
+            echo "Deterministic data preflight failed; emitting its full diagnostic:"
+            cat /tmp/x-data-preflight.log
+            exit 1
+          fi
+          tail -n 25 /tmp/x-data-preflight.log
+          grep -q "PREFLIGHT PASSED" /tmp/x-data-preflight.log
+
+          echo "Running complete deterministic regression suite..."
+          if ! python3 -m unittest discover -s tests -v > /tmp/x-regression.log 2>&1; then
+            echo "Deterministic regression suite failed; emitting its diagnostic:"
+            tail -n 120 /tmp/x-regression.log
+            exit 1
+          fi
+          tail -n 35 /tmp/x-regression.log
+          grep -q "OK" /tmp/x-regression.log
+
+          echo "Running bounded real-data end-to-end readiness example..."
+          python3 examples/regime_stability_universe.py > /tmp/x-e2e-preflight.log 2>&1
+          tail -n 35 /tmp/x-e2e-preflight.log
+
+          echo "RESEARCH_PREFLIGHT=PASS"
+      - name: Deep audit — after Research readiness preflight
+        id: deep_audit_9_research_readiness_preflight
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.preflight.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Research readiness preflight"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
+      - name: Smoke-test real Kilo execution path
+        id: kilo_smoke
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/kilo-smoke
+          mkdir -p /tmp/kilo-smoke
+          cat > /tmp/kilo-smoke/prompt.txt <<'EOF'
+          Use the available shell/tool capability to create exactly one file:
+            /tmp/kilo-smoke/sentinel.txt
+          The complete contents must be exactly SMOKE_OK.
+          Do not modify the Git repository. Verify the file contents and stop.
+          EOF
+          cd /tmp/kilo-smoke
+          kilo run --model openai-compatible/free-kilo --auto "$(cat /tmp/kilo-smoke/prompt.txt)" > /tmp/kilo-smoke.log 2>&1
+          status=$?
+          cat /tmp/kilo-smoke.log
+          test "$status" -eq 0
+          test -s /tmp/kilo-smoke/sentinel.txt
+          test "$(cat /tmp/kilo-smoke/sentinel.txt)" = "SMOKE_OK"
+          echo "Representative Kilo execution-path smoke test passed."
+      - name: Deep audit — after Smoke-test real Kilo execution path
+        id: deep_audit_10_smoke_test_real_kilo_execution_path
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.kilo_smoke.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Smoke-test real Kilo execution path"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
+      - name: Run Kilo
+        id: kilo
+        if: steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 340
+        env:
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
+        run: |
+          set +e
+          mkdir -p state
+          cat > state/worker_progress.md <<EOF
+          # Worker Progress
+          
+          activation_id: $GITHUB_RUN_ID
+          phase: CONTROLLER_INITIALIZED
+          status: OBSERVATION_ONLY
+          last_verified_milestone: none yet
+          next_bounded_action: begin the declared research objective
+          
+          This file is a liveness contract. Update it only after a real research-state transition or verified milestone.
+          EOF
+          initial_checkpoint_mtime="$(stat -c %Y state/worker_progress.md)"
+
+          : > /tmp/kilo-primary.log
+          # Stream Kilo stdout/stderr into the live GitHub Actions log while also
+          # retaining a local copy for liveness checks and post-run diagnostics.
+          stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-primary.log) 2>&1 &
+          kilo_pid=$!
+
+          stall_seconds=1800
+          interval_seconds=300
+          stale_for=0
+          semantic_progress_seen=0
+          liveness_status="RUNNING"
+          last_signal="controller-initialized"
+
+          while kill -0 "$kilo_pid" 2>/dev/null; do
+            sleep "$interval_seconds"
+
+            if ! kill -0 "$kilo_pid" 2>/dev/null; then
+              break
+            fi
+
+            now="$(date +%s)"
+            checkpoint_mtime="$initial_checkpoint_mtime"
+            if [ -f state/worker_progress.md ]; then
+              checkpoint_mtime="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo "$initial_checkpoint_mtime")"
+            fi
+            output_mtime="$(stat -c %Y /tmp/kilo-primary.log 2>/dev/null || echo "$now")"
+
+            checkpoint_age=$((now - checkpoint_mtime))
+            output_age=$((now - output_mtime))
+
+            if [ "$checkpoint_mtime" -gt "$initial_checkpoint_mtime" ]; then
+              semantic_progress_seen=1
+              stale_for=0
+              last_signal="SEMANTIC_CHECKPOINT"
+            elif [ "$output_age" -le "$interval_seconds" ]; then
+              stale_for=0
+              last_signal="PROCESS_ACTIVITY_ONLY"
+            else
+              stale_for=$((stale_for + interval_seconds))
+              last_signal="NO_RECENT_PROGRESS_SIGNAL"
+            fi
+
+            {
+              echo "### Kilo liveness heartbeat"
+              echo "- observed_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+              echo "- process: PID $kilo_pid alive"
+              echo "- semantic_checkpoint_age_seconds: $checkpoint_age"
+              echo "- worker_output_age_seconds: $output_age"
+              echo "- last_signal: $last_signal"
+              echo "- stale_for_seconds: $stale_for"
+              echo "- semantic_progress_seen: $semantic_progress_seen"
+            } >> "$GITHUB_STEP_SUMMARY"
+
+            echo "::notice::Kilo liveness: signal=$last_signal checkpoint_age=$checkpoint_age s output_age=$output_age s stale_for=$stale_for s"
+
+            if [ "$stale_for" -ge "$stall_seconds" ]; then
+              echo "::error::Kilo worker appears stalled: no semantic checkpoint or fresh worker output for $stale_for s."
+              liveness_status="STALLED"
+              echo "KILO_LIVENESS_STATUS=STALLED" >> "$GITHUB_ENV"
+              echo "KILO_LIVENESS_REASON=no semantic checkpoint or fresh worker output for $stale_for s" >> "$GITHUB_ENV"
+              kill -TERM "$kilo_pid" 2>/dev/null || true
+              sleep 10
+              kill -KILL "$kilo_pid" 2>/dev/null || true
+              break
+            fi
+          done
+
+          wait "$kilo_pid"
+          status=$?
+
+          if [ "$liveness_status" != "STALLED" ]; then
+            if [ "$semantic_progress_seen" -eq 1 ]; then
+              echo "KILO_LIVENESS_STATUS=COMPLETED_WITH_SEMANTIC_CHECKPOINTS" >> "$GITHUB_ENV"
+              echo "KILO_LIVENESS_REASON=worker terminated after emitting at least one post-start semantic checkpoint" >> "$GITHUB_ENV"
+            else
+              echo "KILO_LIVENESS_STATUS=COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT" >> "$GITHUB_ENV"
+              echo "KILO_LIVENESS_REASON=worker terminated without a post-start semantic checkpoint" >> "$GITHUB_ENV"
+            fi
+          fi
+
+          echo "Kilo primary session exited with status $status; live output was streamed above."
+          if [ "$status" -eq 0 ]; then
+            exit 0
+          fi
+
+          if grep -Eq 'invalid request error trace_id:' /tmp/kilo-primary.log; then
+            echo "::warning::Kilo gateway returned a transient invalid-request trace; recording it as a recoverable execution event without an automatic retry."
+            echo "KILO_GATEWAY_RECOVERY=TRANSIENT_GATEWAY_NO_RETRY" >> "$GITHUB_ENV"
+            echo "KILO_GATEWAY_RECOVERY_REASON=transient invalid-request trace; preserved current session evidence and deferred recovery to the next fresh activation" >> "$GITHUB_ENV"
+          fi
+
+          exit "$status"
+
 name: Kilo Prompt Execution One Shot
 
 on:
