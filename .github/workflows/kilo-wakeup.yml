@@ -593,20 +593,20 @@ jobs:
 
             before_checkpoint="$(sha256sum state/worker_progress.md 2>/dev/null | cut -d " " -f1 || true)"
             python3 - <<PY > "/tmp/kilo-agent-${agent_id}-before.json"
-import hashlib
-import json
-import subprocess
-from pathlib import Path
-names = set()
-for cmd in (("git", "diff", "--name-only"), ("git", "ls-files", "--others", "--exclude-standard")):
-    names.update(x for x in subprocess.check_output(cmd, text=True).splitlines() if x)
-hashes = {}
-for name in sorted(names):
-    p = Path(name)
-    if p.is_file():
-        hashes[name] = hashlib.sha256(p.read_bytes()).hexdigest()
-print(json.dumps({"hashes": hashes}, indent=2))
-PY
+            import hashlib
+            import json
+            import subprocess
+            from pathlib import Path
+            names = set()
+            for cmd in (("git", "diff", "--name-only"), ("git", "ls-files", "--others", "--exclude-standard")):
+                names.update(x for x in subprocess.check_output(cmd, text=True).splitlines() if x)
+            hashes = {}
+            for name in sorted(names):
+                p = Path(name)
+                if p.is_file():
+                    hashes[name] = hashlib.sha256(p.read_bytes()).hexdigest()
+            print(json.dumps({"hashes": hashes}, indent=2))
+            PY
             before_head="$(git rev-parse --short=12 HEAD)"
             before_status="$(git status --short)"
             printf '%s\n' "$before_status" > "state/campaign/agent_${agent_id}_before_status.txt"
