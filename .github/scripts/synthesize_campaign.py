@@ -82,7 +82,7 @@ def main() -> int:
         final_decision = final_record["decision"]
         for task in queue:
             if task["task_id"] == final_task_id:
-                if final_decision in {"USEFUL_CHANGE", "VERIFIED_NEGATIVE_RESULT", "RETAIN", "NO_SUBSTANTIVE_ACTION"}:
+                if final_decision in {"USEFUL_CHANGE", "VERIFIED_NEGATIVE_RESULT", "RETAIN"}:
                     task["status"] = "RESOLVED"
                 elif final_decision == "REJECT":
                     task["status"] = "REJECTED"
