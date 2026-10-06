@@ -1,160 +1,113 @@
 #!/usr/bin/env python3
-"""Independent controller-side evaluation of research-process quality."""
+"""Independent controller-side evaluation of the sequential campaign process."""
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 from pathlib import Path
 
 
-TERMINAL_PROCESS = {"VERIFIED_PROGRESS", "VERIFIED_REPAIR", "NO_SUBSTANTIVE_ACTION", "UNVERIFIED"}
-
-
-def sha(path: Path) -> str | None:
-    if not path.exists() or not path.is_file():
-        return None
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
-
-
-def load_json(path: Path) -> dict:
+def load(path: Path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--campaign", default="state/campaign/campaign_status.json")
-    ap.add_argument("--verify-outcome", required=True)
-    ap.add_argument("--worker-outcome", required=True)
-    ap.add_argument("--liveness", required=True)
-    ap.add_argument("--output", default="state/campaign/process_evaluation.json")
+    ap.add_argument("--run-id", required=True)
     args = ap.parse_args()
 
-    baseline = {}
-    import subprocess
-    for name in ["state/LEARNING_STATE.md", "state/STATE.md", "state/activation_status.json", "state/worker_progress.md"]:
-        try:
-            blob = subprocess.check_output(["git", "show", f"HEAD:{name}"])
-            baseline[name] = hashlib.sha256(blob).hexdigest()
-        except subprocess.CalledProcessError:
-            baseline[name] = None
-    campaign_path = Path(args.campaign)
-    campaign = load_json(campaign_path) if campaign_path.exists() else {}
+    root = Path("state/campaign/runs") / str(args.run_id)
+    status = load(root / "campaign_status.json")
+    count = int(status["agent_count"])
+    records = []
+    validations = []
+    missing: list[int] = []
 
-    successes = int(campaign.get("success_count", 0) or 0)
-    failures = int(campaign.get("failure_count", 0) or 0)
-    agent_count = int(campaign.get("agent_count", 0) or 0)
+    for n in range(1, count + 1):
+        rp = root / "agents" / f"agent_{n:02d}.json"
+        vp = root / "agents" / f"agent_{n:02d}_validation.json"
+        if rp.exists():
+            records.append(load(rp))
+        else:
+            missing.append(n)
+        if vp.exists():
+            validations.append(load(vp))
+        else:
+            missing.append(n)
 
-    current = {
-        "learning_state": sha(Path("state/LEARNING_STATE.md")),
-        "research_state": sha(Path("state/STATE.md")),
-        "activation_receipt": sha(Path("state/activation_status.json")),
-        "worker_progress": sha(Path("state/worker_progress.md")),
+    verified_sessions = sum(v.get("status") == "VERIFIED_SESSION" for v in validations)
+    process_pairs = []
+    for even in range(2, count + 1, 2):
+        odd = even - 1
+        odd_record = next((r for r in records if r.get("agent_number") == odd), None)
+        even_record = next((r for r in records if r.get("agent_number") == even), None)
+        if odd_record and even_record:
+            process_pairs.append({
+                "odd_agent": odd,
+                "odd_process_decision": odd_record.get("process_decision"),
+                "odd_task": odd_record.get("task_id"),
+                "even_agent": even,
+                "even_task": even_record.get("task_id"),
+                "even_observation": even_record.get("task_selection_observation"),
+                "even_uncertainty_reduced": even_record.get("uncertainty_reduced"),
+            })
+
+    validated_process = [
+        r for r in records
+        if r.get("role") == "LEARNING_PROCESS"
+        and r.get("decision") in {"USEFUL_CHANGE", "VERIFIED_NEGATIVE_RESULT", "RETAIN"}
+        and r.get("process_decision") in {"IMPROVE", "RETAIN", "REJECT"}
+    ]
+    validated_research = [
+        r for r in records
+        if r.get("role") == "HIGHER_ORDER_OBJECTIVE"
+        and r.get("decision") in {"USEFUL_CHANGE", "VERIFIED_NEGATIVE_RESULT", "RETAIN"}
+        and r.get("uncertainty_reduced") not in {"", "none", "none demonstrated", None}
+    ]
+    negative = [r for r in records if r.get("decision") == "VERIFIED_NEGATIVE_RESULT"]
+    unresolved = [r for r in records if r.get("decision") == "UNVERIFIED"]
+    no_action = [r for r in records if r.get("decision") == "NO_SUBSTANTIVE_ACTION"]
+    selection_observations = {
+        str(r.get("agent_number")): r.get("task_selection_observation")
+        for r in records
     }
 
-    changes = set()
-    try:
-        changes.update(x for x in os.popen("git diff --name-only").read().splitlines() if x)
-        changes.update(x for x in os.popen("git ls-files --others --exclude-standard").read().splitlines() if x)
-    except Exception:
-        pass
+    contradictions = []
+    for r in records:
+        if r.get("decision") == "UNVERIFIED":
+            contradictions.append(f"agent_{r.get('agent_number'):02d}:UNVERIFIED")
+        if r.get("task_selection_observation") == "WORSENED":
+            contradictions.append(f"agent_{r.get('agent_number'):02d}:WORSENED_SELECTION_EFFECT")
 
-    learning_changed = current["learning_state"] != baseline.get("state/LEARNING_STATE.md")
-    research_state_changed = current["research_state"] != baseline.get("state/STATE.md")
-    worker_progress_changed = current["worker_progress"] != baseline.get("state/worker_progress.md")
-    research_code_changed = any(
-        p.startswith("research/") or p.startswith("tests/") or p.startswith("examples/")
-        for p in changes
-    )
-    durable_state_changed = learning_changed or research_state_changed or research_code_changed
-
-    validation_files = sorted(Path("state/campaign").glob("agent_*_validation.json"))
-    validation_reports = []
-    validation_failures = 0
-    validation_verified = 0
-    checkpoint_transitions = 0
-    for path in validation_files:
-        report = load_json(path)
-        validation_reports.append(report)
-        if report.get("status") == "VERIFIED_SESSION":
-            validation_verified += 1
-        else:
-            validation_failures += 1
-        if report.get("checkpoint_changed"):
-            checkpoint_transitions += 1
-
-    reasons: list[str] = []
-    if args.verify_outcome != "success":
-        process = "UNVERIFIED"
-        reasons.append("independent post-worker verification did not succeed")
-    elif successes <= 0:
-        process = "UNVERIFIED"
-        reasons.append("no campaign agent reached controller-verified session status")
-    elif learning_changed or research_state_changed:
-        process = "VERIFIED_PROGRESS"
-        reasons.append("durable research state changed beyond the activation receipt and logs")
-    elif research_code_changed and validation_verified > 0 and validation_failures == 0:
-        process = "VERIFIED_REPAIR"
-        reasons.append("research/software capability changed and all observed campaign sessions passed controller validation")
+    if missing or verified_sessions != count:
+        outcome = "UNVERIFIED"
+    elif validated_process or validated_research or negative:
+        outcome = "VERIFIED_PROGRESS"
     else:
-        process = "NO_SUBSTANTIVE_ACTION"
-        reasons.append("execution and verification completed without independently evidenced durable research-state progress")
-
-    if failures:
-        reasons.append(f"campaign reported {failures} failed or timeout sessions")
-    if checkpoint_transitions == 0:
-        reasons.append("no post-start semantic worker checkpoint transition was independently observed")
-    if worker_progress_changed:
-        reasons.append("worker progress state changed during the activation")
+        outcome = "NO_SUBSTANTIVE_ACTION"
 
     report = {
-        "process_outcome": process,
-        "agent_count": agent_count,
-        "campaign_success_count": successes,
-        "campaign_failure_count": failures,
-        "controller_verified_agent_sessions": validation_verified,
-        "controller_failed_agent_sessions": validation_failures,
-        "semantic_checkpoint_transitions": checkpoint_transitions,
-        "learning_state_changed": learning_changed,
-        "research_state_changed": research_state_changed,
-        "research_code_changed": research_code_changed,
-        "worker_progress_changed": worker_progress_changed,
-        "independent_verify_outcome": args.verify_outcome,
-        "worker_outcome": args.worker_outcome,
-        "liveness": args.liveness,
-        "reasons": reasons,
-        "baseline": baseline,
-        "current_hashes": current,
-        "validation_reports": validation_reports,
+        "campaign_process_outcome": outcome,
+        "agent_count": count,
+        "controller_verified_sessions": verified_sessions,
+        "unverified_sessions": len(unresolved) + len(missing),
+        "validated_process_improvement": [r["agent_number"] for r in validated_process],
+        "validated_research_progress": [r["agent_number"] for r in validated_research],
+        "rejected_or_negative_hypotheses": [r["agent_number"] for r in negative],
+        "unresolved_uncertainty": [r["agent_number"] for r in unresolved],
+        "no_substantive_action": [r["agent_number"] for r in no_action],
+        "task_selection_observations": selection_observations,
+        "odd_even_process_pairs": process_pairs,
+        "contradictory_evidence": contradictions,
+        "missing_agents": missing,
     }
-
-    Path(args.output).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(report, indent=2))
-    print(f"RESEARCH_PROCESS_OUTCOME={process}")
-    print(f"RESEARCH_PROCESS_REASON={' | '.join(reasons)}")
-
+    (root / "process_evaluation.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     with open(os.environ.get("GITHUB_ENV", "/dev/null"), "a", encoding="utf-8") as env:
-        env.write(f"RESEARCH_PROCESS_OUTCOME={process}\n")
-        env.write(f"RESEARCH_PROCESS_REASON={' | '.join(reasons)}\n")
-
-    with open(os.environ.get("GITHUB_STEP_SUMMARY", "/dev/null"), "a", encoding="utf-8") as summary:
-        summary.write("### Independent research-process evaluation\n")
-        summary.write(f"- outcome: **{process}**\n")
-        summary.write(f"- controller-verified agent sessions: {validation_verified}/{agent_count}\n")
-        summary.write(f"- semantic checkpoint transitions: {checkpoint_transitions}\n")
-        summary.write(f"- learning state changed: {learning_changed}\n")
-        summary.write(f"- research state changed: {research_state_changed}\n")
-        summary.write(f"- research/software paths changed: {research_code_changed}\n")
-        for reason in reasons:
-            summary.write(f"- reason: {reason}\n")
-
-    return 0 if process != "UNVERIFIED" else 1
+        env.write(f"CAMPAIGN_PROCESS_OUTCOME={outcome}\n")
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0 if outcome != "UNVERIFIED" else 1
 
 
 if __name__ == "__main__":
