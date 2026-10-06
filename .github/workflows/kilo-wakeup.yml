@@ -685,15 +685,15 @@ jobs:
             printf '%s\n' "$after_status" > "state/campaign/agent_${agent_id}_after_status.txt"
 
             protected_tamper=0
-            if git diff --name-only -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md | grep -q .; then
+            if git diff --name-only -- .github/workflows .github/scripts .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md | grep -q .; then
               protected_tamper=1
               campaign_failed=1
               echo "::error::Campaign agent ${agent_id} modified a protected control-plane path; controller is restoring it before the next fresh session."
               echo "CONTROL_PLANE_TAMPER_ATTEMPT=1" >> "$GITHUB_ENV"
             fi
-            git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
-            git reset -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
-            git clean -fd -- .github/workflows .kilo 2>/dev/null || true
+            git restore --worktree --staged -- .github/workflows .github/scripts .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
+            git reset -- .github/workflows .github/scripts .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
+            git clean -fd -- .github/workflows .github/scripts .kilo 2>/dev/null || true
 
             echo "CAMPAIGN_AGENT_${agent_id}_STATUS=${agent_status}" >> "$GITHUB_ENV"
             echo "CAMPAIGN_SUCCESS_COUNT=${campaign_successes}" >> "$GITHUB_ENV"
@@ -938,7 +938,209 @@ jobs:
             ':(glob)**/*.pyc' \
             ':(glob)**/*.py.c' 2>/dev/null || true
 
-          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md)$' >/tmp/kilo_protected_paths; then
+          if git diff --cached --name-only | grep -E '(^|/)(\.github/workflows/|\.github/scripts/|\.kilo/)|^(AGENTS\.md|ENTERPRISE\.md|MANUAL_SETUP\.md|PERSISTENCE_POLICY\.md) >/tmp/kilo_protected_paths; then
+            echo "Protected paths unexpectedly staged:"
+            cat /tmp/kilo_protected_paths
+            exit 1
+          fi
+          if git diff --cached --name-only | grep -E '(^|/)(\.env(\..*)?|id_rsa|id_dsa|id_ecdsa|id_ed25519|credentials\.(json|ya?ml|toml)|secrets\.(json|ya?ml|toml))$|\.(pem|key)$' >/tmp/kilo_credential_paths; then
+            echo "Credential-like paths are not allowed to persist:"
+            cat /tmp/kilo_credential_paths
+            exit 1
+          fi
+          if git diff --cached --binary | grep -E -n 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|kilo_[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}' >/tmp/kilo_secrets; then
+            echo "Potential credential material detected:"
+            cat /tmp/kilo_secrets
+            exit 1
+          fi
+          if git diff --cached --summary | grep -E '^ create mode 120000 ' >/tmp/kilo_symlinks; then
+            echo "Symbolic links are not allowed to persist:"
+            cat /tmp/kilo_symlinks
+            exit 1
+          fi
+
+          git diff --check
+          if git diff --cached --quiet; then
+            echo "No safe repository changes to persist."
+            echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          test -f state/activation_status.json
+          python3 .github/scripts/stamp_activation_receipt.py --validate-only
+          if [ -f state/campaign/process_evaluation.json ]; then
+            python3 -m json.tool state/campaign/process_evaluation.json >/dev/null
+          fi
+
+          if git diff --cached --quiet; then
+            echo "No safe repository changes to persist."
+            echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          git config user.name "kilo-research-enterprise"
+          git config user.email "kilo-research-enterprise@users.noreply.github.com"
+
+          if [ "$recovery_required" -eq 1 ]; then
+            git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+            git commit -m "Kilo activation: preserve recovery state"
+            local_commit="$(git rev-parse HEAD)"
+            recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            if git push origin "$local_commit:refs/heads/$recovery_branch"; then
+              echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
+              echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
+              echo "::warning::Unverified or failed worker state preserved only on $recovery_branch; main integration was prohibited."
+              exit 0
+            fi
+            echo "::error::Recovery branch persistence failed; unverified worker state was not integrated."
+            exit 1
+          fi
+
+          git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+          git commit -m "Kilo activation: update research state"
+          local_commit="$(git rev-parse HEAD)"
+          git fetch origin "$GITHUB_REF_NAME"
+
+          if git rebase "origin/$GITHUB_REF_NAME"; then
+            if git push origin "HEAD:$GITHUB_REF_NAME"; then
+              echo "PERSISTENCE_STATUS=MAIN" >> "$GITHUB_ENV"
+              exit 0
+            fi
+          fi
+
+          git rebase --abort >/dev/null 2>&1 || true
+          recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          git push origin "$local_commit:refs/heads/$recovery_branch"
+          echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
+          echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
+          echo "::warning::Main integration failed; worker commit preserved on $recovery_branch."
+      - name: Deep audit — after Verify and persist safe repository changes
+        id: deep_audit_14_verify_and_persist_safe_repository_changes
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.persist.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xwake --step "Verify and persist safe repository changes"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
+      - name: Report Kilo outcome
+        id: audit_source_15_report_kilo_outcome
+        if: always()
+        env:
+          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          KILO_SMOKE_OUTCOME: ${{ steps.kilo_smoke.outcome }}
+          KILO_OUTCOME: ${{ steps.kilo.outcome }}
+          VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
+          PROCESS_OUTCOME: ${{ env.RESEARCH_PROCESS_OUTCOME }}
+        run: |
+          echo "::group::REPORT KILO OUTCOME DEBUG — run metadata"
+          printf 'GITHUB_RUN_ID=%s\n' "${GITHUB_RUN_ID:-unknown}"
+          printf 'GITHUB_RUN_ATTEMPT=%s\n' "${GITHUB_RUN_ATTEMPT:-unknown}"
+          printf 'GITHUB_REF_NAME=%s\n' "${GITHUB_REF_NAME:-unknown}"
+          printf 'GITHUB_SHA=%s\n' "${GITHUB_SHA:-unknown}"
+          printf 'GITHUB_EVENT_NAME=%s\n' "${GITHUB_EVENT_NAME:-unknown}"
+          printf 'GITHUB_WORKFLOW=%s\n' "${GITHUB_WORKFLOW:-unknown}"
+          echo "::endgroup::"
+
+          echo "::group::REPORT KILO OUTCOME DEBUG — exact decision inputs"
+          printf 'PREFLIGHT_OUTCOME=%q\n' "${PREFLIGHT_OUTCOME:-<unset>}"
+          printf 'KILO_SMOKE_OUTCOME=%q\n' "${KILO_SMOKE_OUTCOME:-<unset>}"
+          printf 'KILO_OUTCOME=%q\n' "${KILO_OUTCOME:-<unset>}"
+          printf 'VERIFY_OUTCOME=%q\n' "${VERIFY_OUTCOME:-<unset>}"
+          printf 'KILO_LIVENESS_STATUS=%q\n' "${KILO_LIVENESS_STATUS:-<unset>}"
+          printf 'KILO_LIVENESS_REASON=%q\n' "${KILO_LIVENESS_REASON:-<unset>}"
+          printf 'PERSISTENCE_STATUS=%q\n' "${PERSISTENCE_STATUS:-<unset>}"
+          printf 'PERSISTENCE_RECOVERY_BRANCH=%q\n' "${PERSISTENCE_RECOVERY_BRANCH:-<unset>}"
+          printf 'RESEARCH_PROCESS_OUTCOME=%q\n' "${PROCESS_OUTCOME:-<unset>}"
+          echo "::endgroup::"
+
+          echo "::group::REPORT KILO OUTCOME DEBUG — classifier integrity and cross-check"
+          test -f .github/scripts/report_kilo_outcome.py
+          sha256sum .github/scripts/report_kilo_outcome.py
+          python3 -m py_compile .github/scripts/report_kilo_outcome.py
+          set +e
+          CLASSIFIER_OUTPUT="$(python3 .github/scripts/report_kilo_outcome.py \
+            --preflight "${PREFLIGHT_OUTCOME:-}" \
+            --smoke "${KILO_SMOKE_OUTCOME:-}" \
+            --worker "${KILO_OUTCOME:-}" \
+            --verify "${VERIFY_OUTCOME:-}" \
+            --liveness "${KILO_LIVENESS_STATUS:-}" \
+            --persistence "${PERSISTENCE_STATUS:-}" \
+            --process "${PROCESS_OUTCOME:-UNVERIFIED}" 2>&1)"
+          CLASSIFIER_RC=$?
+          set -e
+          printf '%s\n' "$CLASSIFIER_OUTPUT"
+          printf 'CLASSIFIER_RC=%s\n' "$CLASSIFIER_RC"
+          echo "The shell decision path below remains authoritative; this scripted result is a diagnostic consistency check."
+          echo "::endgroup::"
+
+          echo "::group::REPORT KILO OUTCOME DEBUG — repository/persistence evidence"
+          git rev-parse --short=12 HEAD
+          git status --short
+          echo "--- unstaged names ---"
+          git diff --name-status
+          echo "--- staged names ---"
+          git diff --cached --name-status
+          echo "--- recent commits ---"
+          git log -5 --format='%h %ct %s'
+          for debug_path in state/worker_progress.md state/worker_receipt.json state/activation_receipt.json reports logs; do
+            if [ -e "$debug_path" ]; then
+              stat -c '%n | type=%F | bytes=%s | mode=%a | mtime=%y' "$debug_path"
+            else
+              echo "ABSENT | $debug_path"
+            fi
+          done
+          echo "::endgroup::"
+
+          echo "::group::REPORT KILO OUTCOME DEBUG — terminal-state matrix"
+          case "${PERSISTENCE_STATUS:-FAILED}" in
+            MAIN|RECOVERY_BRANCH|NO_CHANGES|FAILED) echo "Persistence token recognized: ${PERSISTENCE_STATUS:-FAILED}" ;;
+            *) echo "UNRECOGNIZED persistence token: ${PERSISTENCE_STATUS:-<unset>}" ;;
+          esac
+          case "${KILO_LIVENESS_STATUS:-unknown}" in
+            STALLED|COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT|COMPLETED_WITH_SEMANTIC_CHECKPOINTS|COMPLETED_WITH_POSTWORKER_VERIFICATION|unknown) echo "Liveness token: ${KILO_LIVENESS_STATUS:-unknown}" ;;
+            *) echo "UNRECOGNIZED liveness token: ${KILO_LIVENESS_STATUS:-<unset>}" ;;
+          esac
+          echo "::endgroup::"
+
+          echo "::group::REPORT KILO OUTCOME — authoritative deterministic classifier"
+          echo "The Python classifier is the single authoritative terminal-state decision path."
+          echo "::endgroup::"
+
+          set -euo pipefail
+          python3 .github/scripts/report_kilo_outcome.py \
+            --preflight "${PREFLIGHT_OUTCOME:-unknown}" \
+            --smoke "${KILO_SMOKE_OUTCOME:-unknown}" \
+            --worker "${KILO_OUTCOME:-unknown}" \
+            --verify "${VERIFY_OUTCOME:-skipped}" \
+            --liveness "${KILO_LIVENESS_STATUS:-unknown}" \
+            --persistence "${PERSISTENCE_STATUS:-FAILED}" \
+            --process "${PROCESS_OUTCOME:-UNVERIFIED}"
+
+      - name: Deep audit — after Report Kilo outcome
+        id: deep_audit_15_report_kilo_outcome
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.audit_source_15_report_kilo_outcome.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xwake --step "Report Kilo outcome"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
+      - name: Deep audit — final rollup
+        id: deep_audit_final
+        if: always()
+        continue-on-error: true
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xwake --final
+          rc=$?
+          echo "DEEP_AUDIT_FINAL_RC=$rc"
+          exit 0 >/tmp/kilo_protected_paths; then
             echo "Protected paths unexpectedly staged:"
             cat /tmp/kilo_protected_paths
             exit 1
