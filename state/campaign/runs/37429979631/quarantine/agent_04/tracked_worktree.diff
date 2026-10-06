@@ -1,0 +1,4094 @@
+diff --git a/research/backtest/regime_stability.py b/research/backtest/regime_stability.py
+index 09a3cdd..8c24089 100644
+--- a/research/backtest/regime_stability.py
++++ b/research/backtest/regime_stability.py
+@@ -878,7 +878,7 @@ def mean_reversion_signals(
+     out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+     lookback = int(lookback)
+     for i in range(lookback, n):
+-        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++        ret = float(np.log(closes[i] / closes[i - lookback]))
+         out[i] = Signal(date=i + 1, weight=-1.0 if ret > 0 else 1.0)
+     return out
+ 
+@@ -908,7 +908,7 @@ def momentum_signals(
+     out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+     lookback = int(lookback)
+     for i in range(lookback, n):
+-        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++        ret = float(np.log(closes[i] / closes[i - lookback]))
+         out[i] = Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+     return out
+ 
+diff --git a/research/checks/momentum_horizon_gap_analysis.py b/research/checks/momentum_horizon_gap_analysis.py
+index e57a274..89ae68a 100644
+--- a/research/checks/momentum_horizon_gap_analysis.py
++++ b/research/checks/momentum_horizon_gap_analysis.py
+@@ -93,7 +93,7 @@ def momentum_signals(closes, lookback):
+     out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
+     lookback = int(lookback)
+     for i in range(lookback, n):
+-        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++        ret = float(np.log(closes[i] / closes[i - lookback]))
+         out[i] = bt.Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+     return out
+ 
+diff --git a/research/checks/verify_mean_reversion.py b/research/checks/verify_mean_reversion.py
+index 91fe3ba..5c216de 100644
+--- a/research/checks/verify_mean_reversion.py
++++ b/research/checks/verify_mean_reversion.py
+@@ -93,7 +93,7 @@ def mean_reversion_signals(closes, lookback):
+     out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
+     lookback = int(lookback)
+     for i in range(lookback, n):
+-        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++        ret = float(np.log(closes[i] / closes[i - lookback]))
+         out[i] = bt.Signal(date=i + 1, weight=-1.0 if ret > 0 else 1.0)
+     return out
+ 
+@@ -229,9 +229,9 @@ def main():
+                   .format(verdict_status))
+ 
+     # Perturbation recomputation (fresh walk_forward loop per param set)
+-    print("\n=== Perturbation recomputation (3 / 5 / 10 lookback) ===")
++    print("\n=== Perturbation recomputation (2.5 / 5 / 10 lookback) ===")
+     bars = bt.generate_bars(600, seed=SEED)
+-    grid = [{"lookback": 3}, {"lookback": 5}, {"lookback": 10}]
++    grid = bt.parameter_grid_around((("lookback", LOOKBACK),), multipliers=(0.5, 1.0, 2.0))
+     recomputed = []
+     for params in grid:
+         signals = mean_reversion_signals(bars.closes_array(), params["lookback"])
+diff --git a/research/checks/verify_momentum.py b/research/checks/verify_momentum.py
+index cd32818..b2651e4 100644
+--- a/research/checks/verify_momentum.py
++++ b/research/checks/verify_momentum.py
+@@ -93,7 +93,7 @@ def momentum_signals(closes, lookback):
+     out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
+     lookback = int(lookback)
+     for i in range(lookback, n):
+-        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++        ret = float(np.log(closes[i] / closes[i - lookback]))
+         out[i] = bt.Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+     return out
+ 
+@@ -229,9 +229,9 @@ def main():
+                   .format(verdict_status))
+ 
+     # Perturbation recomputation (fresh walk_forward loop per param set)
+-    print("\n=== Perturbation recomputation (3 / 5 / 10 lookback) ===")
++    print("\n=== Perturbation recomputation (2.5 / 5 / 10 lookback) ===")
+     bars = bt.generate_bars(600, seed=SEED)
+-    grid = [{"lookback": 3}, {"lookback": 5}, {"lookback": 10}]
++    grid = bt.parameter_grid_around((("lookback", LOOKBACK),), multipliers=(0.5, 1.0, 2.0))
+     recomputed = []
+     for params in grid:
+         signals = momentum_signals(bars.closes_array(), params["lookback"])
+diff --git a/research/checks/verify_momentum_longer_horizon.py b/research/checks/verify_momentum_longer_horizon.py
+index f4f517f..b3ffbbb 100644
+--- a/research/checks/verify_momentum_longer_horizon.py
++++ b/research/checks/verify_momentum_longer_horizon.py
+@@ -95,7 +95,7 @@ def momentum_signals(closes, lookback):
+     out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
+     lookback = int(lookback)
+     for i in range(lookback, n):
+-        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++        ret = float(np.log(closes[i] / closes[i - lookback]))
+         out[i] = bt.Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+     return out
+ 
+diff --git a/research/checks/verify_momentum_lookback_sweep.py b/research/checks/verify_momentum_lookback_sweep.py
+index 29ab252..4583216 100644
+--- a/research/checks/verify_momentum_lookback_sweep.py
++++ b/research/checks/verify_momentum_lookback_sweep.py
+@@ -92,7 +92,7 @@ def momentum_signals(closes, lookback):
+     out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
+     lookback = int(lookback)
+     for i in range(lookback, n):
+-        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++        ret = float(np.log(closes[i] / closes[i - lookback]))
+         out[i] = bt.Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+     return out
+ 
+diff --git a/state/campaign/task_queue.json b/state/campaign/task_queue.json
+index d9375d0..00274ef 100644
+--- a/state/campaign/task_queue.json
++++ b/state/campaign/task_queue.json
+@@ -3,257 +3,259 @@
+   "selection_principle": "qualitative_evidence_backed_priority",
+   "tasks": [
+     {
+-      "task_id": "P-001",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+       "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+-      "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+-      "scope": "Use LEARNING_STATE, STATE, activation records, and current controller state; produce one bounded process judgment.",
+-      "out_of_scope": "Do not redesign the controller architecture or add a numerical reward score.",
++      "complexity": "LOW",
+       "deliverable": "A durable process decision with evidence-backed examples from recent activations.",
+-      "success_criterion": "The assessment distinguishes a concrete selector advantage, no demonstrated advantage, or an unresolved result using actual durable evidence.",
+-      "stop_condition": "Stop once the selector decision is supported or the evidence is insufficient for a stronger conclusion.",
+-      "verification_requirement": "Controller-side validation plus inspection of cited durable evidence; no reliance on agent confidence.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "LEARNING_STATE documents the previous frontier-first selection gap and five recent frontier cells closed without equivalent retests.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
++      "out_of_scope": "Do not redesign the controller architecture or add a numerical reward score.",
++      "primary_question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Use LEARNING_STATE, STATE, activation records, and current controller state; produce one bounded process judgment.",
++      "selected_agent": 3,
++      "status": "RESOLVED",
++      "stop_condition": "Stop once the selector decision is supported or the evidence is insufficient for a stronger conclusion.",
++      "success_criterion": "The assessment distinguishes a concrete selector advantage, no demonstrated advantage, or an unresolved result using actual durable evidence.",
++      "task_id": "P-001",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Controller-side validation plus inspection of cited durable evidence; no reliance on agent confidence."
+     },
+     {
+-      "task_id": "P-002",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+       "bottleneck": "Research efficiency depends on preserving negative evidence strongly enough to redirect search.",
+-      "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
+-      "scope": "Inspect LEARNING_STATE, STATE, research checks, and campaign queue semantics; propose at most one minimal change.",
+-      "out_of_scope": "Do not rerun historical experiments or add broad metadata systems.",
++      "complexity": "LOW",
+       "deliverable": "A retain/reject/unverified process decision with concrete duplicate-avoidance evidence.",
+-      "success_criterion": "At least one evidence-backed conclusion about duplicate-work prevention is established.",
+-      "stop_condition": "Stop when the duplicate-work question is resolved or clearly unverified.",
+-      "verification_requirement": "Independent controller validation of any implementation change.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "LEARNING_EFFICIENCY already calls for a novelty guard and recent research cells were closed as FALSIFIED/TESTED.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
++      "out_of_scope": "Do not rerun historical experiments or add broad metadata systems.",
++      "primary_question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Inspect LEARNING_STATE, STATE, research checks, and campaign queue semantics; propose at most one minimal change.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the duplicate-work question is resolved or clearly unverified.",
++      "success_criterion": "At least one evidence-backed conclusion about duplicate-work prevention is established.",
++      "task_id": "P-002",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Independent controller validation of any implementation change."
+     },
+     {
+-      "task_id": "P-003",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the durable evidence layer preserve useful negative evidence strongly enough to redirect future research?",
+       "bottleneck": "Negative findings are valuable only if later agents can reliably see and use them.",
+-      "objective": "Audit whether recent falsified frontiers and rejected process decisions are discoverable and actually reflected in the current task queue.",
+-      "scope": "Use durable state only; compare a sample of falsified cells with current task candidates.",
+-      "out_of_scope": "Do not rewrite the entire state model or duplicate the research history.",
++      "complexity": "LOW",
+       "deliverable": "A bounded evidence-preservation assessment and, only if necessary, one minimal durable-state repair.",
+-      "success_criterion": "The audit either verifies preservation/reuse or identifies one specific failure that can be repaired and verified.",
+-      "stop_condition": "Stop after the sampled evidence is sufficient to classify the preservation mechanism.",
+-      "verification_requirement": "Controller-side schema validation plus inspection of the referenced durable records.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "The repository contains extensive FALSIFIED and TESTED frontier entries plus a dedicated LEARNING_STATE layer.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Audit whether recent falsified frontiers and rejected process decisions are discoverable and actually reflected in the current task queue.",
++      "out_of_scope": "Do not rewrite the entire state model or duplicate the research history.",
++      "primary_question": "Does the durable evidence layer preserve useful negative evidence strongly enough to redirect future research?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Use durable state only; compare a sample of falsified cells with current task candidates.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the sampled evidence is sufficient to classify the preservation mechanism.",
++      "success_criterion": "The audit either verifies preservation/reuse or identifies one specific failure that can be repaired and verified.",
++      "task_id": "P-003",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Controller-side schema validation plus inspection of the referenced durable records."
+     },
+     {
+-      "task_id": "P-004",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the odd/even role split add measurable learning value without creating unnecessary orchestration complexity?",
+       "bottleneck": "The ten-agent allocation is an experiment, not a success metric, so its process cost must be justified by evidence.",
+-      "objective": "Boundedly compare observed evidence from alternating process and research roles against a hypothetical single-track sequence and decide whether the split merits retention.",
+-      "scope": "Inspect campaign records only; use qualitative evidence and complexity observations.",
+-      "out_of_scope": "Do not add a quantitative reward score or duplicate workflow infrastructure.",
++      "complexity": "MEDIUM",
+       "deliverable": "A process decision supported by campaign evidence.",
+-      "success_criterion": "The role split is classified as RETAIN, REJECT, or UNVERIFIED using actual campaign evidence.",
+-      "stop_condition": "Stop when the current campaign contains enough observations to classify the split.",
+-      "verification_requirement": "Final controller synthesis must preserve disagreement and unverified evidence.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "The campaign explicitly alternates LEARNING_PROCESS and HIGHER_ORDER_OBJECTIVE roles to create a meta-learning loop.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Boundedly compare observed evidence from alternating process and research roles against a hypothetical single-track sequence and decide whether the split merits retention.",
++      "out_of_scope": "Do not add a quantitative reward score or duplicate workflow infrastructure.",
++      "primary_question": "Does the odd/even role split add measurable learning value without creating unnecessary orchestration complexity?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Inspect campaign records only; use qualitative evidence and complexity observations.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the current campaign contains enough observations to classify the split.",
++      "success_criterion": "The role split is classified as RETAIN, REJECT, or UNVERIFIED using actual campaign evidence.",
++      "task_id": "P-004",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Final controller synthesis must preserve disagreement and unverified evidence."
+     },
+     {
+-      "task_id": "P-005",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does an explicit stop condition reduce scope expansion enough to improve validated learning efficiency?",
+       "bottleneck": "Focused tasks lose efficiency if agents continue interesting side paths after the evidence gate is already satisfied.",
+-      "objective": "Audit the campaign contracts and agent records for scope expansion pressure and determine whether the explicit stop boundary should be retained or minimally strengthened.",
+-      "scope": "Inspect campaign contracts, agent records, and worker progress; propose at most one minimal process change.",
+-      "out_of_scope": "Do not redesign Kilo execution, add scoring, or pursue any secondary research experiment.",
++      "complexity": "LOW",
+       "deliverable": "A bounded process decision with evidence about scope control and stop-condition effectiveness.",
+-      "success_criterion": "The evidence supports RETAIN, REJECT, or UNVERIFIED for the explicit stop boundary.",
+-      "stop_condition": "Stop once observed scope behavior is sufficient to classify the stop-condition mechanism.",
+-      "verification_requirement": "Controller-side validation of the durable record and any changed process artifact.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "The campaign requires zero intentional scope expansion and exactly one stop condition per focused task.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Audit the campaign contracts and agent records for scope expansion pressure and determine whether the explicit stop boundary should be retained or minimally strengthened.",
++      "out_of_scope": "Do not redesign Kilo execution, add scoring, or pursue any secondary research experiment.",
++      "primary_question": "Does an explicit stop condition reduce scope expansion enough to improve validated learning efficiency?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Inspect campaign contracts, agent records, and worker progress; propose at most one minimal process change.",
++      "status": "OPEN",
++      "stop_condition": "Stop once observed scope behavior is sufficient to classify the stop-condition mechanism.",
++      "success_criterion": "The evidence supports RETAIN, REJECT, or UNVERIFIED for the explicit stop boundary.",
++      "task_id": "P-005",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Controller-side validation of the durable record and any changed process artifact."
+     },
+     {
+-      "task_id": "P-006",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does independent controller validation distinguish evidence quality from agent-reported confidence reliably enough for campaign decisions?",
+       "bottleneck": "The research system must not confuse a plausible explanation or successful session with validated learning.",
+-      "objective": "Inspect agent records and controller validation outputs to determine whether the current evidence hierarchy catches unsupported claims and whether one minimal safeguard is warranted.",
+-      "scope": "Audit controller validation outputs, durable records, and final synthesis semantics.",
+-      "out_of_scope": "Do not add a numeric reward score or duplicate an independent research engine.",
++      "complexity": "LOW",
+       "deliverable": "A bounded process decision about evidence-versus-confidence separation.",
+-      "success_criterion": "The sampled controller records support a clear process classification or expose one specific verifiable gap.",
+-      "stop_condition": "Stop when the sampled records are sufficient to classify the separation mechanism.",
+-      "verification_requirement": "Independent inspection of controller validation outputs and regression tests for any implementation change.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "The repository explicitly treats Kilo success status, activity, and confidence as insufficient evidence.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Inspect agent records and controller validation outputs to determine whether the current evidence hierarchy catches unsupported claims and whether one minimal safeguard is warranted.",
++      "out_of_scope": "Do not add a numeric reward score or duplicate an independent research engine.",
++      "primary_question": "Does independent controller validation distinguish evidence quality from agent-reported confidence reliably enough for campaign decisions?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Audit controller validation outputs, durable records, and final synthesis semantics.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the sampled records are sufficient to classify the separation mechanism.",
++      "success_criterion": "The sampled controller records support a clear process classification or expose one specific verifiable gap.",
++      "task_id": "P-006",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Independent inspection of controller validation outputs and regression tests for any implementation change."
+     },
+     {
+-      "task_id": "R-001",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+       "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+-      "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+-      "scope": "Use the existing 10-asset collected universe and existing momentum implementation/check framework.",
+-      "out_of_scope": "Do not tune signal rules after seeing cost results, expand the universe, or introduce leverage.",
++      "complexity": "LOW",
+       "deliverable": "A reproducible artifact and independent verification result classifying cost robustness.",
+-      "success_criterion": "The result is reproducible and independently verified, regardless of positive or negative outcome.",
+-      "stop_condition": "Stop after the predeclared cost grid is evaluated and the independent verifier agrees or records the exact discrepancy.",
+-      "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, and existing regression suite.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "LEARNING_STATE admits short-horizon momentum as candidate positive evidence but leaves execution-cost robustness as a meaningful qualification.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
++      "out_of_scope": "Do not tune signal rules after seeing cost results, expand the universe, or introduce leverage.",
++      "primary_question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "Use the existing 10-asset collected universe and existing momentum implementation/check framework.",
++      "status": "DEFERRED",
++      "stop_condition": "Stop after the predeclared cost grid is evaluated and the independent verifier agrees or records the exact discrepancy.",
++      "success_criterion": "The result is reproducible and independently verified, regardless of positive or negative outcome.",
++      "task_id": "R-001",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": true
++      "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, and existing regression suite."
+     },
+     {
+-      "task_id": "R-002",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does the qualified momentum effect survive a small predeclared holding-period variation without becoming a single-point timing artifact?",
+       "bottleneck": "The current evidence is strongest for one-day holding, so temporal robustness is still partly unresolved.",
+-      "objective": "Test a fixed lookback-5 momentum signal with a predeclared small holding-period set using the existing walk-forward/null methodology.",
+-      "scope": "Use only the existing 10-asset universe and a fixed hold-period grid declared before execution.",
+-      "out_of_scope": "Do not tune the lookback or choose a holding period after inspecting results.",
++      "complexity": "LOW",
+       "deliverable": "A reproducible robustness artifact plus independent verification.",
+-      "success_criterion": "The holding-period sensitivity is classified and any positive finding is reproducible.",
+-      "stop_condition": "Stop after the declared holding-period grid is complete and independently checked.",
+-      "verification_requirement": "Matched null, leakage review, independent recomputation, determinism, regression suite.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "Momentum is candidate positive evidence at a one-day hold and has already survived lookback and horizon robustness in magnitude.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Test a fixed lookback-5 momentum signal with a predeclared small holding-period set using the existing walk-forward/null methodology.",
++      "out_of_scope": "Do not tune the lookback or choose a holding period after inspecting results.",
++      "primary_question": "Does the qualified momentum effect survive a small predeclared holding-period variation without becoming a single-point timing artifact?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "Use only the existing 10-asset universe and a fixed hold-period grid declared before execution.",
++      "selected_agent": 4,
++      "status": "SELECTED",
++      "stop_condition": "Stop after the declared holding-period grid is complete and independently checked.",
++      "success_criterion": "The holding-period sensitivity is classified and any positive finding is reproducible.",
++      "task_id": "R-002",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": true
++      "verification_requirement": "Matched null, leakage review, independent recomputation, determinism, regression suite."
+     },
+     {
+-      "task_id": "R-003",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does a single past-only volatility gate create a predeclared robustness improvement for the qualified momentum effect?",
+       "bottleneck": "A candidate momentum effect may depend on market regime even after horizon robustness.",
+-      "objective": "Test one explicitly predeclared past-only volatility gate on lookback-5 momentum through the existing regime-stability and null framework.",
+-      "scope": "One volatility feature, one threshold rule declared before execution, existing 10-asset universe.",
+-      "out_of_scope": "Do not search a threshold grid or optimize the gate after seeing results.",
++      "complexity": "MEDIUM",
+       "deliverable": "A falsifiable regime-conditioned momentum result with independent verification.",
+-      "success_criterion": "The gate either demonstrates a reproducible improvement in robustness or is falsified/unsupported.",
+-      "stop_condition": "Stop after the one predeclared gate is evaluated and independently checked.",
+-      "verification_requirement": "Leakage gate, matched null, regime-stability, independent recomputation, determinism.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "MA regime filters were previously falsified; whether the same class of conditioning helps the different momentum mechanism remains unresolved.",
++      "execution_risk": "MEDIUM",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Test one explicitly predeclared past-only volatility gate on lookback-5 momentum through the existing regime-stability and null framework.",
++      "out_of_scope": "Do not search a threshold grid or optimize the gate after seeing results.",
++      "primary_question": "Does a single past-only volatility gate create a predeclared robustness improvement for the qualified momentum effect?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "One volatility feature, one threshold rule declared before execution, existing 10-asset universe.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the one predeclared gate is evaluated and independently checked.",
++      "success_criterion": "The gate either demonstrates a reproducible improvement in robustness or is falsified/unsupported.",
++      "task_id": "R-003",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "MEDIUM",
+-      "tests_preceding_process": true
++      "verification_requirement": "Leakage gate, matched null, regime-stability, independent recomputation, determinism."
+     },
+     {
+-      "task_id": "R-004",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does a fixed 20-day breakout continuation signal produce reproducible evidence beyond the currently qualified momentum family?",
+       "bottleneck": "The research frontier needs genuinely new signal classes rather than endless momentum variants.",
+-      "objective": "Test one fixed 20-day breakout continuation rule on the collected universe through the existing robustness gate stack.",
+-      "scope": "One predeclared breakout rule, existing data universe, existing walk-forward, regime, null, and independent-verification infrastructure.",
+-      "out_of_scope": "Do not sweep breakout lengths, tune after seeing results, or add new data dependencies.",
++      "complexity": "MEDIUM",
+       "deliverable": "A reproducible new-signal-class artifact with independent verification and a clear verdict.",
+-      "success_criterion": "The hypothesis is classified as falsified, supported, or unverified by the existing evidence standard.",
+-      "stop_condition": "Stop after the fixed rule completes the declared gate stack.",
+-      "verification_requirement": "Data preflight, leakage, regime stability, matched null, independent recomputation, determinism, regression suite.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "The current frontier explicitly calls for a genuinely new signal class or new data/method frontier after momentum qualification.",
++      "execution_risk": "MEDIUM",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Test one fixed 20-day breakout continuation rule on the collected universe through the existing robustness gate stack.",
++      "out_of_scope": "Do not sweep breakout lengths, tune after seeing results, or add new data dependencies.",
++      "primary_question": "Does a fixed 20-day breakout continuation signal produce reproducible evidence beyond the currently qualified momentum family?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "One predeclared breakout rule, existing data universe, existing walk-forward, regime, null, and independent-verification infrastructure.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the fixed rule completes the declared gate stack.",
++      "success_criterion": "The hypothesis is classified as falsified, supported, or unverified by the existing evidence standard.",
++      "task_id": "R-004",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "MEDIUM",
+-      "tests_preceding_process": true
++      "verification_requirement": "Data preflight, leakage, regime stability, matched null, independent recomputation, determinism, regression suite."
+     },
+     {
+-      "task_id": "R-005",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does a conservative volatility-normalized sizing variant preserve a positive momentum signal without creating leverage-dependent evidence?",
+       "bottleneck": "A research candidate should not depend on uncontrolled sizing assumptions.",
+-      "objective": "Evaluate one fixed volatility-normalized sizing rule for the already-qualified momentum signal without leverage and with the existing null.",
+-      "scope": "One fixed sizing rule, existing universe, existing research engine, no leverage.",
+-      "out_of_scope": "Do not optimize sizing parameters or compare many variants.",
++      "complexity": "MEDIUM",
+       "deliverable": "A bounded sizing robustness result and independent verification.",
+-      "success_criterion": "The result distinguishes signal robustness from sizing artifacts.",
+-      "stop_condition": "Stop after the fixed sizing rule is tested and independently checked.",
+-      "verification_requirement": "Leakage, cost assumptions, matched null, independent recomputation, determinism.",
++      "downstream_leverage": "MEDIUM",
++      "effort": "MEDIUM",
+       "evidence_basis": "The current candidate is mechanical and short-horizon; separating signal evidence from sizing effects is decision-relevant.",
++      "execution_risk": "MEDIUM",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "MEDIUM",
+       "falsification_power": "MEDIUM",
++      "objective": "Evaluate one fixed volatility-normalized sizing rule for the already-qualified momentum signal without leverage and with the existing null.",
++      "out_of_scope": "Do not optimize sizing parameters or compare many variants.",
++      "primary_question": "Does a conservative volatility-normalized sizing variant preserve a positive momentum signal without creating leverage-dependent evidence?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "One fixed sizing rule, existing universe, existing research engine, no leverage.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the fixed sizing rule is tested and independently checked.",
++      "success_criterion": "The result distinguishes signal robustness from sizing artifacts.",
++      "task_id": "R-005",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "MEDIUM",
+-      "tests_preceding_process": true
++      "verification_requirement": "Leakage, cost assumptions, matched null, independent recomputation, determinism."
+     }
+   ]
+ }
+diff --git a/state/check_artifacts/mean_reversion_results.json b/state/check_artifacts/mean_reversion_results.json
+index 8425261..216a42d 100644
+--- a/state/check_artifacts/mean_reversion_results.json
++++ b/state/check_artifacts/mean_reversion_results.json
+@@ -23,11 +23,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "mean_reversion": {
+-        "candidate_dispersion": 0.033,
++        "candidate_dispersion": 0.038,
+         "medians": [
+-          -0.202,
+-          -0.193,
+-          -0.128
++          0.041,
++          -0.003,
++          -0.052
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.019,
+@@ -36,7 +36,7 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE_LOSS"
++        "verdict": "REGIME_STABLE"
+       }
+     },
+     "JPM": {
+@@ -57,11 +57,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "mean_reversion": {
+-        "candidate_dispersion": 0.049,
++        "candidate_dispersion": 0.039,
+         "medians": [
+-          -0.132,
+-          -0.067,
+-          -0.187
++          0.038,
++          -0.021,
++          -0.057
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.012,
+@@ -75,14 +75,14 @@
+     }
+   },
+   "perturbation": {
+-    "baseline_median": 0.003,
++    "baseline_median": -0.013,
+     "compare_noise_default": true,
+     "compare_noise_fixed": true,
+     "effective_tolerance": 0.05,
+     "medians": [
+-      0.003,
+-      0.003,
+-      0.003
++      -0.015,
++      -0.013,
++      -0.005
+     ],
+     "n_folds": 52,
+     "noise_median": -0.001,
+@@ -113,12 +113,12 @@
+   "universe": {
+     "per_asset": {
+       "AAPL": {
+-        "candidate_dispersion": 0.089,
++        "candidate_dispersion": 0.1,
+         "medians": [
+-          -0.21,
+-          -0.093,
+-          -0.332,
+-          -0.145
++          -0.237,
++          -0.033,
++          0.035,
++          -0.058
+         ],
+         "null_dispersion": 0.028,
+         "null_medians": [
+@@ -136,11 +136,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "AMZN": {
+-        "candidate_dispersion": 0.033,
++        "candidate_dispersion": 0.038,
+         "medians": [
+-          -0.202,
+-          -0.193,
+-          -0.128
++          0.041,
++          -0.003,
++          -0.052
+         ],
+         "null_dispersion": 0.019,
+         "null_medians": [
+@@ -153,14 +153,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE_LOSS"
++        "verdict": "REGIME_STABLE"
+       },
+       "GOOGL": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.038,
+         "medians": [
+-          -0.096,
+-          -0.102,
+-          -0.206
++          -0.06,
++          0.013,
++          0.026
+         ],
+         "null_dispersion": 0.039,
+         "null_medians": [
+@@ -173,13 +173,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE_LOSS"
++        "verdict": "REGIME_STABLE"
+       },
+       "JNJ": {
+         "candidate_dispersion": 0.012,
+         "medians": [
+-          -0.067,
+-          -0.043
++          0.012,
++          -0.012
+         ],
+         "null_dispersion": 0.019,
+         "null_medians": [
+@@ -190,14 +190,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE_LOSS"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "JPM": {
+-        "candidate_dispersion": 0.049,
++        "candidate_dispersion": 0.039,
+         "medians": [
+-          -0.132,
+-          -0.067,
+-          -0.187
++          0.038,
++          -0.021,
++          -0.057
+         ],
+         "null_dispersion": 0.012,
+         "null_medians": [
+@@ -213,11 +213,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "META": {
+-        "candidate_dispersion": 0.048,
++        "candidate_dispersion": 0.037,
+         "medians": [
+-          -0.199,
+-          -0.115,
+-          -0.086
++          0.049,
++          0.029,
++          -0.037
+         ],
+         "null_dispersion": 0.055,
+         "null_medians": [
+@@ -230,13 +230,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE_LOSS"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "MSFT": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.003,
+         "medians": [
+-          -0.09,
+-          -0.145
++          0.033,
++          0.026
+         ],
+         "null_dispersion": 0.008,
+         "null_medians": [
+@@ -247,14 +247,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "NVDA": {
+-        "candidate_dispersion": 0.078,
++        "candidate_dispersion": 0.071,
+         "medians": [
+           0.022,
+-          0.018,
+-          -0.145
++          -0.12,
++          -0.134
+         ],
+         "null_dispersion": 0.06,
+         "null_medians": [
+@@ -270,11 +270,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "TSLA": {
+-        "candidate_dispersion": 0.026,
++        "candidate_dispersion": 0.069,
+         "medians": [
+-          -0.037,
+-          -0.063,
+-          0.001
++          0.093,
++          -0.027,
++          -0.07
+         ],
+         "null_dispersion": 0.034,
+         "null_medians": [
+@@ -287,13 +287,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "XOM": {
+-        "candidate_dispersion": 0.035,
++        "candidate_dispersion": 0.006,
+         "medians": [
+-          -0.014,
+-          -0.084
++          0.009,
++          -0.002
+         ],
+         "null_dispersion": 0.005,
+         "null_medians": [
+@@ -304,7 +304,7 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       }
+     },
+     "ticker_order": [
+@@ -320,10 +320,10 @@
+       "XOM"
+     ],
+     "verdict_counts": {
+-      "CONSISTENT_WITH_NOISE": 0,
+-      "REGIME_DEPENDENT": 4,
+-      "REGIME_STABLE": 2,
+-      "REGIME_STABLE_LOSS": 4
++      "CONSISTENT_WITH_NOISE": 4,
++      "REGIME_DEPENDENT": 3,
++      "REGIME_STABLE": 3,
++      "REGIME_STABLE_LOSS": 0
+     }
+   },
+   "warmup": 60,
+diff --git a/state/check_artifacts/momentum_horizon_gap_analysis.json b/state/check_artifacts/momentum_horizon_gap_analysis.json
+index b67b809..6ff7c50 100644
+--- a/state/check_artifacts/momentum_horizon_gap_analysis.json
++++ b/state/check_artifacts/momentum_horizon_gap_analysis.json
+@@ -11,34 +11,34 @@
+     {
+       "lookback20": {
+         "lookback": 20,
+-        "max_gap": 0.099,
+-        "median_gap": 0.082,
+-        "min_gap": 0.029,
+-        "pos_segment_gap_count": "4/4",
++        "max_gap": 0.08,
++        "median_gap": 0.041,
++        "min_gap": -0.009,
++        "pos_segment_gap_count": "3/4",
+         "segment_gaps": [
+           [
+             [
+-              0.071,
++              0.072,
+               0.042
+             ],
+             [
+-              0.054,
++              0.035,
+               -0.045
+             ],
+             [
+-              0.092,
++              0.052,
+               -0.001
+             ],
+             [
+-              0.069,
++              -0.011,
+               -0.002
+             ]
+           ],
+           [
+-            0.029,
+-            0.099,
+-            0.093,
+-            0.071
++            0.03,
++            0.08,
++            0.053,
++            -0.009
+           ]
+         ],
+         "segments": [
+@@ -50,34 +50,34 @@
+       },
+       "lookback60": {
+         "lookback": 60,
+-        "max_gap": 0.131,
+-        "median_gap": 0.08,
+-        "min_gap": 0.057,
++        "max_gap": 0.11,
++        "median_gap": 0.069,
++        "min_gap": 0.048,
+         "pos_segment_gap_count": "4/4",
+         "segment_gaps": [
+           [
+             [
+-              0.071,
++              0.089,
+               -0.021
+             ],
+             [
+-              0.054,
++              0.045,
+               -0.003
+             ],
+             [
+-              0.092,
++              0.048,
+               -0.039
+             ],
+             [
+-              0.069,
++              0.054,
+               0.002
+             ]
+           ],
+           [
+-            0.092,
+-            0.057,
+-            0.131,
+-            0.067
++            0.11,
++            0.048,
++            0.087,
++            0.052
+           ]
+         ],
+         "segments": [
+@@ -92,24 +92,24 @@
+     {
+       "lookback20": {
+         "lookback": 20,
+-        "max_gap": 0.053,
+-        "median_gap": 0.043,
+-        "min_gap": 0.033,
+-        "pos_segment_gap_count": "2/2",
++        "max_gap": -0.029,
++        "median_gap": -0.054,
++        "min_gap": -0.079,
++        "pos_segment_gap_count": "0/2",
+         "segment_gaps": [
+           [
+             [
+-              0.052,
++              -0.01,
+               0.019
+             ],
+             [
+-              0.072,
++              -0.06,
+               0.019
+             ]
+           ],
+           [
+-            0.033,
+-            0.053
++            -0.029,
++            -0.079
+           ]
+         ],
+         "segments": [
+@@ -119,24 +119,24 @@
+       },
+       "lookback60": {
+         "lookback": 60,
+-        "max_gap": 0.064,
+-        "median_gap": 0.059,
+-        "min_gap": 0.054,
+-        "pos_segment_gap_count": "2/2",
++        "max_gap": 0.01,
++        "median_gap": 0.004,
++        "min_gap": -0.002,
++        "pos_segment_gap_count": "1/2",
+         "segment_gaps": [
+           [
+             [
+-              0.052,
++              0.008,
+               -0.002
+             ],
+             [
+-              0.072,
++              0.006,
+               0.008
+             ]
+           ],
+           [
+-            0.054,
+-            0.064
++            0.01,
++            -0.002
+           ]
+         ],
+         "segments": [
+@@ -149,29 +149,29 @@
+     {
+       "lookback20": {
+         "lookback": 20,
+-        "max_gap": 0.09,
+-        "median_gap": 0.089,
+-        "min_gap": 0.006,
++        "max_gap": 0.023,
++        "median_gap": 0.013,
++        "min_gap": 0.004,
+         "pos_segment_gap_count": "3/3",
+         "segment_gaps": [
+           [
+             [
+-              0.069,
++              0.067,
+               0.063
+             ],
+             [
+-              0.071,
++              0.004,
+               -0.019
+             ],
+             [
+-              0.101,
++              0.026,
+               0.013
+             ]
+           ],
+           [
+-            0.006,
+-            0.09,
+-            0.089
++            0.004,
++            0.023,
++            0.013
+           ]
+         ],
+         "segments": [
+@@ -182,29 +182,29 @@
+       },
+       "lookback60": {
+         "lookback": 60,
+-        "max_gap": 0.11,
+-        "median_gap": 0.091,
+-        "min_gap": 0.09,
+-        "pos_segment_gap_count": "3/3",
++        "max_gap": 0.024,
++        "median_gap": 0.021,
++        "min_gap": -0.037,
++        "pos_segment_gap_count": "2/3",
+         "segment_gaps": [
+           [
+             [
+-              0.069,
++              -0.058,
+               -0.021
+             ],
+             [
+-              0.071,
++              0.004,
+               -0.02
+             ],
+             [
+-              0.101,
++              0.012,
+               -0.009
+             ]
+           ],
+           [
+-            0.09,
+-            0.091,
+-            0.11
++            -0.037,
++            0.024,
++            0.021
+           ]
+         ],
+         "segments": [
+@@ -218,29 +218,29 @@
+     {
+       "lookback20": {
+         "lookback": 20,
+-        "max_gap": 0.093,
+-        "median_gap": 0.031,
+-        "min_gap": 0.006,
+-        "pos_segment_gap_count": "3/3",
++        "max_gap": 0.048,
++        "median_gap": -0.003,
++        "min_gap": -0.192,
++        "pos_segment_gap_count": "1/3",
+         "segment_gaps": [
+           [
+             [
+-              0.065,
++              -0.133,
+               0.06
+             ],
+             [
+-              0.076,
++              0.043,
+               0.046
+             ],
+             [
+-              0.077,
++              0.032,
+               -0.016
+             ]
+           ],
+           [
+-            0.006,
+-            0.031,
+-            0.093
++            -0.192,
++            -0.003,
++            0.048
+           ]
+         ],
+         "segments": [
+@@ -251,29 +251,29 @@
+       },
+       "lookback60": {
+         "lookback": 60,
+-        "max_gap": 0.112,
+-        "median_gap": 0.084,
+-        "min_gap": 0.073,
++        "max_gap": 0.035,
++        "median_gap": 0.033,
++        "min_gap": 0.031,
+         "pos_segment_gap_count": "3/3",
+         "segment_gaps": [
+           [
+             [
+-              0.065,
++              0.025,
+               -0.008
+             ],
+             [
+-              0.076,
++              0.023,
+               -0.008
+             ],
+             [
+-              0.077,
++              -0.001,
+               -0.035
+             ]
+           ],
+           [
+-            0.073,
+-            0.084,
+-            0.112
++            0.033,
++            0.031,
++            0.035
+           ]
+         ],
+         "segments": [
+@@ -287,29 +287,29 @@
+     {
+       "lookback20": {
+         "lookback": 20,
+-        "max_gap": 0.044,
+-        "median_gap": 0.041,
+-        "min_gap": 0.031,
+-        "pos_segment_gap_count": "3/3",
++        "max_gap": 0.017,
++        "median_gap": 0.013,
++        "min_gap": -0.074,
++        "pos_segment_gap_count": "2/3",
+         "segment_gaps": [
+           [
+             [
+-              0.073,
++              0.049,
+               0.032
+             ],
+             [
+-              0.067,
++              -0.037,
+               0.037
+             ],
+             [
+-              0.042,
++              0.011,
+               -0.002
+             ]
+           ],
+           [
+-            0.041,
+-            0.031,
+-            0.044
++            0.017,
++            -0.074,
++            0.013
+           ]
+         ],
+         "segments": [
+@@ -320,29 +320,29 @@
+       },
+       "lookback60": {
+         "lookback": 60,
+-        "max_gap": 0.061,
+-        "median_gap": 0.051,
+-        "min_gap": 0.026,
+-        "pos_segment_gap_count": "3/3",
++        "max_gap": 0.049,
++        "median_gap": -0.011,
++        "min_gap": -0.016,
++        "pos_segment_gap_count": "1/3",
+         "segment_gaps": [
+           [
+             [
+-              0.073,
++              0.001,
+               0.012
+             ],
+             [
+-              0.067,
++              0.001,
+               0.017
+             ],
+             [
+-              0.042,
++              0.065,
+               0.016
+             ]
+           ],
+           [
+-            0.061,
+-            0.051,
+-            0.026
++            -0.011,
++            -0.016,
++            0.049
+           ]
+         ],
+         "segments": [
+@@ -356,29 +356,29 @@
+     {
+       "lookback20": {
+         "lookback": 20,
+-        "max_gap": 0.084,
+-        "median_gap": 0.05,
+-        "min_gap": -0.02,
+-        "pos_segment_gap_count": "2/3",
++        "max_gap": 0.121,
++        "median_gap": 0.045,
++        "min_gap": 0.009,
++        "pos_segment_gap_count": "3/3",
+         "segment_gaps": [
+           [
+             [
+-              -0.038,
++              0.027,
+               -0.018
+             ],
+             [
+-              0.015,
++              0.086,
+               -0.035
+             ],
+             [
+-              0.1,
++              0.026,
+               0.016
+             ]
+           ],
+           [
+-            -0.02,
+-            0.05,
+-            0.084
++            0.045,
++            0.121,
++            0.009
+           ]
+         ],
+         "segments": [
+@@ -389,29 +389,29 @@
+       },
+       "lookback60": {
+         "lookback": 60,
+-        "max_gap": 0.22,
+-        "median_gap": 0.163,
+-        "min_gap": -0.049,
++        "max_gap": 0.289,
++        "median_gap": 0.11,
++        "min_gap": -0.015,
+         "pos_segment_gap_count": "2/3",
+         "segment_gaps": [
+           [
+             [
+-              -0.038,
++              0.03,
+               -0.258
+             ],
+             [
+-              0.015,
++              0.048,
+               0.063
+             ],
+             [
+-              0.1,
++              0.047,
+               -0.063
+             ]
+           ],
+           [
+-            0.22,
+-            -0.049,
+-            0.163
++            0.289,
++            -0.015,
++            0.11
+           ]
+         ],
+         "segments": [
+@@ -425,29 +425,29 @@
+     {
+       "lookback20": {
+         "lookback": 20,
+-        "max_gap": 1.287,
+-        "median_gap": 0.123,
+-        "min_gap": 0.1,
++        "max_gap": 1.339,
++        "median_gap": 0.094,
++        "min_gap": 0.078,
+         "pos_segment_gap_count": "3/3",
+         "segment_gaps": [
+           [
+             [
+-              0.132,
++              0.11,
+               0.032
+             ],
+             [
+-              0.016,
++              0.068,
+               -1.271
+             ],
+             [
+-              0.107,
++              0.079,
+               -0.016
+             ]
+           ],
+           [
+-            0.1,
+-            1.287,
+-            0.123
++            0.078,
++            1.339,
++            0.094
+           ]
+         ],
+         "segments": [
+@@ -458,29 +458,29 @@
+       },
+       "lookback60": {
+         "lookback": 60,
+-        "max_gap": 0.16,
+-        "median_gap": 0.153,
+-        "min_gap": 0.051,
+-        "pos_segment_gap_count": "3/3",
++        "max_gap": 0.053,
++        "median_gap": 0.023,
++        "min_gap": -0.022,
++        "pos_segment_gap_count": "2/3",
+         "segment_gaps": [
+           [
+             [
+-              0.132,
++              0.002,
+               -0.021
+             ],
+             [
+-              0.016,
++              -0.057,
+               -0.034
+             ],
+             [
+-              0.107,
++              0.001,
+               -0.052
+             ]
+           ],
+           [
+-            0.153,
+-            0.051,
+-            0.16
++            0.023,
++            -0.022,
++            0.053
+           ]
+         ],
+         "segments": [
+@@ -494,29 +494,29 @@
+     {
+       "lookback20": {
+         "lookback": 20,
+-        "max_gap": 0.085,
+-        "median_gap": 0.084,
+-        "min_gap": 0.003,
+-        "pos_segment_gap_count": "3/3",
++        "max_gap": 0.037,
++        "median_gap": 0.026,
++        "min_gap": -0.061,
++        "pos_segment_gap_count": "2/3",
+         "segment_gaps": [
+           [
+             [
+-              0.113,
++              0.065,
+               0.028
+             ],
+             [
+-              0.044,
++              -0.019,
+               0.042
+             ],
+             [
+-              0.083,
++              0.024,
+               -0.001
+             ]
+           ],
+           [
+-            0.085,
+-            0.003,
+-            0.084
++            0.037,
++            -0.061,
++            0.026
+           ]
+         ],
+         "segments": [
+@@ -527,29 +527,29 @@
+       },
+       "lookback60": {
+         "lookback": 60,
+-        "max_gap": 0.216,
+-        "median_gap": 0.124,
+-        "min_gap": 0.032,
+-        "pos_segment_gap_count": "3/3",
++        "max_gap": 0.154,
++        "median_gap": 0.058,
++        "min_gap": -0.004,
++        "pos_segment_gap_count": "2/3",
+         "segment_gaps": [
+           [
+             [
+-              0.113,
++              0.051,
+               -0.103
+             ],
+             [
+-              0.044,
++              0.008,
+               0.012
+             ],
+             [
+-              0.083,
++              0.017,
+               -0.041
+             ]
+           ],
+           [
+-            0.216,
+-            0.032,
+-            0.124
++            0.154,
++            -0.004,
++            0.058
+           ]
+         ],
+         "segments": [
+@@ -563,24 +563,24 @@
+     {
+       "lookback20": {
+         "lookback": 20,
+-        "max_gap": 0.038,
+-        "median_gap": 0.021,
+-        "min_gap": 0.005,
+-        "pos_segment_gap_count": "2/2",
++        "max_gap": -0.028,
++        "median_gap": -0.038,
++        "min_gap": -0.048,
++        "pos_segment_gap_count": "0/2",
+         "segment_gaps": [
+           [
+             [
+-              0.05,
++              -0.036,
+               0.012
+             ],
+             [
+-              0.046,
++              0.013,
+               0.041
+             ]
+           ],
+           [
+-            0.038,
+-            0.005
++            -0.048,
++            -0.028
+           ]
+         ],
+         "segments": [
+@@ -590,24 +590,24 @@
+       },
+       "lookback60": {
+         "lookback": 60,
+-        "max_gap": 0.078,
+-        "median_gap": 0.045,
+-        "min_gap": 0.013,
+-        "pos_segment_gap_count": "2/2",
++        "max_gap": 0.027,
++        "median_gap": -0.011,
++        "min_gap": -0.048,
++        "pos_segment_gap_count": "1/2",
+         "segment_gaps": [
+           [
+             [
+-              0.05,
++              -0.011,
+               0.037
+             ],
+             [
+-              0.046,
++              -0.005,
+               -0.032
+             ]
+           ],
+           [
+-            0.013,
+-            0.078
++            -0.048,
++            0.027
+           ]
+         ],
+         "segments": [
+@@ -620,24 +620,24 @@
+     {
+       "lookback20": {
+         "lookback": 20,
+-        "max_gap": 0.037,
+-        "median_gap": 0.011,
+-        "min_gap": -0.014,
+-        "pos_segment_gap_count": "1/2",
++        "max_gap": -0.027,
++        "median_gap": -0.043,
++        "min_gap": -0.059,
++        "pos_segment_gap_count": "0/2",
+         "segment_gaps": [
+           [
+             [
+-              0.018,
++              -0.027,
+               0.032
+             ],
+             [
+-              0.037,
++              -0.027,
+               -0.0
+             ]
+           ],
+           [
+-            -0.014,
+-            0.037
++            -0.059,
++            -0.027
+           ]
+         ],
+         "segments": [
+@@ -647,24 +647,24 @@
+       },
+       "lookback60": {
+         "lookback": 60,
+-        "max_gap": 0.109,
+-        "median_gap": 0.051,
+-        "min_gap": -0.006,
++        "max_gap": 0.03,
++        "median_gap": -0.013,
++        "min_gap": -0.055,
+         "pos_segment_gap_count": "1/2",
+         "segment_gaps": [
+           [
+             [
+-              0.018,
++              -0.031,
+               0.024
+             ],
+             [
+-              0.037,
++              -0.042,
+               -0.072
+             ]
+           ],
+           [
+-            -0.006,
+-            0.109
++            -0.055,
++            0.03
+           ]
+         ],
+         "segments": [
+diff --git a/state/check_artifacts/momentum_longer_horizon_results.json b/state/check_artifacts/momentum_longer_horizon_results.json
+index 00a35d8..ada2b86 100644
+--- a/state/check_artifacts/momentum_longer_horizon_results.json
++++ b/state/check_artifacts/momentum_longer_horizon_results.json
+@@ -10,12 +10,12 @@
+   "per_asset": {
+     "AAPL": {
+       "20": {
+-        "candidate_dispersion": 0.014,
++        "candidate_dispersion": 0.03,
+         "medians": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.072,
++          0.035,
++          0.052,
++          -0.011
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.031,
+@@ -34,12 +34,12 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.014,
++        "candidate_dispersion": 0.017,
+         "medians": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.089,
++          0.045,
++          0.048,
++          0.054
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.016,
+@@ -58,23 +58,23 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "edge_counts": {
+-        "EDGE": 2,
++        "EDGE": 1,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 1
+       },
+-      "horizon_verdict": "ROBUST",
++      "horizon_verdict": "SENSITIVE",
+       "lookback_medians": {
+         "20": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.072,
++          0.035,
++          0.052,
++          -0.011
+         ],
+         "60": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.089,
++          0.045,
++          0.048,
++          0.054
+         ]
+       },
+       "lookback_null_medians": {
+@@ -94,11 +94,11 @@
+     },
+     "AMZN": {
+       "20": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.08,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          -0.133,
++          0.043,
++          0.032
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.033,
+@@ -112,14 +112,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "60": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.012,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          0.025,
++          0.023,
++          -0.001
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.013,
+@@ -133,24 +133,24 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+-        "EDGE": 2,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 2
+       },
+-      "horizon_verdict": "ROBUST",
++      "horizon_verdict": "NO_EDGE",
+       "lookback_medians": {
+         "20": [
+-          0.065,
+-          0.076,
+-          0.077
++          -0.133,
++          0.043,
++          0.032
+         ],
+         "60": [
+-          0.065,
+-          0.076,
+-          0.077
++          0.025,
++          0.023,
++          -0.001
+         ]
+       },
+       "lookback_null_medians": {
+@@ -168,11 +168,11 @@
+     },
+     "GOOGL": {
+       "20": {
+-        "candidate_dispersion": 0.015,
++        "candidate_dispersion": 0.026,
+         "medians": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.067,
++          0.004,
++          0.026
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.034,
+@@ -189,11 +189,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.015,
++        "candidate_dispersion": 0.031,
+         "medians": [
+-          0.069,
+-          0.071,
+-          0.101
++          -0.058,
++          0.004,
++          0.012
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.006,
+@@ -217,14 +217,14 @@
+       "horizon_verdict": "SENSITIVE",
+       "lookback_medians": {
+         "20": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.067,
++          0.004,
++          0.026
+         ],
+         "60": [
+-          0.069,
+-          0.071,
+-          0.101
++          -0.058,
++          0.004,
++          0.012
+         ]
+       },
+       "lookback_null_medians": {
+@@ -242,10 +242,10 @@
+     },
+     "JNJ": {
+       "20": {
+-        "candidate_dispersion": 0.002,
++        "candidate_dispersion": 0.024,
+         "medians": [
+-          0.05,
+-          0.046
++          -0.036,
++          0.013
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.015,
+@@ -260,10 +260,10 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.002,
++        "candidate_dispersion": 0.003,
+         "medians": [
+-          0.05,
+-          0.046
++          -0.011,
++          -0.005
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.035,
+@@ -285,12 +285,12 @@
+       "horizon_verdict": "NO_EDGE",
+       "lookback_medians": {
+         "20": [
+-          0.05,
+-          0.046
++          -0.036,
++          0.013
+         ],
+         "60": [
+-          0.05,
+-          0.046
++          -0.011,
++          -0.005
+         ]
+       },
+       "lookback_null_medians": {
+@@ -306,11 +306,11 @@
+     },
+     "JPM": {
+       "20": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.034,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          0.065,
++          -0.019,
++          0.024
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.018,
+@@ -327,11 +327,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.019,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          0.051,
++          0.008,
++          0.017
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.047,
+@@ -348,21 +348,21 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "edge_counts": {
+-        "EDGE": 2,
++        "EDGE": 1,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 1
+       },
+-      "horizon_verdict": "ROBUST",
++      "horizon_verdict": "SENSITIVE",
+       "lookback_medians": {
+         "20": [
+-          0.113,
+-          0.044,
+-          0.083
++          0.065,
++          -0.019,
++          0.024
+         ],
+         "60": [
+-          0.113,
+-          0.044,
+-          0.083
++          0.051,
++          0.008,
++          0.017
+         ]
+       },
+       "lookback_null_medians": {
+@@ -380,11 +380,11 @@
+     },
+     "META": {
+       "20": {
+-        "candidate_dispersion": 0.013,
++        "candidate_dispersion": 0.035,
+         "medians": [
+-          0.073,
+-          0.067,
+-          0.042
++          0.049,
++          -0.037,
++          0.011
+         ],
+         "n_folds": 19,
+         "null_dispersion": 0.017,
+@@ -398,14 +398,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.013,
++        "candidate_dispersion": 0.03,
+         "medians": [
+-          0.073,
+-          0.067,
+-          0.042
++          0.001,
++          0.001,
++          0.065
+         ],
+         "n_folds": 19,
+         "null_dispersion": 0.002,
+@@ -422,21 +422,21 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "edge_counts": {
+-        "EDGE": 1,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 1
++        "NO_EDGE": 2
+       },
+-      "horizon_verdict": "SENSITIVE",
++      "horizon_verdict": "NO_EDGE",
+       "lookback_medians": {
+         "20": [
+-          0.073,
+-          0.067,
+-          0.042
++          0.049,
++          -0.037,
++          0.011
+         ],
+         "60": [
+-          0.073,
+-          0.067,
+-          0.042
++          0.001,
++          0.001,
++          0.065
+         ]
+       },
+       "lookback_null_medians": {
+@@ -454,10 +454,10 @@
+     },
+     "MSFT": {
+       "20": {
+-        "candidate_dispersion": 0.01,
++        "candidate_dispersion": 0.025,
+         "medians": [
+-          0.052,
+-          0.072
++          -0.01,
++          -0.06
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.0,
+@@ -472,10 +472,10 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "60": {
+-        "candidate_dispersion": 0.01,
++        "candidate_dispersion": 0.001,
+         "medians": [
+-          0.052,
+-          0.072
++          0.008,
++          0.006
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.005,
+@@ -487,7 +487,7 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+         "EDGE": 0,
+@@ -497,12 +497,12 @@
+       "horizon_verdict": "NO_EDGE",
+       "lookback_medians": {
+         "20": [
+-          0.052,
+-          0.072
++          -0.01,
++          -0.06
+         ],
+         "60": [
+-          0.052,
+-          0.072
++          0.008,
++          0.006
+         ]
+       },
+       "lookback_null_medians": {
+@@ -518,11 +518,11 @@
+     },
+     "NVDA": {
+       "20": {
+-        "candidate_dispersion": 0.057,
++        "candidate_dispersion": 0.028,
+         "medians": [
+-          -0.038,
+-          0.015,
+-          0.1
++          0.027,
++          0.086,
++          0.026
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.022,
+@@ -536,14 +536,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "REGIME_STABLE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.057,
++        "candidate_dispersion": 0.008,
+         "medians": [
+-          -0.038,
+-          0.015,
+-          0.1
++          0.03,
++          0.048,
++          0.047
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.132,
+@@ -557,24 +557,24 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+-        "EDGE": 0,
++        "EDGE": 1,
+         "LOSS": 0,
+-        "NO_EDGE": 2
++        "NO_EDGE": 1
+       },
+-      "horizon_verdict": "NO_EDGE",
++      "horizon_verdict": "SENSITIVE",
+       "lookback_medians": {
+         "20": [
+-          -0.038,
+-          0.015,
+-          0.1
++          0.027,
++          0.086,
++          0.026
+         ],
+         "60": [
+-          -0.038,
+-          0.015,
+-          0.1
++          0.03,
++          0.048,
++          0.047
+         ]
+       },
+       "lookback_null_medians": {
+@@ -592,11 +592,11 @@
+     },
+     "TSLA": {
+       "20": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.018,
+         "medians": [
+-          0.132,
+-          0.016,
+-          0.107
++          0.11,
++          0.068,
++          0.079
+         ],
+         "n_folds": 24,
+         "null_dispersion": 0.603,
+@@ -613,11 +613,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.027,
+         "medians": [
+-          0.132,
+-          0.016,
+-          0.107
++          0.002,
++          -0.057,
++          0.001
+         ],
+         "n_folds": 24,
+         "null_dispersion": 0.013,
+@@ -641,14 +641,14 @@
+       "horizon_verdict": "SENSITIVE",
+       "lookback_medians": {
+         "20": [
+-          0.132,
+-          0.016,
+-          0.107
++          0.11,
++          0.068,
++          0.079
+         ],
+         "60": [
+-          0.132,
+-          0.016,
+-          0.107
++          0.002,
++          -0.057,
++          0.001
+         ]
+       },
+       "lookback_null_medians": {
+@@ -666,10 +666,10 @@
+     },
+     "XOM": {
+       "20": {
+-        "candidate_dispersion": 0.009,
++        "candidate_dispersion": 0.0,
+         "medians": [
+-          0.018,
+-          0.037
++          -0.027,
++          -0.027
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.016,
+@@ -684,10 +684,10 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "60": {
+-        "candidate_dispersion": 0.009,
++        "candidate_dispersion": 0.006,
+         "medians": [
+-          0.018,
+-          0.037
++          -0.031,
++          -0.042
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.048,
+@@ -709,12 +709,12 @@
+       "horizon_verdict": "NO_EDGE",
+       "lookback_medians": {
+         "20": [
+-          0.018,
+-          0.037
++          -0.027,
++          -0.027
+         ],
+         "60": [
+-          0.018,
+-          0.037
++          -0.031,
++          -0.042
+         ]
+       },
+       "lookback_null_medians": {
+@@ -734,42 +734,42 @@
+   "train": 252,
+   "universe": {
+     "horizon_counts": {
+-      "NO_EDGE": 4,
+-      "ROBUST": 3,
+-      "SENSITIVE": 3
++      "NO_EDGE": 5,
++      "ROBUST": 0,
++      "SENSITIVE": 5
+     },
+     "lookback_20_counts": {
+-      "CONSISTENT_WITH_NOISE": 2,
++      "CONSISTENT_WITH_NOISE": 3,
+       "REGIME_DEPENDENT": 2,
+-      "REGIME_STABLE": 6,
++      "REGIME_STABLE": 5,
+       "REGIME_STABLE_LOSS": 0
+     },
+     "lookback_60_counts": {
+-      "CONSISTENT_WITH_NOISE": 2,
+-      "REGIME_DEPENDENT": 4,
+-      "REGIME_STABLE": 4,
++      "CONSISTENT_WITH_NOISE": 5,
++      "REGIME_DEPENDENT": 3,
++      "REGIME_STABLE": 2,
+       "REGIME_STABLE_LOSS": 0
+     },
+     "per_asset": {
+       "AAPL": {
+         "edge_counts": {
+-          "EDGE": 2,
++          "EDGE": 1,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 1
+         },
+-        "horizon_verdict": "ROBUST",
++        "horizon_verdict": "SENSITIVE",
+         "lookback_medians": {
+           "20": [
+-            0.071,
+-            0.054,
+-            0.092,
+-            0.069
++            0.072,
++            0.035,
++            0.052,
++            -0.011
+           ],
+           "60": [
+-            0.071,
+-            0.054,
+-            0.092,
+-            0.069
++            0.089,
++            0.045,
++            0.048,
++            0.054
+           ]
+         },
+         "lookback_null_medians": {
+@@ -793,21 +793,21 @@
+       },
+       "AMZN": {
+         "edge_counts": {
+-          "EDGE": 2,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 2
+         },
+-        "horizon_verdict": "ROBUST",
++        "horizon_verdict": "NO_EDGE",
+         "lookback_medians": {
+           "20": [
+-            0.065,
+-            0.076,
+-            0.077
++            -0.133,
++            0.043,
++            0.032
+           ],
+           "60": [
+-            0.065,
+-            0.076,
+-            0.077
++            0.025,
++            0.023,
++            -0.001
+           ]
+         },
+         "lookback_null_medians": {
+@@ -824,8 +824,8 @@
+         },
+         "n_folds_20": 28,
+         "n_folds_60": 28,
+-        "verdicts_20": "REGIME_STABLE",
+-        "verdicts_60": "REGIME_STABLE"
++        "verdicts_20": "REGIME_DEPENDENT",
++        "verdicts_60": "CONSISTENT_WITH_NOISE"
+       },
+       "GOOGL": {
+         "edge_counts": {
+@@ -836,14 +836,14 @@
+         "horizon_verdict": "SENSITIVE",
+         "lookback_medians": {
+           "20": [
+-            0.069,
+-            0.071,
+-            0.101
++            0.067,
++            0.004,
++            0.026
+           ],
+           "60": [
+-            0.069,
+-            0.071,
+-            0.101
++            -0.058,
++            0.004,
++            0.012
+           ]
+         },
+         "lookback_null_medians": {
+@@ -872,12 +872,12 @@
+         "horizon_verdict": "NO_EDGE",
+         "lookback_medians": {
+           "20": [
+-            0.05,
+-            0.046
++            -0.036,
++            0.013
+           ],
+           "60": [
+-            0.05,
+-            0.046
++            -0.011,
++            -0.005
+           ]
+         },
+         "lookback_null_medians": {
+@@ -897,21 +897,21 @@
+       },
+       "JPM": {
+         "edge_counts": {
+-          "EDGE": 2,
++          "EDGE": 1,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 1
+         },
+-        "horizon_verdict": "ROBUST",
++        "horizon_verdict": "SENSITIVE",
+         "lookback_medians": {
+           "20": [
+-            0.113,
+-            0.044,
+-            0.083
++            0.065,
++            -0.019,
++            0.024
+           ],
+           "60": [
+-            0.113,
+-            0.044,
+-            0.083
++            0.051,
++            0.008,
++            0.017
+           ]
+         },
+         "lookback_null_medians": {
+@@ -933,21 +933,21 @@
+       },
+       "META": {
+         "edge_counts": {
+-          "EDGE": 1,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 1
++          "NO_EDGE": 2
+         },
+-        "horizon_verdict": "SENSITIVE",
++        "horizon_verdict": "NO_EDGE",
+         "lookback_medians": {
+           "20": [
+-            0.073,
+-            0.067,
+-            0.042
++            0.049,
++            -0.037,
++            0.011
+           ],
+           "60": [
+-            0.073,
+-            0.067,
+-            0.042
++            0.001,
++            0.001,
++            0.065
+           ]
+         },
+         "lookback_null_medians": {
+@@ -964,7 +964,7 @@
+         },
+         "n_folds_20": 19,
+         "n_folds_60": 19,
+-        "verdicts_20": "REGIME_STABLE",
++        "verdicts_20": "CONSISTENT_WITH_NOISE",
+         "verdicts_60": "REGIME_DEPENDENT"
+       },
+       "MSFT": {
+@@ -976,12 +976,12 @@
+         "horizon_verdict": "NO_EDGE",
+         "lookback_medians": {
+           "20": [
+-            0.052,
+-            0.072
++            -0.01,
++            -0.06
+           ],
+           "60": [
+-            0.052,
+-            0.072
++            0.008,
++            0.006
+           ]
+         },
+         "lookback_null_medians": {
+@@ -997,25 +997,25 @@
+         "n_folds_20": 75,
+         "n_folds_60": 75,
+         "verdicts_20": "REGIME_DEPENDENT",
+-        "verdicts_60": "REGIME_DEPENDENT"
++        "verdicts_60": "CONSISTENT_WITH_NOISE"
+       },
+       "NVDA": {
+         "edge_counts": {
+-          "EDGE": 0,
++          "EDGE": 1,
+           "LOSS": 0,
+-          "NO_EDGE": 2
++          "NO_EDGE": 1
+         },
+-        "horizon_verdict": "NO_EDGE",
++        "horizon_verdict": "SENSITIVE",
+         "lookback_medians": {
+           "20": [
+-            -0.038,
+-            0.015,
+-            0.1
++            0.027,
++            0.086,
++            0.026
+           ],
+           "60": [
+-            -0.038,
+-            0.015,
+-            0.1
++            0.03,
++            0.048,
++            0.047
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1032,8 +1032,8 @@
+         },
+         "n_folds_20": 28,
+         "n_folds_60": 28,
+-        "verdicts_20": "REGIME_DEPENDENT",
+-        "verdicts_60": "REGIME_STABLE"
++        "verdicts_20": "REGIME_STABLE",
++        "verdicts_60": "CONSISTENT_WITH_NOISE"
+       },
+       "TSLA": {
+         "edge_counts": {
+@@ -1044,14 +1044,14 @@
+         "horizon_verdict": "SENSITIVE",
+         "lookback_medians": {
+           "20": [
+-            0.132,
+-            0.016,
+-            0.107
++            0.11,
++            0.068,
++            0.079
+           ],
+           "60": [
+-            0.132,
+-            0.016,
+-            0.107
++            0.002,
++            -0.057,
++            0.001
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1080,12 +1080,12 @@
+         "horizon_verdict": "NO_EDGE",
+         "lookback_medians": {
+           "20": [
+-            0.018,
+-            0.037
++            -0.027,
++            -0.027
+           ],
+           "60": [
+-            0.018,
+-            0.037
++            -0.031,
++            -0.042
+           ]
+         },
+         "lookback_null_medians": {
+diff --git a/state/check_artifacts/momentum_lookback_sweep_results.json b/state/check_artifacts/momentum_lookback_sweep_results.json
+index 6dd8f6f..952dee4 100644
+--- a/state/check_artifacts/momentum_lookback_sweep_results.json
++++ b/state/check_artifacts/momentum_lookback_sweep_results.json
+@@ -11,12 +11,12 @@
+   "per_asset": {
+     "AAPL": {
+       "10": {
+-        "candidate_dispersion": 0.014,
++        "candidate_dispersion": 0.013,
+         "medians": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.02,
++          0.05,
++          0.02,
++          0.021
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.006,
+@@ -32,15 +32,15 @@
+           "turbulent",
+           "calm"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.014,
++        "candidate_dispersion": 0.069,
+         "medians": [
+-          0.071,
+           0.054,
+-          0.092,
+-          0.069
++          -0.027,
++          -0.087,
++          0.088
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.05,
+@@ -59,12 +59,12 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.014,
++        "candidate_dispersion": 0.045,
+         "medians": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.085,
++          0.035,
++          -0.037,
++          0.054
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.028,
+@@ -83,28 +83,28 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "edge_counts": {
+-        "EDGE": 2,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 1
++        "NO_EDGE": 3
+       },
+       "lookback_medians": {
+         "10": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.02,
++          0.05,
++          0.02,
++          0.021
+         ],
+         "3": [
+-          0.071,
+           0.054,
+-          0.092,
+-          0.069
++          -0.027,
++          -0.087,
++          0.088
+         ],
+         "5": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.085,
++          0.035,
++          -0.037,
++          0.054
+         ]
+       },
+       "lookback_null_medians": {
+@@ -127,15 +127,15 @@
+           0.032
+         ]
+       },
+-      "robustness_verdict": "ROBUST"
++      "robustness_verdict": "NO_EDGE"
+     },
+     "AMZN": {
+       "10": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.055,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          0.02,
++          0.029,
++          -0.093
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.04,
+@@ -152,11 +152,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.056,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          0.014,
++          0.009,
++          -0.106
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.037,
+@@ -173,11 +173,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.039,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          -0.05,
++          0.005,
++          0.046
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.019,
+@@ -191,28 +191,28 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+-        "EDGE": 3,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 3
+       },
+       "lookback_medians": {
+         "10": [
+-          0.065,
+-          0.076,
+-          0.077
++          0.02,
++          0.029,
++          -0.093
+         ],
+         "3": [
+-          0.065,
+-          0.076,
+-          0.077
++          0.014,
++          0.009,
++          -0.106
+         ],
+         "5": [
+-          0.065,
+-          0.076,
+-          0.077
++          -0.05,
++          0.005,
++          0.046
+         ]
+       },
+       "lookback_null_medians": {
+@@ -232,15 +232,15 @@
+           0.036
+         ]
+       },
+-      "robustness_verdict": "ROBUST"
++      "robustness_verdict": "NO_EDGE"
+     },
+     "GOOGL": {
+       "10": {
+-        "candidate_dispersion": 0.015,
++        "candidate_dispersion": 0.058,
+         "medians": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.08,
++          -0.058,
++          0.039
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.019,
+@@ -254,14 +254,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "3": {
+-        "candidate_dispersion": 0.015,
++        "candidate_dispersion": 0.029,
+         "medians": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.021,
++          -0.035,
++          0.031
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.04,
+@@ -275,14 +275,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.015,
++        "candidate_dispersion": 0.031,
+         "medians": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.045,
++          -0.011,
++          -0.027
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.039,
+@@ -296,28 +296,28 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+-        "EDGE": 3,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 3
+       },
+       "lookback_medians": {
+         "10": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.08,
++          -0.058,
++          0.039
+         ],
+         "3": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.021,
++          -0.035,
++          0.031
+         ],
+         "5": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.045,
++          -0.011,
++          -0.027
+         ]
+       },
+       "lookback_null_medians": {
+@@ -337,14 +337,14 @@
+           -0.008
+         ]
+       },
+-      "robustness_verdict": "ROBUST"
++      "robustness_verdict": "NO_EDGE"
+     },
+     "JNJ": {
+       "10": {
+-        "candidate_dispersion": 0.002,
++        "candidate_dispersion": 0.0,
+         "medians": [
+-          0.05,
+-          0.046
++          0.011,
++          0.01
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.004,
+@@ -359,10 +359,10 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.002,
++        "candidate_dispersion": 0.008,
+         "medians": [
+-          0.05,
+-          0.046
++          0.017,
++          0.001
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.03,
+@@ -377,10 +377,10 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.002,
++        "candidate_dispersion": 0.014,
+         "medians": [
+-          0.05,
+-          0.046
++          -0.011,
++          0.016
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.019,
+@@ -401,16 +401,16 @@
+       },
+       "lookback_medians": {
+         "10": [
+-          0.05,
+-          0.046
++          0.011,
++          0.01
+         ],
+         "3": [
+-          0.05,
+-          0.046
++          0.017,
++          0.001
+         ],
+         "5": [
+-          0.05,
+-          0.046
++          -0.011,
++          0.016
+         ]
+       },
+       "lookback_null_medians": {
+@@ -431,11 +431,11 @@
+     },
+     "JPM": {
+       "10": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.03,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          -0.036,
++          -0.01,
++          0.036
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.009,
+@@ -449,14 +449,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.038,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          0.046,
++          0.01,
++          -0.048
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.014,
+@@ -470,14 +470,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.031,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          -0.039,
++          0.028,
++          0.028
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.012,
+@@ -491,7 +491,7 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+         "EDGE": 0,
+@@ -500,19 +500,19 @@
+       },
+       "lookback_medians": {
+         "10": [
+-          0.113,
+-          0.044,
+-          0.083
++          -0.036,
++          -0.01,
++          0.036
+         ],
+         "3": [
+-          0.113,
+-          0.044,
+-          0.083
++          0.046,
++          0.01,
++          -0.048
+         ],
+         "5": [
+-          0.113,
+-          0.044,
+-          0.083
++          -0.039,
++          0.028,
++          0.028
+         ]
+       },
+       "lookback_null_medians": {
+@@ -536,11 +536,11 @@
+     },
+     "META": {
+       "10": {
+-        "candidate_dispersion": 0.013,
++        "candidate_dispersion": 0.108,
+         "medians": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.062,
++          -0.278,
++          -0.037
+         ],
+         "n_folds": 19,
+         "null_dispersion": 0.027,
+@@ -554,14 +554,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "3": {
+-        "candidate_dispersion": 0.013,
++        "candidate_dispersion": 0.091,
+         "medians": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.223,
++          -0.014,
++          -0.053
+         ],
+         "n_folds": 19,
+         "null_dispersion": 0.026,
+@@ -575,14 +575,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "5": {
+-        "candidate_dispersion": 0.013,
++        "candidate_dispersion": 0.072,
+         "medians": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.129,
++          -0.041,
++          0.047
+         ],
+         "n_folds": 19,
+         "null_dispersion": 0.055,
+@@ -599,25 +599,25 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "edge_counts": {
+-        "EDGE": 3,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 3
+       },
+       "lookback_medians": {
+         "10": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.062,
++          -0.278,
++          -0.037
+         ],
+         "3": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.223,
++          -0.014,
++          -0.053
+         ],
+         "5": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.129,
++          -0.041,
++          0.047
+         ]
+       },
+       "lookback_null_medians": {
+@@ -637,14 +637,14 @@
+           -0.09
+         ]
+       },
+-      "robustness_verdict": "ROBUST"
++      "robustness_verdict": "NO_EDGE"
+     },
+     "MSFT": {
+       "10": {
+-        "candidate_dispersion": 0.01,
++        "candidate_dispersion": 0.005,
+         "medians": [
+-          0.052,
+-          0.072
++          -0.004,
++          -0.013
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.037,
+@@ -656,13 +656,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.01,
++        "candidate_dispersion": 0.032,
+         "medians": [
+-          0.052,
+-          0.072
++          -0.006,
++          -0.07
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.016,
+@@ -674,13 +674,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "5": {
+-        "candidate_dispersion": 0.01,
++        "candidate_dispersion": 0.006,
+         "medians": [
+-          0.052,
+-          0.072
++          -0.041,
++          -0.03
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.008,
+@@ -692,25 +692,25 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "edge_counts": {
+-        "EDGE": 3,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 3
+       },
+       "lookback_medians": {
+         "10": [
+-          0.052,
+-          0.072
++          -0.004,
++          -0.013
+         ],
+         "3": [
+-          0.052,
+-          0.072
++          -0.006,
++          -0.07
+         ],
+         "5": [
+-          0.052,
+-          0.072
++          -0.041,
++          -0.03
+         ]
+       },
+       "lookback_null_medians": {
+@@ -727,15 +727,15 @@
+           -0.029
+         ]
+       },
+-      "robustness_verdict": "ROBUST"
++      "robustness_verdict": "NO_EDGE"
+     },
+     "NVDA": {
+       "10": {
+-        "candidate_dispersion": 0.057,
++        "candidate_dispersion": 0.058,
+         "medians": [
+-          -0.038,
+-          0.014,
+-          0.1
++          0.008,
++          -0.056,
++          0.085
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.035,
+@@ -752,11 +752,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.057,
++        "candidate_dispersion": 0.059,
+         "medians": [
+-          -0.038,
+-          0.013,
+-          0.1
++          -0.003,
++          0.059,
++          -0.086
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.024,
+@@ -773,11 +773,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "5": {
+-        "candidate_dispersion": 0.057,
++        "candidate_dispersion": 0.049,
+         "medians": [
+-          -0.038,
+-          0.013,
+-          0.1
++          -0.024,
++          0.092,
++          0.063
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.06,
+@@ -800,19 +800,19 @@
+       },
+       "lookback_medians": {
+         "10": [
+-          -0.038,
+-          0.014,
+-          0.1
++          0.008,
++          -0.056,
++          0.085
+         ],
+         "3": [
+-          -0.038,
+-          0.013,
+-          0.1
++          -0.003,
++          0.059,
++          -0.086
+         ],
+         "5": [
+-          -0.038,
+-          0.013,
+-          0.1
++          -0.024,
++          0.092,
++          0.063
+         ]
+       },
+       "lookback_null_medians": {
+@@ -836,11 +836,11 @@
+     },
+     "TSLA": {
+       "10": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.109,
+         "medians": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.194,
++          0.02,
++          0.053
+         ],
+         "n_folds": 24,
+         "null_dispersion": 0.029,
+@@ -854,14 +854,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "3": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.021,
+         "medians": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.008,
++          -0.025,
++          0.025
+         ],
+         "n_folds": 24,
+         "null_dispersion": 0.236,
+@@ -875,14 +875,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.136,
+         "medians": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.254,
++          0.019,
++          0.049
+         ],
+         "n_folds": 24,
+         "null_dispersion": 0.034,
+@@ -896,28 +896,28 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "edge_counts": {
+-        "EDGE": 3,
++        "EDGE": 0,
+         "LOSS": 0,
+-        "NO_EDGE": 0
++        "NO_EDGE": 3
+       },
+       "lookback_medians": {
+         "10": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.194,
++          0.02,
++          0.053
+         ],
+         "3": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.008,
++          -0.025,
++          0.025
+         ],
+         "5": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.254,
++          0.019,
++          0.049
+         ]
+       },
+       "lookback_null_medians": {
+@@ -937,14 +937,14 @@
+           -0.019
+         ]
+       },
+-      "robustness_verdict": "ROBUST"
++      "robustness_verdict": "NO_EDGE"
+     },
+     "XOM": {
+       "10": {
+-        "candidate_dispersion": 0.009,
++        "candidate_dispersion": 0.006,
+         "medians": [
+-          0.018,
+-          0.037
++          -0.021,
++          -0.032
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.025,
+@@ -959,10 +959,10 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "3": {
+-        "candidate_dispersion": 0.009,
++        "candidate_dispersion": 0.02,
+         "medians": [
+-          0.018,
+-          0.037
++          -0.023,
++          0.017
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.035,
+@@ -977,10 +977,10 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "5": {
+-        "candidate_dispersion": 0.009,
++        "candidate_dispersion": 0.004,
+         "medians": [
+-          0.018,
+-          0.037
++          -0.008,
++          0.001
+         ],
+         "n_folds": 75,
+         "null_dispersion": 0.005,
+@@ -1001,16 +1001,16 @@
+       },
+       "lookback_medians": {
+         "10": [
+-          0.018,
+-          0.037
++          -0.021,
++          -0.032
+         ],
+         "3": [
+-          0.018,
+-          0.037
++          -0.023,
++          0.017
+         ],
+         "5": [
+-          0.018,
+-          0.037
++          -0.008,
++          0.001
+         ]
+       },
+       "lookback_null_medians": {
+@@ -1035,36 +1035,36 @@
+   "train": 252,
+   "universe": {
+     "lookback_5_counts": {
+-      "CONSISTENT_WITH_NOISE": 2,
++      "CONSISTENT_WITH_NOISE": 6,
+       "REGIME_DEPENDENT": 1,
+-      "REGIME_STABLE": 7,
++      "REGIME_STABLE": 3,
+       "REGIME_STABLE_LOSS": 0
+     },
+     "per_asset": {
+       "AAPL": {
+         "edge_counts": {
+-          "EDGE": 2,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 1
++          "NO_EDGE": 3
+         },
+         "lookback_medians": {
+           "10": [
+-            0.071,
+-            0.054,
+-            0.092,
+-            0.069
++            0.02,
++            0.05,
++            0.02,
++            0.021
+           ],
+           "3": [
+-            0.071,
+             0.054,
+-            0.092,
+-            0.069
++            -0.027,
++            -0.087,
++            0.088
+           ],
+           "5": [
+-            0.071,
+-            0.054,
+-            0.092,
+-            0.069
++            0.085,
++            0.035,
++            -0.037,
++            0.054
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1088,30 +1088,30 @@
+           ]
+         },
+         "n_folds_5": 28,
+-        "robustness_verdict": "ROBUST",
++        "robustness_verdict": "NO_EDGE",
+         "verdicts_5": "REGIME_STABLE"
+       },
+       "AMZN": {
+         "edge_counts": {
+-          "EDGE": 3,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 3
+         },
+         "lookback_medians": {
+           "10": [
+-            0.065,
+-            0.076,
+-            0.077
++            0.02,
++            0.029,
++            -0.093
+           ],
+           "3": [
+-            0.065,
+-            0.076,
+-            0.077
++            0.014,
++            0.009,
++            -0.106
+           ],
+           "5": [
+-            0.065,
+-            0.076,
+-            0.077
++            -0.05,
++            0.005,
++            0.046
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1132,30 +1132,30 @@
+           ]
+         },
+         "n_folds_5": 28,
+-        "robustness_verdict": "ROBUST",
+-        "verdicts_5": "REGIME_STABLE"
++        "robustness_verdict": "NO_EDGE",
++        "verdicts_5": "CONSISTENT_WITH_NOISE"
+       },
+       "GOOGL": {
+         "edge_counts": {
+-          "EDGE": 3,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 3
+         },
+         "lookback_medians": {
+           "10": [
+-            0.069,
+-            0.071,
+-            0.101
++            0.08,
++            -0.058,
++            0.039
+           ],
+           "3": [
+-            0.069,
+-            0.071,
+-            0.101
++            0.021,
++            -0.035,
++            0.031
+           ],
+           "5": [
+-            0.069,
+-            0.071,
+-            0.101
++            0.045,
++            -0.011,
++            -0.027
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1176,8 +1176,8 @@
+           ]
+         },
+         "n_folds_5": 28,
+-        "robustness_verdict": "ROBUST",
+-        "verdicts_5": "REGIME_STABLE"
++        "robustness_verdict": "NO_EDGE",
++        "verdicts_5": "CONSISTENT_WITH_NOISE"
+       },
+       "JNJ": {
+         "edge_counts": {
+@@ -1187,16 +1187,16 @@
+         },
+         "lookback_medians": {
+           "10": [
+-            0.05,
+-            0.046
++            0.011,
++            0.01
+           ],
+           "3": [
+-            0.05,
+-            0.046
++            0.017,
++            0.001
+           ],
+           "5": [
+-            0.05,
+-            0.046
++            -0.011,
++            0.016
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1225,19 +1225,19 @@
+         },
+         "lookback_medians": {
+           "10": [
+-            0.113,
+-            0.044,
+-            0.083
++            -0.036,
++            -0.01,
++            0.036
+           ],
+           "3": [
+-            0.113,
+-            0.044,
+-            0.083
++            0.046,
++            0.01,
++            -0.048
+           ],
+           "5": [
+-            0.113,
+-            0.044,
+-            0.083
++            -0.039,
++            0.028,
++            0.028
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1259,29 +1259,29 @@
+         },
+         "n_folds_5": 28,
+         "robustness_verdict": "NO_EDGE",
+-        "verdicts_5": "REGIME_DEPENDENT"
++        "verdicts_5": "CONSISTENT_WITH_NOISE"
+       },
+       "META": {
+         "edge_counts": {
+-          "EDGE": 3,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 3
+         },
+         "lookback_medians": {
+           "10": [
+-            0.073,
+-            0.067,
+-            0.042
++            -0.062,
++            -0.278,
++            -0.037
+           ],
+           "3": [
+-            0.073,
+-            0.067,
+-            0.042
++            -0.223,
++            -0.014,
++            -0.053
+           ],
+           "5": [
+-            0.073,
+-            0.067,
+-            0.042
++            -0.129,
++            -0.041,
++            0.047
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1302,27 +1302,27 @@
+           ]
+         },
+         "n_folds_5": 19,
+-        "robustness_verdict": "ROBUST",
++        "robustness_verdict": "NO_EDGE",
+         "verdicts_5": "REGIME_STABLE"
+       },
+       "MSFT": {
+         "edge_counts": {
+-          "EDGE": 3,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 3
+         },
+         "lookback_medians": {
+           "10": [
+-            0.052,
+-            0.072
++            -0.004,
++            -0.013
+           ],
+           "3": [
+-            0.052,
+-            0.072
++            -0.006,
++            -0.07
+           ],
+           "5": [
+-            0.052,
+-            0.072
++            -0.041,
++            -0.03
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1340,8 +1340,8 @@
+           ]
+         },
+         "n_folds_5": 75,
+-        "robustness_verdict": "ROBUST",
+-        "verdicts_5": "REGIME_STABLE"
++        "robustness_verdict": "NO_EDGE",
++        "verdicts_5": "CONSISTENT_WITH_NOISE"
+       },
+       "NVDA": {
+         "edge_counts": {
+@@ -1351,19 +1351,19 @@
+         },
+         "lookback_medians": {
+           "10": [
+-            -0.038,
+-            0.014,
+-            0.1
++            0.008,
++            -0.056,
++            0.085
+           ],
+           "3": [
+-            -0.038,
+-            0.013,
+-            0.1
++            -0.003,
++            0.059,
++            -0.086
+           ],
+           "5": [
+-            -0.038,
+-            0.013,
+-            0.1
++            -0.024,
++            0.092,
++            0.063
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1389,25 +1389,25 @@
+       },
+       "TSLA": {
+         "edge_counts": {
+-          "EDGE": 3,
++          "EDGE": 0,
+           "LOSS": 0,
+-          "NO_EDGE": 0
++          "NO_EDGE": 3
+         },
+         "lookback_medians": {
+           "10": [
+-            0.132,
+-            0.016,
+-            0.107
++            -0.194,
++            0.02,
++            0.053
+           ],
+           "3": [
+-            0.132,
+-            0.016,
+-            0.107
++            -0.008,
++            -0.025,
++            0.025
+           ],
+           "5": [
+-            0.132,
+-            0.016,
+-            0.107
++            -0.254,
++            0.019,
++            0.049
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1428,8 +1428,8 @@
+           ]
+         },
+         "n_folds_5": 24,
+-        "robustness_verdict": "ROBUST",
+-        "verdicts_5": "REGIME_STABLE"
++        "robustness_verdict": "NO_EDGE",
++        "verdicts_5": "REGIME_DEPENDENT"
+       },
+       "XOM": {
+         "edge_counts": {
+@@ -1439,16 +1439,16 @@
+         },
+         "lookback_medians": {
+           "10": [
+-            0.018,
+-            0.037
++            -0.021,
++            -0.032
+           ],
+           "3": [
+-            0.018,
+-            0.037
++            -0.023,
++            0.017
+           ],
+           "5": [
+-            0.018,
+-            0.037
++            -0.008,
++            0.001
+           ]
+         },
+         "lookback_null_medians": {
+@@ -1471,8 +1471,8 @@
+       }
+     },
+     "robustness_counts": {
+-      "NO_EDGE": 4,
+-      "ROBUST": 6,
++      "NO_EDGE": 10,
++      "ROBUST": 0,
+       "SENSITIVE": 0
+     },
+     "ticker_order": [
+diff --git a/state/check_artifacts/momentum_results.json b/state/check_artifacts/momentum_results.json
+index afe16b2..4bcd35e 100644
+--- a/state/check_artifacts/momentum_results.json
++++ b/state/check_artifacts/momentum_results.json
+@@ -23,11 +23,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "momentum": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.039,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          -0.05,
++          0.005,
++          0.046
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.019,
+@@ -36,7 +36,7 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       }
+     },
+     "JPM": {
+@@ -57,11 +57,11 @@
+         "verdict": "REGIME_DEPENDENT"
+       },
+       "momentum": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.031,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          -0.039,
++          0.028,
++          0.028
+         ],
+         "n_folds": 28,
+         "null_dispersion": 0.012,
+@@ -70,19 +70,19 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       }
+     }
+   },
+   "perturbation": {
+-    "baseline_median": -0.004,
++    "baseline_median": 0.013,
+     "compare_noise_default": true,
+     "compare_noise_fixed": true,
+     "effective_tolerance": 0.05,
+     "medians": [
+-      -0.004,
+-      -0.004,
+-      -0.004
++      0.018,
++      0.013,
++      0.006
+     ],
+     "n_folds": 52,
+     "noise_median": -0.001,
+@@ -113,12 +113,12 @@
+   "universe": {
+     "per_asset": {
+       "AAPL": {
+-        "candidate_dispersion": 0.014,
++        "candidate_dispersion": 0.045,
+         "medians": [
+-          0.071,
+-          0.054,
+-          0.092,
+-          0.069
++          0.085,
++          0.035,
++          -0.037,
++          0.054
+         ],
+         "null_dispersion": 0.028,
+         "null_medians": [
+@@ -136,11 +136,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "AMZN": {
+-        "candidate_dispersion": 0.005,
++        "candidate_dispersion": 0.039,
+         "medians": [
+-          0.065,
+-          0.076,
+-          0.077
++          -0.05,
++          0.005,
++          0.046
+         ],
+         "null_dispersion": 0.019,
+         "null_medians": [
+@@ -153,14 +153,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "GOOGL": {
+-        "candidate_dispersion": 0.015,
++        "candidate_dispersion": 0.031,
+         "medians": [
+-          0.069,
+-          0.071,
+-          0.101
++          0.045,
++          -0.011,
++          -0.027
+         ],
+         "null_dispersion": 0.039,
+         "null_medians": [
+@@ -173,13 +173,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "JNJ": {
+-        "candidate_dispersion": 0.002,
++        "candidate_dispersion": 0.014,
+         "medians": [
+-          0.05,
+-          0.046
++          -0.011,
++          0.016
+         ],
+         "null_dispersion": 0.019,
+         "null_medians": [
+@@ -193,11 +193,11 @@
+         "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "JPM": {
+-        "candidate_dispersion": 0.028,
++        "candidate_dispersion": 0.031,
+         "medians": [
+-          0.113,
+-          0.044,
+-          0.083
++          -0.039,
++          0.028,
++          0.028
+         ],
+         "null_dispersion": 0.012,
+         "null_medians": [
+@@ -210,14 +210,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_DEPENDENT"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "META": {
+-        "candidate_dispersion": 0.013,
++        "candidate_dispersion": 0.072,
+         "medians": [
+-          0.073,
+-          0.067,
+-          0.042
++          -0.129,
++          -0.041,
++          0.047
+         ],
+         "null_dispersion": 0.055,
+         "null_medians": [
+@@ -233,10 +233,10 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "MSFT": {
+-        "candidate_dispersion": 0.01,
++        "candidate_dispersion": 0.006,
+         "medians": [
+-          0.052,
+-          0.072
++          -0.041,
++          -0.03
+         ],
+         "null_dispersion": 0.008,
+         "null_medians": [
+@@ -247,14 +247,14 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "CONSISTENT_WITH_NOISE"
+       },
+       "NVDA": {
+-        "candidate_dispersion": 0.057,
++        "candidate_dispersion": 0.049,
+         "medians": [
+-          -0.038,
+-          0.013,
+-          0.1
++          -0.024,
++          0.092,
++          0.063
+         ],
+         "null_dispersion": 0.06,
+         "null_medians": [
+@@ -270,11 +270,11 @@
+         "verdict": "REGIME_STABLE"
+       },
+       "TSLA": {
+-        "candidate_dispersion": 0.05,
++        "candidate_dispersion": 0.136,
+         "medians": [
+-          0.132,
+-          0.016,
+-          0.107
++          -0.254,
++          0.019,
++          0.049
+         ],
+         "null_dispersion": 0.034,
+         "null_medians": [
+@@ -287,13 +287,13 @@
+           "calm",
+           "turbulent"
+         ],
+-        "verdict": "REGIME_STABLE"
++        "verdict": "REGIME_DEPENDENT"
+       },
+       "XOM": {
+-        "candidate_dispersion": 0.009,
++        "candidate_dispersion": 0.004,
+         "medians": [
+-          0.018,
+-          0.037
++          -0.008,
++          0.001
+         ],
+         "null_dispersion": 0.005,
+         "null_medians": [
+@@ -320,9 +320,9 @@
+       "XOM"
+     ],
+     "verdict_counts": {
+-      "CONSISTENT_WITH_NOISE": 2,
++      "CONSISTENT_WITH_NOISE": 6,
+       "REGIME_DEPENDENT": 1,
+-      "REGIME_STABLE": 7,
++      "REGIME_STABLE": 3,
+       "REGIME_STABLE_LOSS": 0
+     }
+   },
+diff --git a/state/worker_progress.md b/state/worker_progress.md
+index d6db99b..f015548 100644
+--- a/state/worker_progress.md
++++ b/state/worker_progress.md
+@@ -1,38 +1,9 @@
+ # Worker Progress
+ 
+-activation_id: 37414038601
+-phase: COMPLETE
+-status: COMPLETE
+-last_verified_milestone: breakout_20day_cont cell closed FALSIFIED with full independent verification; 161/161 regression tests pass; state artifacts and frontier records updated
+-
+-This file is a liveness contract. Updated after the final verified milestone.
+-
+-## Objective completed (task R-004 from state/campaign/task_queue.json)
+-
+-**Test:** Does a fixed 20-day breakout continuation signal (long when the close exceeds the highest close of the preceding 20 trading days; hold 1 day; daily rebalance) produce reproducible evidence beyond the currently qualified momentum family?
+-
+-**Verdict: FALSIFIED.** Gate stack completed end-to-end (manifest 10/10 OK, preflight PASSED, leakage PASS on AMZN/JPM + equity-fill audit, walk-forward regime-stability gate across all 10 collected tickers with a matched coin-flip null, bounded lookback sensitivity {5, 10, 20}, determinism r1==r2, independent verifier 3 gates all MATCH). Results: canonical 20-day lookback = 9/10 CONSISTENT_WITH_NOISE, 1/10 REGIME_STABLE (TSLA, small edge); sensitivity = ROBUST=1 (TSLA @5/@20), SENSITIVE=2 (AAPL @5, NVDA @10), NO_EDGE=7. The small positive verdicts are absent from the momentum-asset list (MSFT/GOOGL/AMZN/META show NO_EDGE) and are non-lookback-robust. The result matches the a-priori prediction: noise-like in most assets, small positive verdicts only among momentum assets — the breakout filter adds no robust evidence beyond momentum.
+-
+-## Deliverables
+-- `research/backtest/regime_stability.py::breakout_signals` (new signal function, exported)
+-- `research/checks/breakout_20day_cont.py` (check)
+-- `research/checks/verify_breakout_20day_cont.py` (independent verifier)
+-- `research/checks/smoke_breakout_signals.py` (scratch smoke test; retained as a useful diagnostic)
+-- `tests/test_regime_stability.py` (5 new unit tests)
+-- `state/check_artifacts/breakout_20day_cont_results.json` (artifact)
+-- `state/STATE.md`, `state/LEARNING_STATE.md`, `state/activation_status.json`, `state/worker_progress.md`, `logs/ACTIVATION-2026-10-06.md` (records)
+-
+-## Post-change verification
+-- `python3 research/checks/smoke_breakout_signals.py`: exits 0.
+-- `python3 research/checks/breakout_20day_cont.py`: exits 0; all gates complete; artifact written.
+-- `python3 research/checks/verify_breakout_20day_cont.py`: GATE 1 PASS (AMZN/JPM MATCH), GATE 2 PASS (all-asset MATCH + verdicts MATCH), GATE 3 PASS (determinism identical).
+-- `python3 -m unittest discover -s tests -v`: 161 tests, all passing (156 existing + 5 new), no regressions.
+-- Py_compile on all edited modules: OK.
+-
+-## Unresolved / caveats
+-- The three borderline REGIME_STABLE verdicts (AAPL @5, TSLA @5/@20, NVDA @10) sit just above the framework's 0.05 noise band; their threshold sensitivity is not independently quantified (flagged in STATE.md).
+-- No per-checkpoint UTC timestamps captured (the `date` shell form is denied); run identity anchored to GITHUB_RUN_ID=37414038601.
+-- No KILO_RECOVERY_BRANCH present; no outstanding recovery work.
+-
+-## Next
+-Task R-001: cost-sensitivity test of the qualified momentum edge (fixed cost model, lookback 3/5/10, matched null) through the full gate stack; report whether costs erase the edge.
++activation_id: 37429979631
++agent_number: 04
++task_id: R-002
++phase: AGENT_04_START
++status: RUNNING
++last_verified_milestone: controller-started fresh Kilo session
++next_bounded_action: execute the declared focused task

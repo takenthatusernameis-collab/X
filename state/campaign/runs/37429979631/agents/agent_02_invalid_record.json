@@ -1,0 +1,90 @@
+{
+  "action": "Wrote research/checks/momentum_cost_sensitivity.py: a-priori fixed cost grid (zero / realistic: commission $2/trade + $0.003/share, slippage 2c + 5bp, matching examples/ma_crossover_real_data.py / heavy: exactly 2x realistic) x lookbacks {3,5,10}, full 10-asset universe. Two measurements per cell: (1) the repository's walk-forward regime-stability gate with the matched coin-flip null, (2) a direct 1-day-hold daily-rebalance cost-drag measurement (each signal bar opens and closes with round-trip commission + slippage). Gate stack: manifest, real-data preflight, leakage review on AMZN/JPM for every cost config, determinism (r1==r2), regression suite. Wrote research/checks/verify_momentum_cost_sensitivity.py as the independent verifier (fresh walk_forward recomputation for all cells, framework noise_benchmark null regenerated, fresh independent Gate 2 cost-drag recomputation), ran both.",
+  "activation_record": {
+    "checkpoint_1": "2026-10-06T07:34Z baseline momentum check reran, confirming documented REGIME_STABLE=7 baseline (artifact check_artifacts/momentum_results.json)",
+    "checkpoint_2": "2026-10-06T07:36Z momentum_cost_sensitivity.py completed: preflight PASSED, leakage PASS all configs, gate 1 + gate 2 output, artifact written, determinism r1==r2",
+    "checkpoint_3": "2026-10-06T07:38Z independent verifier completed: all independent recomputations MATCH the check artifact",
+    "checkpoint_4": "2026-10-06T07:40Z regression suite reran: 165/165 PASS",
+    "finish_observed_utc": "2026-10-06T07:51Z",
+    "start_observed_utc": "2026-10-06T07:33Z",
+    "unverified_note": "per-checkpoint wall clocks are session-observed (message time 2026-10-06T07:33:37Z); no timestamps backfilled"
+  },
+  "agent_number": 2,
+  "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+  "campaign_slot": 2,
+  "candidate_tasks": [
+    {
+      "complexity": "LOW",
+      "deliverable": "A reproducible artifact classifying turnover sensitivity: net daily edge at 1-day close vs hold-for-signal-duration under zero/realistic costs, plus verdicts.",
+      "downstream_leverage": "If the edge recovers, a bounded turnover-cost scan (predeclared grid) becomes the next cost-robustness cell.",
+      "effort": "MEDIUM",
+      "evidence_basis": "R-001 found net edge negative at 1-day close because round-trip costs (~0.3174%/day) exceed the gross edge (~0.111%/day); holding for the full signal duration pays costs per signal instead of per bar.",
+      "execution_risk": "LOW",
+      "expected_information_gain": "Whether the cost erosion is a turnover artifact resolvable by longer holding; if the net edge recovers, the momentum evidence could be rescued on the same signal with a different execution rule.",
+      "falsification_power": "HIGH - directly tests the turnover mechanism that R-001 identified as the cause of cost drag.",
+      "scope": "same 10-asset collected universe; momentum_signals only; reduce turnover (hold for full signal duration vs close every bar); no leverage, no new lookbacks, no universe expansion.",
+      "status": "PENDING",
+      "tests_preceding_process": true,
+      "verifiability": "high",
+      "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, existing regression suite."
+    },
+    {
+      "complexity": "LOW",
+      "deliverable": "The cost multiplier at which the net median daily log return crosses zero, with the artifact documenting gross edge vs cost vs net at each step.",
+      "downstream_leverage": "Break-even multiplier bounds the cost-reduction target required for the momentum evidence to become decision-usable.",
+      "effort": "LOW",
+      "evidence_basis": "R-001 measured gross +0.00111/day and cost -0.00317/day at realistic (1x); net -0.00466/day at 2x heavy.",
+      "execution_risk": "LOW",
+      "expected_information_gain": "Quantifies how close the edge is to break-even and whether any realistic cost level preserves it (bounds how much venue/sizing cost reduction would be needed).",
+      "falsification_power": "MEDIUM",
+      "scope": "same 10-asset universe; momentum_signals; scaled-down cost grid (e.g. 0.1x, 0.25x, 0.5x realistic) to locate the break-even multiplier.",
+      "status": "PENDING",
+      "tests_preceding_process": true,
+      "verifiability": "high",
+      "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, existing regression suite."
+    }
+  ],
+  "changed": [
+    "research/checks/momentum_cost_sensitivity.py",
+    "research/checks/verify_momentum_cost_sensitivity.py",
+    "state/check_artifacts/momentum_cost_sensitivity_results.json",
+    "state/worker_progress.md",
+    "state/LEARNING_STATE.md",
+    "logs/ACTIVATION-2026-10-06.md"
+  ],
+  "complexity_added": "MODERATE: added a second cost measurement (Gate 2: true 1-day-hold daily-rebalance cost drag) because the existing walk-forward gate carries positions through the 84-day test window and does not reflect full daily-rebalance costs; plus a complete independent verifier covering both gates.",
+  "decision": "REJECT",
+  "failure_class": "NONE",
+  "global_agent_number": 2,
+  "methodology_notes": [
+    "The existing gate's per-fold medians are cost-insensitive by construction: walk-forward folds carry the position through the 84-bar test window, so only fills executed inside the test window pay costs; Gate 2 was added to measure the stated 1-day-hold daily-rebalance strategy's true cost drag.",
+    "Gate 1 null medians were reproduced exactly by the verifier using the framework's own noise_benchmark (same deterministic seed derivation), so the few verdict flips between cost configs (e.g. JPM lookback-5 REGIME_DEPENDENT->REGIME_STABLE under realistic/heavy) are pure null-dispersion effects, not candidate changes.",
+    "Cost values are on a $1M constant-dollar book at target_exposure 1.0; AAPL representative mean round-trip cost = $3,174/day (0.3174% of capital); costs scale with share price and position size."
+  ],
+  "next": "Bounded follow-up on the same 10-asset universe: test whether holding the position for the full duration of a single momentum signal (instead of closing at every bar) halves the daily cost frequency enough to restore a positive net edge - a predeclared alternative turnover parameter, not tuning of the winning parameter after seeing results.",
+  "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+  "observed_effect": "Verified negative result: at the repository's realistic cost model the 1-day-hold daily-rebalance momentum strategy pays ~$3,174/day round-trip cost (0.3174% of a $1M constant-dollar book) against a gross daily edge of only ~+0.00111 log (0.111%/day); net median daily log return is -0.001949 (~-0.195%/day, ~-49%/yr log) at lookback 5, and -0.0047 at the 2x heavy model. Identical across lookbacks 3/5/10 (gross edge is lookback-flat, costs are daily-sized). Gate 1 fold medians are byte-identical across costs because the fold structure carries positions through the 84-day test window; only the matched null's dispersion shifts, moving JPM lookback-5 from REGIME_DEPENDENT to REGIME_STABLE under realistic/heavy costs - a null-dispersion artifact, not an edge change.",
+  "process_decision": "RETAIN",
+  "question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+  "research_result": "VERIFIED_NEGATIVE_RESULT: short-horizon momentum (lookback 3/5/10) is not cost-robust under the repository's existing realistic cost model for the 1-day-hold daily-rebalance strategy; conservative round-trip transaction costs exceed the gross edge by ~3x and produce a negative net edge across all three lookbacks.",
+  "role": "HIGHER_ORDER_OBJECTIVE",
+  "task_id": "R-001",
+  "task_selection_observation": "IMPROVED",
+  "uncertainty_reduced": "The decision-relevant cost-robustness question is now answered with verified numbers: conservative round-trip costs (~0.32%/day) exceed the gross short-horizon momentum edge (~0.11%/day) by ~3x, so the edge is erased and reversed at realistic costs (net -0.195%/day median; ~-49%/yr log) and worse at 2x (net -0.47%/day). This downgrades the zero-cost REGIME_STABLE evidence from the momentum cell: the edge is not cost-robust for the 1-day-hold daily-rebalance strategy at lookbacks 3/5/10 on the collected real-data universe.",
+  "uncertainty_targeted": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+  "unverified": [],
+  "verified": [
+    "research/checks/momentum_cost_sensitivity.py exits 0: manifest 10/10 OK, preflight PASSED, leakage PASS for zero/realistic/heavy on AMZN/JPM, determinism r1==r2, artifact written",
+    "research/checks/verify_momentum_cost_sensitivity.py: all independent recomputations MATCH the artifact - Gate 1 candidate medians 18/18 per-asset cells + 30/30 universe lookback-5 cells MATCH, null medians MATCH, regenerated verdicts MATCH; Gate 2 (AMZN/JPM x 9 cells) median/net/cost fields MATCH; Gate 2 determinism identical",
+    "python3 -m unittest discover -s tests -v: 165/165 tests pass, 0 failures, no regressions"
+  ],
+  "verified_gates": {
+    "determinism": "r1==r2 on check; Gate 2 r1==r2 on verifier",
+    "gate1_walk_forward": "all candidate medians, null medians and regenerated verdicts MATCH (18 per-asset + 30 universe lookback-5 cells)",
+    "gate2_daily_rebalance": "AMZN/JPM x 9 cells MATCH on median/gross/cost/net",
+    "leakage": "PASS zero/realistic/heavy on AMZN/JPM",
+    "manifest": "10/10 OK",
+    "preflight": "PASSED",
+    "regression_suite": "165/165 PASS"
+  }
+}
