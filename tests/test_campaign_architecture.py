@@ -45,9 +45,9 @@ class CampaignArchitectureTests(unittest.TestCase):
 
     def test_odd_even_roles_are_explicit(self):
         for n in (1, 3, 5, 7, 9):
-            self.assertIn(f"Agent {n:02d} — Learning Process", self.workflow)
+            self.assertIn(f"Campaign Slot {n:02d} — Learning Process — Fresh Kilo session", self.workflow)
         for n in (2, 4, 6, 8, 10):
-            self.assertIn(f"Agent {n:02d} — Higher-Order Objective", self.workflow)
+            self.assertIn(f"Campaign Slot {n:02d} — Higher-Order Objective — Fresh Kilo session", self.workflow)
 
     def test_no_recursive_dispatch_or_retry_once_architecture(self):
         for value in (self.workflow, self.oneshot):
@@ -96,6 +96,9 @@ class CampaignArchitectureTests(unittest.TestCase):
                 self.assertEqual(saved["next_global_agent_number"], 21)
         finally:
             self.controller.GLOBAL_COUNTER_PATH = original
+
+    def test_global_identity_is_used_in_prompt_contract(self):
+        self.assertIn("Global Agent", self.controller.render_prompt.__doc__ or "")
 
     def test_role_mapping(self):
         for n in range(1, 11):
