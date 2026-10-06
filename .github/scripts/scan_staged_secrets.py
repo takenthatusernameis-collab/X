@@ -14,9 +14,15 @@ PATTERNS = (
     ("private_key", re.compile(r"BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY")),
     ("github_classic_token", re.compile(r"ghp_[A-Za-z0-9]{30,}")),
     ("github_fine_grained_token", re.compile(r"github_pat_[A-Za-z0-9_]{40,}")),
-    # Require a substantially longer token body than the benign
-    # "kilo_campaign_dummy_trigger" path that previously false-positive matched.
-    ("kilo_token", re.compile(r"kilo_[A-Za-z0-9_-]{32,}")),
+    # Kilo documents Gateway API keys as JWTs. Match them only when they
+    # appear in an authentication context instead of guessing a "kilo_" prefix.
+    (
+        "kilo_jwt_key",
+        re.compile(
+            r"(?i)(?:KILO_API_KEY|Authorization\\s*:\\s*Bearer)\\s*[:=]\\s*['\"]?"
+            r"(eyJ[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+)"
+        ),
+    ),
     ("openai_style_key", re.compile(r"sk-[A-Za-z0-9_-]{24,}")),
 )
 
