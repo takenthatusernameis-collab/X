@@ -31,11 +31,13 @@ class StagedSecretScanTests(unittest.TestCase):
         )
         self.assertEqual(self.scanner.scan_text(text), [])
 
-    def test_kilo_style_secret_is_detected(self):
+    def test_kilo_jwt_key_is_detected_only_in_auth_context(self):
+        token = "eyJ" + "a" * 18 + "." + "b" * 18 + "." + "c" * 18
         self.assertIn(
-            "kilo_token",
-            self.scanner.scan_text("TOKEN=kilo_" + "a" * 32),
+            "kilo_jwt_key",
+            self.scanner.scan_text(f"KILO_API_KEY={token}"),
         )
+
 
     def test_github_classic_token_is_detected(self):
         self.assertIn(
