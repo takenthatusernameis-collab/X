@@ -1030,7 +1030,11 @@ jobs:
             echo "::error::Credential-like paths are staged."
             exit 1
           fi
-          if git diff --cached --binary | grep -E -n 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|kilo_[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}'; then
+          if git diff --cached --name-only -z --diff-filter=AM |
+            while IFS= read -r -d "" path; do
+              git cat-file blob ":$path"
+            done |
+            grep -E -n 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY|ghp_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|kilo_[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{20,}'; then
             echo "::error::Potential credential material detected."
             exit 1
           fi
