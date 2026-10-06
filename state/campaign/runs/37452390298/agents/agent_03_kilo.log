@@ -1,0 +1,116 @@
+[0m
+> code · free-kilo
+[0m
+[0m✗ [0mfind /home/runner/work/X/X -maxdepth 3 -type d | head -50; echo "---"; ls -la /home/runner/work/X/X failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m✱ [0mGlob "**/*.md"[90m in . · 20 matches[0m
+[0m→ [0mRead state/STATE.md
+[0m→ [0mRead state/LEARNING_STATE.md
+The bash tool is restricted; I'll use read/glob tools instead. Let me inspect the key durable files.
+[0m→ [0mRead state/worker_progress.md
+[0m→ [0mRead logs/ACTIVATION-2026-10-03.md
+[0m✗ [0mecho skipped failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m✱ [0mGlob "**/*"[90m in state/campaign/runs/37452390298 · 33 matches[0m
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_03_contract.json
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_03_before.json
+[0m→ [0mRead state/campaign/runs/37452390298/task_queue_initial.json
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_01.json
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_02.json
+[0m→ [0mRead state/campaign/runs/37452390298/campaign_status.json
+Now let me examine the agent records and controller state to see how task selection actually worked.
+[0m→ [0mRead state/campaign/current_task.json
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_01_invalid_record.json
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_02_runtime.json
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_02_validation.json
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_03_kilo.log
+Let me inspect the controller to understand how the selection mechanism actually works.
+[0m→ [0mRead .github/scripts/run_campaign_agent.py
+[0m✱ [0mGrep "compared_against|qualitative_priority|selection_history|SELECTED"[90m in .github/scripts · 10 matches[0m
+[0m→ [0mRead .github/scripts/campaign_controller.py[90m [offset=280, limit=120][0m
+[0m✱ [0mGrep "def candidate_tasks_for_role"[90m in .github/scripts/campaign_controller.py · 1 match[0m
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_01_runtime.json
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_02_kilo.log
+The selection picks `candidates[0]` after sorting by ordinal qualitative fields — but let me verify the queue ordering, the agent-1 record validity, and the agent-2 failure context.
+[0m✱ [0mGrep "37260572520|receipt|queue|opportunistic"[90m in logs · 9 matches[0m
+I now have complete evidence. Let me verify one final structural detail before writing the record.
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_01.json
+I have all the evidence needed. Now I'll write the durable agent record and mark the worker progress checkpoint.
+[0m
+[0m← [0mWrite state/campaign/runs/37452390298/agents/agent_03.json
+Wrote file successfully.
+[0m
+[0m← [0mEdit state/worker_progress.md
+Index: /home/runner/work/X/X/state/worker_progress.md
+===================================================================
+--- /home/runner/work/X/X/state/worker_progress.md
++++ /home/runner/work/X/X/state/worker_progress.md
+@@ -2,8 +2,8 @@
+ 
+ activation_id: 37452390298
+ agent_number: 03
+ task_id: P-001
+-phase: AGENT_03_START
++phase: AGENT_03_END
+ status: RUNNING
+ last_verified_milestone: controller-started fresh Kilo session
+ next_bounded_action: execute the declared focused task
+
+[0m
+[0m← [0mEdit state/worker_progress.md
+Index: /home/runner/work/X/X/state/worker_progress.md
+===================================================================
+--- /home/runner/work/X/X/state/worker_progress.md
++++ /home/runner/work/X/X/state/worker_progress.md
+@@ -4,6 +4,6 @@
+ agent_number: 03
+ task_id: P-001
+ phase: AGENT_03_END
+ status: RUNNING
+-last_verified_milestone: controller-started fresh Kilo session
+-next_bounded_action: execute the declared focused task
++last_verified_milestone: process audit complete; agent_03.json written with RETAIN decision
++next_bounded_action: run R-001 (lookback-3/5/10 cost sensitivity) end-to-end plus its verifier until all gates MATCH
+
+[0m
+Now let me verify the record was written correctly and is well-formed.
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_03.json
+The record is written. Let me remove the duplicate `agent_number` key for cleanliness.
+[0m
+[0m← [0mEdit state/campaign/runs/37452390298/agents/agent_03.json
+Index: /home/runner/work/X/X/state/campaign/runs/37452390298/agents/agent_03.json
+===================================================================
+--- /home/runner/work/X/X/state/campaign/runs/37452390298/agents/agent_03.json
++++ /home/runner/work/X/X/state/campaign/runs/37452390298/agents/agent_03.json
+@@ -1,8 +1,7 @@
+ {
+   "agent_number": 3,
+   "action": "Inspected campaign_controller.py selection logic (task_rank, candidate_tasks_for_role), the initial queue and selection_history in task_queue_initial.json and campaign_status.json, the full frontier table and learning history in LEARNING_STATE.md, and run 37452390298 agent runtime/validations to compare the frontier-first selector against the documented opportunistic before-state.",
+-  "agent_number": 3,
+   "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+   "campaign_slot": 3,
+   "candidate_tasks": [
+     {
+
+[0m
+[0m→ [0mRead state/campaign/runs/37452390298/agents/agent_03.json[90m [limit=10][0m
+[0m→ [0mRead state/worker_progress.md
+[0m
+[0m← [0mEdit state/worker_progress.md
+Index: /home/runner/work/X/X/state/worker_progress.md
+===================================================================
+--- /home/runner/work/X/X/state/worker_progress.md
++++ /home/runner/work/X/X/state/worker_progress.md
+@@ -3,7 +3,7 @@
+ activation_id: 37452390298
+ agent_number: 03
+ task_id: P-001
+ phase: AGENT_03_END
+-status: RUNNING
++status: COMPLETE
+ last_verified_milestone: process audit complete; agent_03.json written with RETAIN decision
+ next_bounded_action: run R-001 (lookback-3/5/10 cost sensitivity) end-to-end plus its verifier until all gates MATCH
+
+[0m
+The audit is complete. Here is the durable process decision.
+

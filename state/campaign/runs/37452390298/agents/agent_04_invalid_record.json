@@ -1,0 +1,67 @@
+{
+  "a_priori_prediction": "Costs at or above the realistic level would materially erode or erase the momentum edge, especially at the shortest lookbacks, because constant-dollar daily rebalancing produces turnover comparable to the per-fold edge.",
+  "a_priori_prediction_outcome": "NOT SUPPORTED - the edge survives the full cost grid; verdict counts are stable at realistic and even rise at conservative/heavy (partly a null-dispersion artifact, documented).",
+  "action": "Ran a bounded cost-sensitivity grid on the 10-asset collected universe: momentum (long the previous N-day return, hold 1 day, daily rebalance) at lookbacks 3/5/10 under four predeclared cost levels (zero; realistic=10 bps proportional slippage, $0 comm; conservative=20 bps + $0.005/share; heavy=50 bps + $0.01/share + $0.05/trade), each run through the existing walk-forward regime-stability gate with a matched coin-flip null computed with the same cost config; computed exact dollar cost accounting from fills; wrote artifact; and ran an independent verifier (fresh walk-forward recomputation of candidate medians plus a freshly generated coin-flip null replicated from the framework's random_signals contract) comparing every cell to the artifact.",
+  "action_timestamp": "2026-10-06T11:08:07Z",
+  "agent_number": 4,
+  "artifact_path": "state/check_artifacts/momentum_cost_sensitivity_results.json",
+  "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+  "campaign_slot": 4,
+  "candidate_tasks": [
+    {
+      "objective": "Test longer-horizon momentum (lookback 20/60) generalization of the admitted short-horizon edge.",
+      "status": "pending",
+      "task_id": "R-002",
+      "verification_requirement": "Same gate stack: manifest preflight, leakage review, regime-stability gate, matched null, independent verifier, determinism."
+    },
+    {
+      "objective": "Continue the frontier after momentum (remaining deferred signal classes or extensions).",
+      "status": "pending",
+      "task_id": "R-004",
+      "verification_requirement": "Same gate stack."
+    },
+    {
+      "objective": "Further robustness work on momentum (e.g., hold-period sensitivity) if longer-horizon generalization passes.",
+      "status": "pending",
+      "task_id": "R-003",
+      "verification_requirement": "Same gate stack."
+    },
+    {
+      "objective": "Remaining lower-priority frontier item after momentum and hold-period work.",
+      "status": "pending",
+      "task_id": "R-005",
+      "verification_requirement": "Same gate stack."
+    }
+  ],
+  "changed": [
+    "research/checks/momentum_cost_sensitivity.py (new; bounded cost grid + cost accounting + artifact)",
+    "research/checks/verify_momentum_cost_sensitivity.py (new; independent recomputation verifier, Gate 1 + Gate 2)",
+    "state/check_artifacts/momentum_cost_sensitivity_results.json (new artifact)",
+    "state/verify_momentum_cost_sensitivity/verify_momentum_cost_sensitivity_log.json (new verifier log)"
+  ],
+  "complexity_added": "VERIFIED",
+  "decision": "RETAIN",
+  "failure_class": "NONE",
+  "global_agent_number": 4,
+  "next": "Run a longer-horizon momentum test (lookback 20/60 on the collected universe through the same walk-forward regime-stability gate and matched null) to test whether the short-horizon edge generalizes beyond the short-horizon window, before declaring momentum robust across horizons.",
+  "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+  "observed_effect": "Cost robustness classified: lookback 5 zero-cost REGIME_STABLE = 7/10; unchanged (7/10) at realistic 10 bps; 8/10 conservative; 9/10 heavy. Lookback 3: 6/10 -> 6/10 -> 8/10 -> 8/10. Lookback 10: 6/10 -> 6/10 -> 8/10 -> 9/10. Break-even cost level = None (no level where the REGIME_STABLE count drops below the zero-cost baseline). Full-sample cost accounting: realistic ~5.7% of capital (~$57k/$1M), conservative ~13.1%, heavy ~32.1%, driven by daily turnover from constant-dollar rebalancing. The a-priori prediction that costs would erode the edge was not supported; at realistic large-cap costs the REGIME_STABLE verdict count is identical to zero cost. Note: the increase at conservative/heavy is partly a null-dispersion artifact - the coin-flip null's tiny returns are swamped by slippage, inflating null dispersion and making REGIME_STABLE easier to achieve; the clean evidence is the realistic-cost row, which is unchanged from zero cost.",
+  "out_of_scope": "Do not tune signal rules after seeing cost results, expand the universe, or introduce leverage.",
+  "primary_question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+  "process_decision": "IMPROVE",
+  "question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+  "research_result": "The momentum edge survives conservative transaction-cost stress. Lookback 5: REGIME_STABLE in 7/10 collected assets at zero cost; 7/10 at realistic (10 bps); 8/10 at conservative; 9/10 at heavy; break-even cost level None. All 120 cells (3 lookbacks x 4 cost levels x 10 assets) independently recomputed and verified MATCH (medians, null medians, verdicts); determinism confirmed across reruns; 168-test suite green. The a-priori prediction that costs would materially erode or erase the edge was not supported - at realistic large-cap costs the verdicts are identical to zero cost. The improvement in REGIME_STABLE counts at conservative/heavy levels is partly driven by cost-inflated null dispersion (the matched coin-flip null's tiny returns are swamped by slippage), which makes the heavy-cost row a weaker evidence tier than the zero/realistic rows; the zero/realistic rows are the decision-relevant tier and they show no erosion.",
+  "role": "HIGHER_ORDER_OBJECTIVE",
+  "scope": "Use the existing 10-asset collected universe and existing momentum implementation/check framework.",
+  "task_id": "R-001",
+  "task_selection_observation": "IMPROVED",
+  "uncertainty_reduced": "Whether the admitted short-horizon momentum edge is cost-robust: answered with a verified classification. The REGIME_STABLE edge at lookback 5 (7/10 assets) is unchanged at realistic 10 bps costs (7/10), confirming cost robustness at the level a real large-cap trade would face; the zero-cost result is not an artifact of zero costs. Break-even cost level is None across the predeclared grid. The null-dispersion artifact at high cost levels was identified and documented as a caveat.",
+  "uncertainty_targeted": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+  "unverified": [],
+  "verified": [
+    "python3 research/checks/momentum_cost_sensitivity.py ran end-to-end: manifest 10/10 OK, data preflight PASSED, leakage gate PASSED (past-only signal integrity for lookbacks 3/5/10 on AMZN/JPM; equity-fill audit PASS), cost grid computed for 3 lookbacks x 4 cost levels, determinism r1==r2, artifact written.",
+    "python3 research/checks/verify_momentum_cost_sensitivity.py: Gate 1 PASS - all 120 recomputations (3 lookbacks x 4 cost levels x 10 assets) MATCH the artifact on medians, null medians, and regenerated verdicts; Gate 2 PASS - fresh recomputation identical across two full reruns; VERIFIED.",
+    "python3 -m unittest discover -s tests -v: 168 tests, all passing."
+  ],
+  "verifier_log_path": "state/verify_momentum_cost_sensitivity/verify_momentum_cost_sensitivity_log.json"
+}
