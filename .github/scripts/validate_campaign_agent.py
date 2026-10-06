@@ -23,6 +23,7 @@ PROTECTED_FILES = {
     "MANUAL_SETUP.md",
     "PERSISTENCE_POLICY.md",
     "tests/test_campaign_architecture.py",
+    "tests/test_staged_secret_scan.py",
 }
 DECISIONS = controller.DECISIONS
 PROCESS_DECISIONS = controller.PROCESS_DECISIONS
