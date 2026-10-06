@@ -78,7 +78,7 @@ def main() -> int:
     ap.add_argument("--agent-number", required=True, type=int)
     ap.add_argument("--model", required=True)
     ap.add_argument("--prompt-file", required=True)
-    ap.add_argument("--timeout-seconds", type=int, default=1680)
+    ap.add_argument("--timeout-seconds", type=int, default=1760)
     ap.add_argument("--stall-seconds", type=int, default=900)
     args = ap.parse_args()
 
