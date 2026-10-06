@@ -526,158 +526,179 @@ jobs:
           rc=$?
           echo "DEEP_AUDIT_RC=$rc"
           exit 0
-      - name: Run Kilo
+      - name: Run 10-agent campaign
         id: kilo
         if: steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success'
         continue-on-error: true
-        timeout-minutes: 340
+        timeout-minutes: 300
         env:
           KILO_DISABLE_EXTERNAL_SKILLS: "true"
+          CAMPAIGN_AGENT_COUNT: "10"
+          CAMPAIGN_AGENT_TIMEOUT_MINUTES: "28"
         run: |
           set +e
-          mkdir -p state
+          mkdir -p state/campaign
           cat > state/worker_progress.md <<EOF
           # Worker Progress
-          
+
           activation_id: $GITHUB_RUN_ID
-          phase: CONTROLLER_INITIALIZED
+          phase: CAMPAIGN_INITIALIZED
           status: OBSERVATION_ONLY
-          last_verified_milestone: none yet
-          next_bounded_action: begin the declared research objective
-          
+          last_verified_milestone: campaign initialized
+          next_bounded_action: run campaign agent 01 of 10
+
           This file is a liveness contract. Update it only after a real research-state transition or verified milestone.
           EOF
-          initial_checkpoint_mtime="$(stat -c %Y state/worker_progress.md)"
 
-          : > /tmp/kilo-primary.log
-          # Stream Kilo stdout/stderr into the live GitHub Actions log while also
-          # retaining a local copy for liveness checks and post-run diagnostics.
-          stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-primary.log) 2>&1 &
-          kilo_pid=$!
-
-          stall_seconds=1800
-          interval_seconds=300
-          stale_for=0
+          campaign_failed=0
+          campaign_successes=0
           semantic_progress_seen=0
-          liveness_status="RUNNING"
-          last_signal="controller-initialized"
 
-          while kill -0 "$kilo_pid" 2>/dev/null; do
-            sleep "$interval_seconds"
+          roles=(
+            "FORENSICS"
+            "HYPOTHESIS_EXPANSION"
+            "ADVERSARIAL_FALSIFICATION"
+            "METHODOLOGY_ENGINEERING"
+            "DECISIVE_EXPERIMENT"
+            "INDEPENDENT_REPRODUCTION"
+            "ROBUSTNESS_STRESS"
+            "RESEARCH_SOFTWARE_RELIABILITY"
+            "SYNTHESIS_LEARNING"
+            "FINAL_RED_TEAM_HANDOFF"
+          )
 
-            if ! kill -0 "$kilo_pid" 2>/dev/null; then
-              break
-            fi
+          echo "CAMPAIGN_AGENT_COUNT=10" >> "$GITHUB_ENV"
+          echo "CAMPAIGN_AGENT_TIMEOUT_MINUTES=28" >> "$GITHUB_ENV"
+          echo "CAMPAIGN_STARTED_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
 
-            now="$(date +%s)"
-            checkpoint_mtime="$initial_checkpoint_mtime"
-            if [ -f state/worker_progress.md ]; then
-              checkpoint_mtime="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo "$initial_checkpoint_mtime")"
-            fi
-            output_mtime="$(stat -c %Y /tmp/kilo-primary.log 2>/dev/null || echo "$now")"
+          for index in $(seq 1 10); do
+            role_index=$((index - 1))
+            role="${roles[role_index]}"
+            printf -v agent_id "%02d" "$index"
+            log_path="state/campaign/agent_${agent_id}.log"
+            record_path="state/campaign/agent_${agent_id}_controller.md"
 
-            checkpoint_age=$((now - checkpoint_mtime))
-            output_age=$((now - output_mtime))
+            echo
+            echo "============================================================"
+            echo "STARTING FRESH CAMPAIGN AGENT ${index}/10: ${role}"
+            echo "============================================================"
 
-            if [ "$checkpoint_mtime" -gt "$initial_checkpoint_mtime" ]; then
+            before_checkpoint="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo 0)"
+            before_head="$(git rev-parse --short=12 HEAD)"
+            before_status="$(git status --short)"
+            printf '%s
+' "$before_status" > "state/campaign/agent_${agent_id}_before_status.txt"
+
+            cat > "/tmp/kilo-agent-${agent_id}.prompt" <<EOF
+          CAMPAIGN_AGENT_NUMBER=${agent_id}
+          CAMPAIGN_AGENT_COUNT=10
+          CAMPAIGN_AGENT_ROLE=${role}
+
+          You are one fresh member of a sequential 10-agent research campaign.
+          This is a new context. Other campaign agents may already have changed the shared
+          worktree. Their claims are not automatically trustworthy.
+
+          Use the campaign role as a lens, not as a requirement to produce edits.
+          Inspect current durable evidence first. Continue, falsify, replace, or reject
+          prior work according to the evidence.
+
+          Do not launch another Kilo session, workflow, recursive agent, or hidden
+          sub-campaign. Do not commit or push. Do not modify trusted control-plane files.
+
+          The campaign's governing prompt follows:
+          $(cat .kilo/wakeup-prompt.md)
+          EOF
+
+            : > "$log_path"
+            stdbuf -oL -eL timeout --foreground --signal=TERM 28m               kilo run --model openai-compatible/free-kilo --auto "$(cat "/tmp/kilo-agent-${agent_id}.prompt")"               > >(tee "$log_path") 2>&1
+            status=$?
+
+            after_checkpoint="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo 0)"
+            after_head="$(git rev-parse --short=12 HEAD)"
+            after_status="$(git status --short)"
+            diff_names="$(git diff --name-status)"
+
+            if [ "$after_checkpoint" -gt "$before_checkpoint" ]; then
               semantic_progress_seen=1
-              stale_for=0
-              last_signal="SEMANTIC_CHECKPOINT"
-            elif [ "$output_age" -le "$interval_seconds" ]; then
-              stale_for=0
-              last_signal="PROCESS_ACTIVITY_ONLY"
+            fi
+
+            if [ "$status" -eq 0 ]; then
+              campaign_successes=$((campaign_successes + 1))
+              agent_status="SUCCESS"
+            elif [ "$status" -eq 124 ]; then
+              campaign_failed=1
+              agent_status="TIMEOUT"
             else
-              stale_for=$((stale_for + interval_seconds))
-              last_signal="NO_RECENT_PROGRESS_SIGNAL"
+              campaign_failed=1
+              agent_status="FAILED"
             fi
 
             {
-              echo "### Kilo liveness heartbeat"
+              echo "# Campaign Agent ${agent_id}"
+              echo
+              echo "- role: ${role}"
+              echo "- status: ${agent_status}"
+              echo "- exit_code: ${status}"
+              echo "- before_head: ${before_head}"
+              echo "- after_head: ${after_head}"
               echo "- observed_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-              echo "- process: PID $kilo_pid alive"
-              echo "- semantic_checkpoint_age_seconds: $checkpoint_age"
-              echo "- worker_output_age_seconds: $output_age"
-              echo "- last_signal: $last_signal"
-              echo "- stale_for_seconds: $stale_for"
-              echo "- semantic_progress_seen: $semantic_progress_seen"
-            } >> "$GITHUB_STEP_SUMMARY"
+              echo
+              echo "STATUS_START"
+              printf '%s
+' "$after_status"
+              echo "STATUS_END"
+              echo
+              echo "DIFF_NAMES_START"
+              printf '%s
+' "$diff_names"
+              echo "DIFF_NAMES_END"
+              echo
+              echo "This record reports controller-observed execution only; it does not certify research claims."
+            } > "$record_path"
 
-            echo "::notice::Kilo liveness: signal=$last_signal checkpoint_age=$checkpoint_age s output_age=$output_age s stale_for=$stale_for s"
+            printf '%s
+' "$after_status" > "state/campaign/agent_${agent_id}_after_status.txt"
 
-            if [ "$stale_for" -ge "$stall_seconds" ]; then
-              echo "::error::Kilo worker appears stalled: no semantic checkpoint or fresh worker output for $stale_for s."
-              liveness_status="STALLED"
-              echo "KILO_LIVENESS_STATUS=STALLED" >> "$GITHUB_ENV"
-              echo "KILO_LIVENESS_REASON=no semantic checkpoint or fresh worker output for $stale_for s" >> "$GITHUB_ENV"
-              kill -TERM "$kilo_pid" 2>/dev/null || true
-              sleep 10
-              kill -KILL "$kilo_pid" 2>/dev/null || true
-              break
-            fi
+            echo "CAMPAIGN_AGENT_${agent_id}_STATUS=${agent_status}" >> "$GITHUB_ENV"
+            echo "CAMPAIGN_SUCCESS_COUNT=${campaign_successes}" >> "$GITHUB_ENV"
+            echo "CAMPAIGN_FAILURE_COUNT=$((index - campaign_successes))" >> "$GITHUB_ENV"
+            echo "::notice::Campaign agent ${index}/10 finished: ${agent_status}; successes=${campaign_successes}; failures=$((index - campaign_successes))"
+
+            echo "## Campaign agent ${index}/10 — ${role}: ${agent_status}" >> "$GITHUB_STEP_SUMMARY"
           done
 
-          wait "$kilo_pid"
-          status=$?
-
-          if [ "$liveness_status" != "STALLED" ]; then
-            if [ "$semantic_progress_seen" -eq 1 ]; then
-              echo "KILO_LIVENESS_STATUS=COMPLETED_WITH_SEMANTIC_CHECKPOINTS" >> "$GITHUB_ENV"
-              echo "KILO_LIVENESS_REASON=worker terminated after emitting at least one post-start semantic checkpoint" >> "$GITHUB_ENV"
-            else
-              echo "KILO_LIVENESS_STATUS=COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT" >> "$GITHUB_ENV"
-              echo "KILO_LIVENESS_REASON=worker terminated without a post-start semantic checkpoint" >> "$GITHUB_ENV"
-            fi
+          campaign_status="PARTIAL"
+          if [ "$campaign_failed" -eq 0 ]; then
+            campaign_status="COMPLETE"
           fi
 
-          echo "Kilo primary session exited with status $status; live output was streamed above."
-          if [ "$status" -eq 0 ]; then
+          echo "CAMPAIGN_SUCCESS_COUNT=$campaign_successes" >> "$GITHUB_ENV"
+          echo "CAMPAIGN_FAILURE_COUNT=$((10 - campaign_successes))" >> "$GITHUB_ENV"
+          echo "CAMPAIGN_STATUS=$campaign_status" >> "$GITHUB_ENV"
+          echo "CAMPAIGN_FINISHED_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
+
+          {
+            echo "{"
+            echo "  \"status\": \"$campaign_status\","
+            echo "  \"agent_count\": 10,"
+            echo "  \"success_count\": $campaign_successes,"
+            echo "  \"failure_count\": $((10 - campaign_successes)),"
+            echo "  \"finished_utc\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\""
+            echo "}"
+          } > state/campaign/campaign_status.json
+
+          if [ "$semantic_progress_seen" -eq 1 ]; then
+            echo "KILO_LIVENESS_STATUS=COMPLETED_WITH_SEMANTIC_CHECKPOINTS" >> "$GITHUB_ENV"
+            echo "KILO_LIVENESS_REASON=10 fresh campaign sessions executed; at least one post-start semantic checkpoint changed" >> "$GITHUB_ENV"
+          else
+            echo "KILO_LIVENESS_STATUS=COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT" >> "$GITHUB_ENV"
+            echo "KILO_LIVENESS_REASON=10 fresh campaign sessions executed without an observed post-start semantic checkpoint change" >> "$GITHUB_ENV"
+          fi
+
+          if [ "$campaign_failed" -eq 0 ]; then
             exit 0
           fi
-
-          if grep -Eq 'invalid request error trace_id:' /tmp/kilo-primary.log; then
-            echo "::warning::Kilo gateway returned a transient invalid-request trace; retrying once with a fresh Kilo session."
-            sleep 5
-            : > /tmp/kilo-retry.log
-            # Stream retry output live as well.
-            stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat .kilo/wakeup-prompt.md)" > >(tee /tmp/kilo-retry.log) 2>&1 &
-            retry_pid=$!
-            retry_stale=0
-
-            while kill -0 "$retry_pid" 2>/dev/null; do
-              sleep "$interval_seconds"
-              if ! kill -0 "$retry_pid" 2>/dev/null; then
-                break
-              fi
-              now="$(date +%s)"
-              retry_output_mtime="$(stat -c %Y /tmp/kilo-retry.log 2>/dev/null || echo "$now")"
-              retry_output_age=$((now - retry_output_mtime))
-              retry_checkpoint_mtime="$(stat -c %Y state/worker_progress.md 2>/dev/null || echo "$initial_checkpoint_mtime")"
-              retry_checkpoint_age=$((now - retry_checkpoint_mtime))
-              if [ "$retry_checkpoint_mtime" -gt "$initial_checkpoint_mtime" ] || [ "$retry_output_age" -le "$interval_seconds" ]; then
-                retry_stale=0
-              else
-                retry_stale=$((retry_stale + interval_seconds))
-              fi
-              echo "::notice::Kilo retry liveness: checkpoint_age=$retry_checkpoint_age s output_age=$retry_output_age s stale_for=$retry_stale s"
-              if [ "$retry_stale" -ge "$stall_seconds" ]; then
-                echo "::error::Fresh Kilo retry also appears stalled; stopping it after $retry_stale s without progress signal."
-                kill -TERM "$retry_pid" 2>/dev/null || true
-                sleep 10
-                kill -KILL "$retry_pid" 2>/dev/null || true
-                liveness_status="STALLED"
-                echo "KILO_LIVENESS_STATUS=STALLED" >> "$GITHUB_ENV"
-                echo "KILO_LIVENESS_REASON=fresh retry produced no semantic checkpoint or worker output for $retry_stale s" >> "$GITHUB_ENV"
-                break
-              fi
-            done
-
-            wait "$retry_pid"
-            retry_status=$?
-            echo "Kilo retry session exited with status $retry_status; live retry output was streamed above."
-            exit "$retry_status"
-          fi
-
-          exit "$status"
+          exit 1
 
       - name: Deep audit — after Run Kilo
         id: deep_audit_12_run_kilo
