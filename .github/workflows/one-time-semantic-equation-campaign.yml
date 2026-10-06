@@ -20,6 +20,79 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install Kilo Code CLI
+        run: npm install -g @kilocode/cli
+
+      - name: Discover and configure free Kilo model
+        env:
+          KILO_DISABLE_EXTERNAL_SKILLS: "true"
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from urllib.request import Request, urlopen
+
+          request = Request("https://api.kilo.ai/api/gateway/models", headers={"Accept": "application/json"})
+          with urlopen(request, timeout=20) as response:
+              payload = json.load(response)
+
+          free = [
+              m for m in payload.get("data", [])
+              if isinstance(m.get("id"), str) and m["id"].endswith(":free")
+          ]
+
+          def tool_capable(model):
+              values = model.get("supported_parameters") or []
+              return bool(
+                  model.get("tool_calling")
+                  or model.get("tool_call")
+                  or any(str(v).lower() in {"tools", "tool_choice"} for v in values)
+              )
+
+          candidates = [m for m in free if tool_capable(m)]
+          candidates.sort(key=lambda m: m.get("id", ""))
+          if not candidates:
+              raise SystemExit("No tool-capable free Kilo model available")
+
+          selected = candidates[0]
+          model_id = selected["id"]
+          model_name = selected.get("name") or model_id
+
+          config = {
+              "$schema": "https://app.kilo.ai/config.json",
+              "enabled_providers": ["openai-compatible"],
+              "model": "openai-compatible/free-kilo",
+              "small_model": "openai-compatible/free-kilo",
+              "subagent_model": "openai-compatible/free-kilo",
+              "provider": {
+                  "openai-compatible": {
+                      "options": {"baseURL": "https://api.kilo.ai/api/gateway"},
+                      "models": {"free-kilo": {"id": model_id, "name": model_name, "tool_call": True}},
+                  }
+              },
+              "sandbox": {
+                  "enabled": False,
+                  "network": "allow",
+                  "allowed_hosts": [
+                      "github.com:443", "api.github.com:443", "raw.githubusercontent.com:443",
+                      "api.kilo.ai:443", "pypi.org:443", "files.pythonhosted.org:443",
+                      "registry.npmjs.org:443"
+                  ],
+              },
+          }
+
+          path = Path(os.environ["HOME"]) / ".config" / "kilo" / "kilo.json"
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(config, indent=2) + "\n", encoding="utf-8")
+          os.chmod(path, 0o600)
+          print("Configured free Kilo model: " + model_id)
+          PY
+
+      - name: Verify Kilo installation
+        run: kilo --version
+
       - name: Verify runner prerequisites
         run: |
           set -euo pipefail
