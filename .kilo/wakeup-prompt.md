@@ -320,6 +320,8 @@ Campaign execution success means all ten sessions exited successfully. Scientifi
 
 Do not optimize for ten edits or ten positive outcomes. Optimize for **maximum trustworthy uncertainty reduction across ten fresh perspectives**.
 
+Entry-point invariant: the scheduled wake workflow and the push-triggered one-shot workflow use the same 10-agent campaign contract. There is no controller entry point that should silently fall back to a single-agent deep session.
+
 # 4. Failure classification before recovery
 
 Classify failures before retrying.
