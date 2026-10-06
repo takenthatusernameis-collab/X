@@ -284,6 +284,42 @@ The controller may preserve a failed worker state on a recovery branch. Treat th
 
 When KILO_RECOVERY_BRANCH is present, first compare that branch with the current main revision, inspect the controller recovery record and the exact changed files, and identify the smallest safe recovery action. Do not silently ignore an outstanding recovery branch merely because a new research idea is available.
 
+# 3B. Ten-agent campaign mode
+
+When the controller invokes you as one member of a multi-agent campaign, treat the activation as a sequence of **10 fresh Kilo sessions**, not one long session and not ten retries.
+
+The controller supplies the current CAMPAIGN_AGENT number and role. Use that role as a perspective, not as permission to force an outcome.
+
+Campaign-wide rules:
+
+1. Each agent inherits only repository state and durable evidence. Do not assume previous agent reasoning is correct.
+2. Inspect state/LEARNING_STATE.md, state/activation_status.json, recent campaign records, current diffs, and any surfaced recovery branch before acting.
+3. Preserve verified work. Do not rewrite working systems merely to leave a visible contribution.
+4. Choose one bounded contribution with high expected information gain.
+5. Prefer a small reference path before expensive experiments or broad refactors.
+6. A fresh agent may confirm, falsify, replace, or reject the preceding hypothesis.
+7. Never launch another Kilo session, GitHub workflow, recursive agent, or hidden sub-campaign.
+8. Never commit or push; controller-owned persistence remains authoritative.
+9. Do not modify trusted control-plane files.
+10. End with CHANGED / VERIFIED / UNVERIFIED / NEXT in durable state, using only observed facts.
+
+The 10 campaign perspectives are:
+
+- AGENT 01 — FORENSICS: reconstruct the frontier, recover unresolved evidence, and identify the highest-value bottleneck.
+- AGENT 02 — HYPOTHESIS_EXPANSION: generate materially different hypotheses and select the most falsifiable high-information direction.
+- AGENT 03 — ADVERSARIAL_FALSIFICATION: attack the strongest current claim for leakage, bias, accounting, benchmark, regime, universe, and implementation failures.
+- AGENT 04 — METHODOLOGY_ENGINEERING: improve the smallest methodological bottleneck using existing tested primitives and reference cases.
+- AGENT 05 — DECISIVE_EXPERIMENT: run the smallest experiment that can materially change the research decision.
+- AGENT 06 — INDEPENDENT_REPRODUCTION: reconstruct the most consequential result using a materially independent verification path when practical.
+- AGENT 07 — ROBUSTNESS_STRESS: stress the leading result across realistic costs, perturbations, periods, assets, regimes, and benchmarks.
+- AGENT 08 — RESEARCH_SOFTWARE_RELIABILITY: inspect the code path behind the strongest evidence and repair root causes with post-fix verification.
+- AGENT 09 — SYNTHESIS_LEARNING: synthesize what was learned and choose RETAIN / REVERT / REPLACE / UNVERIFIED for the research-process strategy.
+- AGENT 10 — FINAL_RED_TEAM_HANDOFF: adversarially review the complete campaign state and prepare an honest, reproducible handoff for the independent controller verifier.
+
+Campaign execution success means all ten sessions exited successfully. Scientific acceptance is separate and still requires independent controller verification.
+
+Do not optimize for ten edits or ten positive outcomes. Optimize for **maximum trustworthy uncertainty reduction across ten fresh perspectives**.
+
 # 4. Failure classification before recovery
 
 Classify failures before retrying.
