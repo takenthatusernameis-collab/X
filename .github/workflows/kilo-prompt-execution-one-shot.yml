@@ -410,7 +410,8 @@ jobs:
             --worker failure \
             --verify success \
             --liveness COMPLETED_WITH_SEMANTIC_CHECKPOINTS \
-            --persistence MAIN 2>&1)"
+            --persistence MAIN \
+            --process VERIFIED_PROGRESS 2>&1)"
           failure_rc=$?
           set -e
           printf '%s\n' "$failure_output"
@@ -584,8 +585,7 @@ jobs:
             fi
 
             if [ "$status" -eq 0 ]; then
-              campaign_successes=$((campaign_successes + 1))
-              agent_status="SUCCESS"
+              agent_status="WORKER_SUCCESS"
             elif [ "$status" -eq 124 ]; then
               campaign_failed=1
               agent_status="TIMEOUT"
@@ -594,27 +594,49 @@ jobs:
               agent_status="FAILED"
             fi
 
+            validation_rc=0
+            set +e
+            python3 .github/scripts/validate_campaign_agent.py --agent-id "$agent_id" --exit-code "$status"
+            validation_rc=$?
+            set -e
+
+            if [ "$validation_rc" -eq 0 ] && [ "$status" -eq 0 ]; then
+              campaign_successes=$((campaign_successes + 1))
+              agent_status="SUCCESS"
+            elif [ "$status" -eq 0 ] && [ "$validation_rc" -ne 0 ]; then
+              campaign_failed=1
+              agent_status="FAILED_VALIDATION"
+            fi
+
             {
               echo "# Campaign Agent ${agent_id}"
               echo
               echo "- role: ${role}"
               echo "- status: ${agent_status}"
-              echo "- exit_code: ${status}"
+              echo "- worker_exit_code: ${status}"
+              echo "- controller_validation_rc: ${validation_rc}"
               echo "- before_head: ${before_head}"
               echo "- after_head: ${after_head}"
               echo "- observed_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
               echo
               echo "STATUS_START"
-              printf '%s\n' "$after_status"
+              printf "%s\n" "$after_status"
               echo "STATUS_END"
               echo
               echo "DIFF_NAMES_START"
-              printf '%s\n' "$diff_names"
+              printf "%s\n" "$diff_names"
               echo "DIFF_NAMES_END"
               echo
-              echo "This record reports controller-observed execution only; it does not certify research claims."
+              echo "VALIDATION_REPORT"
+              if [ -f "state/campaign/agent_${agent_id}_validation.json" ]; then
+                cat "state/campaign/agent_${agent_id}_validation.json"
+              else
+                echo "missing"
+              fi
+              echo "END_VALIDATION_REPORT"
+              echo
+              echo "This record reports controller-observed execution and validation only; it does not certify research claims."
             } > "$record_path"
-
             printf '%s\n' "$after_status" > "state/campaign/agent_${agent_id}_after_status.txt"
 
             protected_tamper=0
@@ -683,7 +705,7 @@ jobs:
           exit 0
       - name: Independent post-worker verification
         id: independent_verify
-        if: always() && steps.kilo.outcome == 'success'
+        if: always() && steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success' && steps.kilo.outcome != 'skipped'
         continue-on-error: true
         timeout-minutes: 15
         run: |
@@ -724,6 +746,36 @@ jobs:
           rc=$?
           echo "DEEP_AUDIT_RC=$rc"
           exit 0
+      - name: Independent research-process evaluation
+        id: process_evaluation
+        if: always() && steps.preflight.outcome == "success" && steps.kilo_smoke.outcome == "success" && steps.kilo.outcome != "skipped"
+        continue-on-error: true
+        env:
+          VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
+          WORKER_OUTCOME: ${{ steps.kilo.outcome }}
+          LIVENESS_STATUS: ${{ env.KILO_LIVENESS_STATUS }}
+        run: |
+          set +e
+          python3 .github/scripts/evaluate_research_process.py \
+            --verify-outcome "$VERIFY_OUTCOME" \
+            --worker-outcome "$WORKER_OUTCOME" \
+            --liveness "$LIVENESS_STATUS"
+          rc=$?
+          echo "PROCESS_EVALUATION_RC=$rc"
+          exit 0
+
+      - name: Deep audit — after Independent research-process evaluation
+        id: deep_audit_process_evaluation
+        if: always()
+        continue-on-error: true
+        env:
+          AUDIT_PREV_OUTCOME: ${{ steps.process_evaluation.outcome }}
+        run: |
+          set +e
+          python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Independent research-process evaluation"
+          rc=$?
+          echo "DEEP_AUDIT_RC=$rc"
+          exit 0
       - name: Verify and persist safe repository changes
         id: persist
         if: always()
@@ -731,9 +783,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
+          VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
+          PROCESS_OUTCOME: ${{ env.RESEARCH_PROCESS_OUTCOME }}
         run: |
           set -euo pipefail
           echo "PERSISTENCE_STATUS=FAILED" >> "$GITHUB_ENV"
+          recovery_required=0
+          if [ "$KILO_OUTCOME" != "success" ] || [ "$VERIFY_OUTCOME" != "success" ]; then
+            recovery_required=1
+            echo "::warning::One-shot main integration prohibited because worker outcome=$KILO_OUTCOME and independent verification=$VERIFY_OUTCOME."
+          fi
 
           git restore --worktree --staged -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
           git reset -- .github/workflows .kilo AGENTS.md ENTERPRISE.md MANUAL_SETUP.md PERSISTENCE_POLICY.md 2>/dev/null || true
@@ -767,6 +826,9 @@ jobs:
           git diff --check
           test -f state/activation_status.json
           python3 .github/scripts/stamp_activation_receipt.py --validate-only
+          if [ -f state/campaign/process_evaluation.json ]; then
+            python3 -m json.tool state/campaign/process_evaluation.json >/dev/null
+          fi
 
           if git diff --cached --quiet; then
             echo "No safe repository changes to persist."
@@ -777,6 +839,20 @@ jobs:
           git config user.name "kilo-research-enterprise"
           git config user.email "kilo-research-enterprise@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+
+          if [ "$recovery_required" -eq 1 ]; then
+            git commit -m "Kilo activation: preserve recovery state"
+            local_commit="$(git rev-parse HEAD)"
+            recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+            if git push origin "$local_commit:refs/heads/$recovery_branch"; then
+              echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
+              echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
+              exit 0
+            fi
+            echo "::error::Recovery branch persistence failed; unverified worker state was not integrated."
+            exit 1
+          fi
+
           git commit -m "Kilo activation: update research state"
           local_commit="$(git rev-parse HEAD)"
           git fetch origin "$GITHUB_REF_NAME"
@@ -789,7 +865,7 @@ jobs:
           fi
 
           git rebase --abort >/dev/null 2>&1 || true
-          recovery_branch="recovery/kilo-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
           git push origin "${local_commit}:refs/heads/${recovery_branch}"
           echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
           echo "PERSISTENCE_RECOVERY_BRANCH=${recovery_branch}" >> "$GITHUB_ENV"
@@ -814,6 +890,7 @@ jobs:
           KILO_SMOKE_OUTCOME: ${{ steps.kilo_smoke.outcome }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
           VERIFY_OUTCOME: ${{ steps.independent_verify.outcome }}
+          PROCESS_OUTCOME: ${{ env.RESEARCH_PROCESS_OUTCOME }}
         run: |
           echo "::group::REPORT KILO OUTCOME DEBUG — run metadata"
           printf 'GITHUB_RUN_ID=%s\n' "${GITHUB_RUN_ID:-unknown}"
@@ -846,7 +923,8 @@ jobs:
             --worker "${KILO_OUTCOME:-}" \
             --verify "${VERIFY_OUTCOME:-}" \
             --liveness "${KILO_LIVENESS_STATUS:-}" \
-            --persistence "${PERSISTENCE_STATUS:-}" 2>&1)"
+            --persistence "${PERSISTENCE_STATUS:-}" \
+            --process "${PROCESS_OUTCOME:-UNVERIFIED}" 2>&1)"
           CLASSIFIER_RC=$?
           set -e
           printf '%s\n' "$CLASSIFIER_OUTPUT"
@@ -894,7 +972,8 @@ jobs:
             --worker "${KILO_OUTCOME:-unknown}" \
             --verify "${VERIFY_OUTCOME:-skipped}" \
             --liveness "${KILO_LIVENESS_STATUS:-unknown}" \
-            --persistence "${PERSISTENCE_STATUS:-FAILED}"
+            --persistence "${PERSISTENCE_STATUS:-FAILED}" \
+            --process "${PROCESS_OUTCOME:-UNVERIFIED}"
 
       - name: Deep audit — after Report Kilo outcome
         id: deep_audit_14_report_kilo_outcome
