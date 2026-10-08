@@ -913,6 +913,39 @@ def momentum_signals(
     return out
 
 
+def momentum_signals_fixed_hold(
+    closes: NDArray,
+    lookback: int = 5,
+    holding_period: int = 1,
+) -> List[Signal]:
+    """Past-only short-horizon momentum signal with configurable holding period.
+
+    Long the previous ``lookback``-day return and hold for ``holding_period`` days:
+    if the last ``lookback`` days were up, go long; if they were down, go short.
+    Neutral before the ``lookback`` window. Daily rebalancing (a fresh
+    signal at every bar) — the standard momentum implementation with
+    configurable holding period.
+
+    This extends momentum_signals to allow testing temporal robustness
+    across different holding periods while keeping lookback fixed.
+
+    No look-ahead: each signal uses only closes up to and including its own
+    bar.
+    """
+    n = len(closes)
+    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    lookback = int(lookback)
+    holding_period = int(holding_period)
+    for i in range(lookback, n):
+        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+        weight = 1.0 if ret > 0 else -1.0
+        # Signal weight persists for holding_period days starting from day i
+        for j in range(holding_period):
+            if i + j < n:
+                out[i + j] = Signal(date=i + j + 1, weight=weight)
+    return out
+
+
 def breakout_signals(
     closes: NDArray,
     lookback: int = 20,
