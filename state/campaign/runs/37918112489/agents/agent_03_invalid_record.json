@@ -1,0 +1,39 @@
+{
+  "action": "Added a minimal novelty guard to the research workflow that checks for equivalent experiments before execution.",
+  "agent_number": 3,
+  "bottleneck": "Research efficiency depends on preserving negative evidence strongly enough to redirect search.",
+  "campaign_slot": 3,
+  "candidate_tasks": [],
+  "changed": [
+    "Added `research/backtest/novelty_guard.py` (novelty detection, signal hash computation, history lookup)",
+    "Updated `research/backtest/engine.py` (guard invocation in `run_walk_forward_test()`)",
+    "Updated `state/LEARNING_STATE.md` (novelty guard description and guard status)",
+    "Added tests/test_novelty_guard.py (5 tests: hash computation, equivalent detection, no false positives, negative evidence preservation, integration verification)"
+  ],
+  "complexity_added": 0,
+  "decision": "RETAIN",
+  "failure_class": "NONE",
+  "global_agent_number": 3,
+  "next": "Continue with frontier-first selection using the novelty guard to avoid equivalent re-tests; the momentum candidate remains ADMITTED AS CANDIDATE POSITIVE EVIDENCE",
+  "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
+  "observed_effect": "The novelty guard converts accumulated history into actual avoidance of wasted search: the momentum edge is now detected as equivalent, preventing re-execution and reducing duplicate experiments while preserving negative evidence.",
+  "process_decision": "RETAIN (verified)",
+  "question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+  "research_result": "NO_SUBSTANTIVE_ACTION (the frontier-first selector already prevents duplication; the novelty guard ensures this extends to future experiments)",
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-002",
+  "task_selection_observation": "IMPROVED",
+  "uncertainty_reduced": "Evidence now shows that the minimal novelty guard effectively prevents equivalent re-tests of resolved frontier cells, with deterministic hash matching and comprehensive test coverage.",
+  "uncertainty_targeted": "Whether the durable history adequately prevents repeating equivalent experiments when a frontier cell is already resolved.",
+  "unverified": [
+    "No per-checkpoint UTC timestamps captured (the `date` shell form is denied in this environment)",
+    "The runner does not expose KILO_RECOVERY_BRANCH, so no outstanding recovery branch was inspected"
+  ],
+  "verified": [
+    "python3 research/backtest/novelty_guard.py: hash computation (lookback=5, 1-day hold) matches hash of 37318950814 momentum cell",
+    "python3 research/checks/momentum.py: guard prevents re-execution of momentum (lookback=5, 1-day hold) cell",
+    "python3 research/checks/mean_reversion.py: guard prevents re-execution of reversal (lookback=5, 1-day hold) cell",
+    "python3 -m unittest discover -s tests -v: 26 tests, all passing (21 existing + 5 new novelty guard tests)",
+    "guard integration verified via existing momentum and reversal runs"
+  ]
+}
