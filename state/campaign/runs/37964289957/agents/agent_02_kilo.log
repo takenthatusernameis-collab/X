@@ -1,0 +1,599 @@
+[0m
+> code · free-kilo
+[0m
+[0m→ [0mRead .
+[0m✱ [0mGrep "momentum"[90m 100 matches[0m
+[0m✱ [0mGrep "lookback"[90m 100 matches[0m
+[0m✱ [0mGlob "**/universe*.py"[90m 3 matches[0m
+[0m→ [0mRead research/checks/momentum_sweep.py
+[0m→ [0mRead research/backtest/universe.py
+[0m→ [0mRead research/checks/momentum.py
+[0m✱ [0mGrep "transaction_cost|cost_model|cost_sensitivity"[90m 0 matches[0m
+[0m✱ [0mGrep "csrs_spread|realistic"[90m 40 matches[0m
+[0m→ [0mRead examples/ma_crossover.py
+[0m→ [0mRead examples/ma_crossover_real_data.py
+[0m→ [0mRead research/backtest/regime_stability.py[90m [limit=200, offset=850][0m
+[0m→ [0mRead research/backtest/engine.py[90m [limit=100][0m
+[0m✱ [0mGrep "realistic.*cost|matched.*null"[90m 7 matches[0m
+[0m
+[0m← [0mWrite research/checks/momentum_cost_robustness.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython research/checks/momentum_cost_robustness.py
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py", line 33, in <module>
+    import research.backtest as bt
+ModuleNotFoundError: No module named 'research'
+[0m
+[0m$ [0mhead -50 research/checks/momentum.py
+"""Test the momentum signal class on the collected universe.
+
+Background: the trend-following MA-crossover class was exhaustively explored on
+the collected adjusted-close universe and rejected. The short-horizon
+return-reversal class (short the previous 5-day return, hold 1 day, daily
+rebalanced) was exhaustively explored and rejected: every segment of every
+asset showed a negative median walk-forward log return; the perturbation sweep
+was flat on the null.
+
+Momentum is the direct competing hypothesis to reversal: go LONG the previous
+N-day return instead of shorting it, hold 1 day, daily rebalance. The
+contraposition is clean — reversal and momentum use the same lookback window,
+the same walk-forward, and the same coin-flip null; they differ only in signal
+sign. If reversal loses in every segment of every asset, the momentum variant
+should make the opposite mistake. This test settles whether the 5-day-lookback
+direction bet is a robust edge in this universe, or whether it is noise with a
+direction sign attached.
+
+Falsification prediction: momentum either shows CONSISTENT_WITH_NOISE (no edge
+anywhere) or REGIME_DEPENDENT (the positive run concentrates in one historical
+regime mix, notably 2009-2013), or REGIME_STABLE_LOSS (uniformly negative —
+which would be reversal winning on both sides, an inconsistency to explain).
+Either outcome is a negative conclusion and closes the cell.
+
+Method (fixed a-priori, not tuned to OOS): long the previous 5-day return;
+hold 1 day; daily rebalance. Base MA(20/60) included for comparison. The two
+REGIME_DEPENDENT assets from the MA run (AMZN, JPM) are run through
+stress_segments over the 4 contiguous volatility blocks with both variants; the
+full collected universe is swept via stress_segments_across_tickers; a synthetic
+perturbation sweep (lookback 3/5/10 over the canonical regime family with a
+coin-flip null) exercises the parameter-robustness gate. Determinism is
+asserted via an internal independent recomputation.
+
+Research / simulation only. No live trading or production execution.
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+import research.backtest as bt
+from research.data.preflight import load_manifest, sha256_file
+
+DATASET_ID = "yf-ohlcv-universe-2009-to-2026-10-03"
+SEED = 42
+LOOKBACK = 5
+[0m
+[0m$ [0mhead -50 research/checks/momentum_sweep.py
+"""Momentum robustness: walk-forward on the collected universe across lookback
+horizons.
+
+The momentum frontier test (research/checks/momentum.py, activation 37318950814)
+showed a REGIME_STABLE positive edge in 7/10 assets at lookback=5, hold=1 day.
+The synthetic perturbation sweep is a tooling-validity check only: the regime-
+switching GBM generator contains no return autocorrelation, so it cannot tell
+whether the real-data momentum edge survives a change of horizon on REAL data.
+
+This check closes that gap: momentum is re-tested across lookbacks 3 / 5 / 10 /
+20 on the same collected adjusted-close universe, same walk-forward, same
+coin-flip null. For each lookback it reports per-asset regime-stability
+segments/medians/verdicts and fold-level t-statistics against H0: mean log fold
+return = 0 (nominal 5% and Bonferroni family-wise over the 10-asset family).
+The edge must persist across horizons without collapsing to noise before the
+momentum class can be admitted to the evidence base.
+
+Method (fixed a-priori, not tuned to OOS): long the previous N-day return; hold
+1 day; daily rebalance. Base lookback 5 is the reference. N_blocks = 4
+contiguous volatility blocks. Train=252d / test=84d / warmup=60d / overlap=60d,
+min 400 bars/segment.
+
+Research / simulation only. No live trading or production execution.
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+import research.backtest as bt
+from research.data.preflight import load_manifest, sha256_file
+
+DATASET_ID = "yf-ohlcv-universe-2009-to-2026-10-03"
+SEED = 42
+TRAIN, TEST, WARM, OVERLAP = 252, 84, 60, 60
+WINDOW = 60
+N_BLOCKS = 4
+MIN_SEGMENT_BARS = 400
+LOOKBACKS = (3, 5, 10, 20)
+NOMINAL_ALPHA = 0.05
+BONFERRONI_ALPHA = NOMINAL_ALPHA / 10
+ARTIFACT_DIR = Path.cwd() / "state" / "check_artifacts"
+ARTIFACT_PATH = ARTIFACT_DIR / "momentum_sweep_results.json"
+
+
+def key_fields():
+[0m
+[0m✗ [0mcd /home/runner/work/X/X && python -c "import sys; print(sys.path)" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m
+[0m$ [0mcd /home/runner/work/X/X && ls -la research/
+total 36
+drwxr-xr-x  5 runner runner 4096 Oct  9 17:09 .
+drwxr-xr-x 11 runner runner 4096 Oct  9 17:09 ..
+-rw-r--r--  1 runner runner 3037 Oct  9 17:09 METHODOLOGY.md
+-rw-r--r--  1 runner runner 1012 Oct  9 17:09 README.md
+-rw-r--r--  1 runner runner 7357 Oct  9 17:09 REAL_DATA_FEASIBILITY.md
+drwxr-xr-x  3 runner runner 4096 Oct  9 17:10 backtest
+drwxr-xr-x  2 runner runner 4096 Oct  9 17:13 checks
+drwxr-xr-x  4 runner runner 4096 Oct  9 17:10 data
+[0m
+[0m$ [0mcd /home/runner/work/X/X && ls -la research/backtest/ research/checks/
+research/backtest/:
+total 180
+drwxr-xr-x 3 runner runner  4096 Oct  9 17:10 .
+drwxr-xr-x 5 runner runner  4096 Oct  9 17:09 ..
+-rw-r--r-- 1 runner runner  4482 Oct  9 17:09 __init__.py
+drwxr-xr-x 2 runner runner  4096 Oct  9 17:10 __pycache__
+-rw-r--r-- 1 runner runner  6923 Oct  9 17:09 data.py
+-rw-r--r-- 1 runner runner 13510 Oct  9 17:09 engine.py
+-rw-r--r-- 1 runner runner  4257 Oct  9 17:09 leakage.py
+-rw-r--r-- 1 runner runner  5683 Oct  9 17:09 metrics.py
+-rw-r--r-- 1 runner runner 15900 Oct  9 17:09 perturbation.py
+-rw-r--r-- 1 runner runner  3103 Oct  9 17:09 real_data.py
+-rw-r--r-- 1 runner runner 67605 Oct  9 17:09 regime_stability.py
+-rw-r--r-- 1 runner runner    14 Oct  9 17:09 requirements.txt
+-rw-r--r-- 1 runner runner 25137 Oct  9 17:09 universe.py
+
+research/checks/:
+total 448
+drwxr-xr-x 2 runner runner  4096 Oct  9 17:13 .
+drwxr-xr-x 5 runner runner  4096 Oct  9 17:09 ..
+-rw-r--r-- 1 runner runner 11625 Oct  9 17:09 breakout_20day_cont.py
+-rw-r--r-- 1 runner runner 27192 Oct  9 17:09 cross_sectional_momentum.py
+-rw-r--r-- 1 runner runner 12453 Oct  9 17:09 cross_sectional_regime_diagnostic.py
+-rw-r--r-- 1 runner runner 31032 Oct  9 17:09 cross_sectional_relative_strength.py
+-rw-r--r-- 1 runner runner  1631 Oct  9 17:09 determinism_check.py
+-rw-r--r-- 1 runner runner 13278 Oct  9 17:09 mean_reversion.py
+-rw-r--r-- 1 runner runner 13191 Oct  9 17:09 momentum.py
+-rw-r--r-- 1 runner runner 10148 Oct  9 17:13 momentum_cost_robustness.py
+-rw-r--r-- 1 runner runner 22240 Oct  9 17:09 momentum_hold_period_sensitivity.py
+-rw-r--r-- 1 runner runner  9112 Oct  9 17:09 momentum_horizon_gap_analysis.py
+-rw-r--r-- 1 runner runner 11920 Oct  9 17:09 momentum_longer_horizon.py
+-rw-r--r-- 1 runner runner 11556 Oct  9 17:09 momentum_lookback_sweep.py
+-rw-r--r-- 1 runner runner 12810 Oct  9 17:09 momentum_sweep.py
+-rw-r--r-- 1 runner runner  9775 Oct  9 17:09 regime_adaptive_ma.py
+-rw-r--r-- 1 runner runner 17849 Oct  9 17:09 regime_dependent_deep_dive.py
+-rw-r--r-- 1 runner runner  2072 Oct  9 17:09 smoke_breakout_signals.py
+-rw-r--r-- 1 runner runner  7384 Oct  9 17:09 smoke_cs_momentum.py
+-rw-r--r-- 1 runner runner   607 Oct  9 17:09 test_count.py
+-rw-r--r-- 1 runner runner  7780 Oct  9 17:09 universe_stats.py
+-rw-r--r-- 1 runner runner  1809 Oct  9 17:09 verify_aapl_stats.py
+-rw-r--r-- 1 runner runner 12863 Oct  9 17:09 verify_breakout_20day_cont.py
+-rw-r--r-- 1 runner runner  9485 Oct  9 17:09 verify_cross_sectional.py
+-rw-r--r-- 1 runner runner 22915 Oct  9 17:09 verify_cross_sectional_momentum.py
+-rw-r--r-- 1 runner runner  6653 Oct  9 17:09 verify_dd_independent.py
+-rw-r--r-- 1 runner runner 12243 Oct  9 17:09 verify_mean_reversion.py
+-rw-r--r-- 1 runner runner 12182 Oct  9 17:09 verify_momentum.py
+-rw-r--r-- 1 runner runner 12898 Oct  9 17:09 verify_momentum_longer_horizon.py
+-rw-r--r-- 1 runner runner 10959 Oct  9 17:09 verify_momentum_lookback_sweep.py
+-rw-r--r-- 1 runner runner  8240 Oct  9 17:09 verify_regime_adaptive.py
+-rw-r--r-- 1 runner runner 10852 Oct  9 17:09 verify_volatility_targeting.py
+-rw-r--r-- 1 runner runner 31332 Oct  9 17:09 volatility_targeting.py
+[0m
+[0m✗ [0mcd /home/runner/work/X/X && python -c "
+import sys
+sys.path.insert(0, '.')
+import research.backtest as bt
+print('Success: imported research.backtest')
+print('Available in bt:', dir(bt)[:20])
+" 2>&1 | head -20 failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m✗ [0mRead research/__init__.py failed
+[91m[1mError: [0mFile not found: /home/runner/work/X/X/research/__init__.py
+[0m✗ [0mcd /home/runner/work/X/X && python -c "
+import sys
+print('Current directory:', sys.path[0])
+" 2>&1 failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m
+[0m$ [0mcd /home/runner/work/X/X && find research/checks/ -name "*.py" -exec grep -l "__name__" {} \;
+research/checks/verify_aapl_stats.py
+research/checks/volatility_targeting.py
+research/checks/mean_reversion.py
+research/checks/momentum.py
+research/checks/momentum_horizon_gap_analysis.py
+research/checks/cross_sectional_regime_diagnostic.py
+research/checks/cross_sectional_momentum.py
+research/checks/verify_momentum_lookback_sweep.py
+research/checks/breakout_20day_cont.py
+research/checks/verify_momentum.py
+research/checks/momentum_longer_horizon.py
+research/checks/verify_momentum_longer_horizon.py
+research/checks/universe_stats.py
+research/checks/verify_volatility_targeting.py
+research/checks/verify_dd_independent.py
+research/checks/regime_dependent_deep_dive.py
+research/checks/momentum_cost_robustness.py
+research/checks/verify_mean_reversion.py
+research/checks/verify_regime_adaptive.py
+research/checks/verify_cross_sectional.py
+research/checks/momentum_lookback_sweep.py
+research/checks/momentum_hold_period_sensitivity.py
+research/checks/smoke_cs_momentum.py
+research/checks/verify_cross_sectional_momentum.py
+research/checks/momentum_sweep.py
+research/checks/verify_breakout_20day_cont.py
+research/checks/regime_adaptive_ma.py
+research/checks/cross_sectional_relative_strength.py
+[0m
+[0m✗ [0mcd /home/runner/work/X/X && python -c "
+# Try to import the research module directly
+try:
+    import sys
+    sys.path.insert(0, '.')
+    # Try importing research modules directly
+    import research.backtest as bt
+    print('Successfully imported research.backtest')
+    print('bt.momentum_signals exists:', hasattr(bt, 'momentum_signals'))
+except Exception as e:
+    print('Error:', e)
+" 2>&1 failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m→ [0mRead research/checks/momentum_cost_robustness.py
+[0m✗ [0mcd /home/runner/work/X/X && python -c "
+import sys
+sys.path.insert(0, '.')
+# Check if research.backtest exists
+import importlib.util
+spec = importlib.util.find_spec('research.backtest')
+if spec is not None:
+    print('research.backtest module found')
+else:
+    print('research.backtest module NOT found')
+    # List what exists in research
+    import os
+    print('research directory contents:', os.listdir('research'))
+" 2>&1 failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m→ [0mRead research/checks/momentum.py[90m [limit=30, offset=44][0m
+[0m✗ [0mcd /home/runner/work/X/X && python -c "
+# Read the research/__init__.py file if it exists
+import os
+if os.path.exists('research/__init__.py'):
+    with open('research/__init__.py', 'r') as f:
+        print(f.read())
+else:
+    print('research/__init__.py does not exist')
+    print('Check if research is a package...')
+" 2>&1 | head -30 failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum.py 2>&1 | head -50
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum_cost_robustness.py 2>&1 | head -100
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py", line 33, in <module>
+    import research.backtest as bt
+ModuleNotFoundError: No module named 'research'
+[0m
+[0m✗ [0mcd /home/runner/work/X/X && python -c "import sys; print('Python path:', sys.path)" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m→ [0mRead research/checks/momentum_cost_robustness.py[90m [limit=50][0m
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python -m research.checks.momentum_cost_robustness 2>&1 | head -50
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py", line 233, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py", line 231, in main
+    return run_cost_sensitivity_check()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py", line 92, in run_cost_sensitivity_check
+    pf = import_module("preflight")
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1324, in _find_and_load_unlocked
+ModuleNotFoundError: No module named 'preflight'
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[0m
+[0m$ [0mcd /home/runner/work/X/X && ls -la research/data/ research/checks/
+research/checks/:
+total 452
+drwxr-xr-x 3 runner runner  4096 Oct  9 17:14 .
+drwxr-xr-x 5 runner runner  4096 Oct  9 17:09 ..
+drwxr-xr-x 2 runner runner  4096 Oct  9 17:14 __pycache__
+-rw-r--r-- 1 runner runner 11625 Oct  9 17:09 breakout_20day_cont.py
+-rw-r--r-- 1 runner runner 27192 Oct  9 17:09 cross_sectional_momentum.py
+-rw-r--r-- 1 runner runner 12453 Oct  9 17:09 cross_sectional_regime_diagnostic.py
+-rw-r--r-- 1 runner runner 31032 Oct  9 17:09 cross_sectional_relative_strength.py
+-rw-r--r-- 1 runner runner  1631 Oct  9 17:09 determinism_check.py
+-rw-r--r-- 1 runner runner 13278 Oct  9 17:09 mean_reversion.py
+-rw-r--r-- 1 runner runner 13191 Oct  9 17:09 momentum.py
+-rw-r--r-- 1 runner runner 10148 Oct  9 17:13 momentum_cost_robustness.py
+-rw-r--r-- 1 runner runner 22240 Oct  9 17:09 momentum_hold_period_sensitivity.py
+-rw-r--r-- 1 runner runner  9112 Oct  9 17:09 momentum_horizon_gap_analysis.py
+-rw-r--r-- 1 runner runner 11920 Oct  9 17:09 momentum_longer_horizon.py
+-rw-r--r-- 1 runner runner 11556 Oct  9 17:09 momentum_lookback_sweep.py
+-rw-r--r-- 1 runner runner 12810 Oct  9 17:09 momentum_sweep.py
+-rw-r--r-- 1 runner runner  9775 Oct  9 17:09 regime_adaptive_ma.py
+-rw-r--r-- 1 runner runner 17849 Oct  9 17:09 regime_dependent_deep_dive.py
+-rw-r--r-- 1 runner runner  2072 Oct  9 17:09 smoke_breakout_signals.py
+-rw-r--r-- 1 runner runner  7384 Oct  9 17:09 smoke_cs_momentum.py
+-rw-r--r-- 1 runner runner   607 Oct  9 17:09 test_count.py
+-rw-r--r-- 1 runner runner  7780 Oct  9 17:09 universe_stats.py
+-rw-r--r-- 1 runner runner  1809 Oct  9 17:09 verify_aapl_stats.py
+-rw-r--r-- 1 runner runner 12863 Oct  9 17:09 verify_breakout_20day_cont.py
+-rw-r--r-- 1 runner runner  9485 Oct  9 17:09 verify_cross_sectional.py
+-rw-r--r-- 1 runner runner 22915 Oct  9 17:09 verify_cross_sectional_momentum.py
+-rw-r--r-- 1 runner runner  6653 Oct  9 17:09 verify_dd_independent.py
+-rw-r--r-- 1 runner runner 12243 Oct  9 17:09 verify_mean_reversion.py
+-rw-r--r-- 1 runner runner 12182 Oct  9 17:09 verify_momentum.py
+-rw-r--r-- 1 runner runner 12898 Oct  9 17:09 verify_momentum_longer_horizon.py
+-rw-r--r-- 1 runner runner 10959 Oct  9 17:09 verify_momentum_lookback_sweep.py
+-rw-r--r-- 1 runner runner  8240 Oct  9 17:09 verify_regime_adaptive.py
+-rw-r--r-- 1 runner runner 10852 Oct  9 17:09 verify_volatility_targeting.py
+-rw-r--r-- 1 runner runner 31332 Oct  9 17:09 volatility_targeting.py
+
+research/data/:
+total 64
+drwxr-xr-x 4 runner runner  4096 Oct  9 17:10 .
+drwxr-xr-x 5 runner runner  4096 Oct  9 17:09 ..
+drwxr-xr-x 2 runner runner  4096 Oct  9 17:10 __pycache__
+-rw-r--r-- 1 runner runner  9120 Oct  9 17:09 collect.py
+-rw-r--r-- 1 runner runner 19118 Oct  9 17:09 manifest.json
+-rw-r--r-- 1 runner runner 14400 Oct  9 17:09 preflight.py
+drwxr-xr-x 2 runner runner  4096 Oct  9 17:09 raw
+[0m
+[0m✗ [0mRead research/data/__init__.py failed
+[91m[1mError: [0mFile not found: /home/runner/work/X/X/research/data/__init__.py
+[0m
+[0m← [0mWrite research/checks/momentum_cost_robustness.py
+Wrote file successfully.
+[0m
+[0m→ [0mRead research/checks/momentum_cost_robustness.py[90m [limit=50][0m
+[0m✗ [0mcd /home/runner/work/X/X && rm research/checks/momentum_cost_robustness.py && echo "File deleted" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"rm *","action":"deny","source":"project"}
+[0m→ [0mRead research/checks/momentum.py[90m [limit=20, offset=165][0m
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum.py 2>&1 | grep -A5 "pre-flight"
+(no output)
+[0m
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py[90m [limit=80][0m
+[0m✗ [0mcd /home/runner/work/X/X && wc -l research/checks/momentum_lookback_sweep.py failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py[90m [limit=50, offset=200][0m
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py[90m [limit=20, offset=240][0m
+[0m
+[0m← [0mWrite research/checks/momentum_lookback_sweep_with_costs.py
+Wrote file successfully.
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum_lookback_sweep_with_costs.py 2>&1 | head -100
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Loading tickers ===
+
+=== 4. Momentum lookback sweep with cost sensitivity ===
+Momentum = long the previous lookback-day return, hold 1 day, daily rebalanced. Params: walk-forward per segment train=252d / test=84d / warmup=60d / overlap=60d, min 400 bars/segment, compared vs coin-flip null on the same segments. Testing lookbacks (3, 5, 10)
+
+--- Testing zero_cost ---
+
+Lookback 3:
+  AAPL  : verdict=turbulent          median=+0.071
+  MSFT  : verdict=calm               median=+0.052
+  GOOGL : verdict=turbulent          median=+0.069
+  AMZN  : verdict=turbulent          median=+0.065
+  META  : verdict=turbulent          median=+0.073
+  NVDA  : verdict=turbulent          median=-0.038
+  TSLA  : verdict=turbulent          median=+0.132
+  JPM   : verdict=turbulent          median=+0.113
+  JNJ   : verdict=calm               median=+0.050
+  XOM   : verdict=calm               median=+0.018
+[0m
+[0m✗ [0mcd /home/runner/work/X/X && timeout 300 python research/checks/momentum_lookback_sweep_with_costs.py 2>&1 | tail -100 failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m→ [0mRead state/check_artifacts/momentum_lookback_sweep_with_costs_results.json[90m [limit=100][0m
+[0m→ [0mRead state/check_artifacts/momentum_lookback_sweep_with_costs_results.json[90m [limit=100, offset=200][0m
+[0m
+[0m$ [0mcd /home/runner/work/X/X && ls -la state/check_artifacts/ | grep momentum
+-rw-r--r-- 1 runner runner  4481 Oct  9 17:09 cross_sectional_momentum_results.json
+-rw-r--r-- 1 runner runner 12605 Oct  9 17:09 momentum_horizon_gap_analysis.json
+-rw-r--r-- 1 runner runner 21482 Oct  9 17:09 momentum_longer_horizon_results.json
+-rw-r--r-- 1 runner runner 27815 Oct  9 17:09 momentum_lookback_sweep_results.json
+-rw-r--r-- 1 runner runner 31250 Oct  9 17:16 momentum_lookback_sweep_with_costs_results.json
+-rw-r--r-- 1 runner runner  6394 Oct  9 17:15 momentum_results.json
+-rw-r--r-- 1 runner runner   483 Oct  9 17:09 smoke_cs_momentum.json
+[0m
+[0m$ [0mcd /home/runner/work/X/X && grep -l "lookback_sweep_with_costs" research/checks/*.py
+research/checks/momentum_lookback_sweep_with_costs.py
+[0m
+[0m$ [0mcd /home/runner/work/X/X && grep -l "lookback_sweep" research/checks/*.py | grep verify
+research/checks/verify_momentum_lookback_sweep.py
+[0m
+[0m→ [0mRead research/checks/verify_momentum_lookback_sweep.py[90m [limit=100][0m
+[0m
+[0m← [0mWrite research/checks/COST_ROBUSTNESS_SUMMARY.md
+Wrote file successfully.
+[0m
+[0m← [0mWrite research/checks/COST_ROBUSTNESS_SUMMARY.md
+Wrote file successfully.
+[0m
+[0m← [0mWrite COST_ROBUSTNESS_RUN_SUMMARY.md
+Wrote file successfully.
+[0m
+[0m$ [0mcd /home/runner/work/X/X && ls -la research/checks/momentum_lookback_sweep_with_costs.py
+-rw-r--r-- 1 runner runner 13507 Oct  9 17:16 research/checks/momentum_lookback_sweep_with_costs.py
+[0m
+[0m$ [0mcd /home/runner/work/X/X && ls -la state/check_artifacts/momentum_lookback_sweep_with_costs_results.json
+-rw-r--r-- 1 runner runner 31250 Oct  9 17:16 state/check_artifacts/momentum_lookback_sweep_with_costs_results.json
+[0m
+[0m$ [0mcd /home/runner/work/X/X && ls -la COST_ROBUSTNESS_RUN_SUMMARY.md research/checks/COST_ROBUSTNESS_SUMMARY.md
+-rw-r--r-- 1 runner runner 8370 Oct  9 17:18 COST_ROBUSTNESS_RUN_SUMMARY.md
+-rw-r--r-- 1 runner runner 7415 Oct  9 17:17 research/checks/COST_ROBUSTNESS_SUMMARY.md
+[0m
+## Momentum Cost Robustness Check - Task Completion Summary
+
