@@ -67,3 +67,16 @@ Prefer the highest-value unresolved frontier cell over repeating an equivalent e
 5. Preserve negative and inconclusive evidence.
 6. Do not claim a strategy delta worked until its expected effect is actually observed.
 7. When there is insufficient evidence, choose UNVERIFIED rather than forcing RETAIN or REVERT.
+
+
+## Sequential campaign 38088247733
+- **Validated process improvement:** agents [3, 5]
+- **Validated research progress:** agents [6, 8, 10]
+- **Validated negative/rejected evidence:** agents [2]
+- **Unresolved uncertainty:** agents [1, 4, 9]
+- **Odd/even process observations:** [{"even_agent": 2, "even_observation": "IMPROVED", "even_task": "R-001", "even_uncertainty_reduced": "Cost-robustness qualification of momentum evidence achieved. The test determines whether the momentum edge survives realistic transaction costs across lookback 3, 5, and 10. This provides the missing cost robustness qualification that was noted as decision-relevant in the learning state.", "odd_agent": 1, "odd_process_decision": "UNVERIFIED", "odd_task": "P-001"}, {"even_agent": 4, "even_observation": "UNVERIFIED", "even_task": "R-002", "even_uncertainty_reduced": "none demonstrated", "odd_agent": 3, "odd_process_decision": "IMPROVE", "odd_task": "P-002"}, {"even_agent": 6, "even_observation": "IMPROVED", "even_task": "R-001", "even_uncertainty_reduced": "cost-robustness qualification of short-horizon momentum edge reveals limited durability under realistic transaction costs", "odd_agent": 5, "odd_process_decision": "IMPROVE", "odd_task": "P-001"}, {"even_agent": 8, "even_observation": "IMPROVED", "even_task": "R-003", "even_uncertainty_reduced": "Implemented and tested volatility gate functionality for momentum signals, providing a mechanism to test regime-dependent momentum effects.", "odd_agent": 7, "odd_process_decision": "IMPROVE", "odd_task": "P-002"}, {"even_agent": 10, "even_observation": "IMPROVED", "even_task": "R-001", "even_uncertainty_reduced": "Cost robustness qualified: momentum survives realistic transaction costs for lookbacks 5 and 10 but fails for lookback 3, providing clear evidence for cost-robust edge qualification.", "odd_agent": 9, "odd_process_decision": "UNVERIFIED", "odd_task": "P-004"}]
+- **Task-selection observation:** {"1": "UNVERIFIED", "10": "IMPROVED", "2": "IMPROVED", "3": "IMPROVED", "4": "UNVERIFIED", "5": "IMPROVED", "6": "IMPROVED", "8": "IMPROVED", "9": "UNVERIFIED"}
+- **Highest-value unresolved next task:** P-001
+- **New complexity introduced:** [{"agent_number": 1, "complexity_added": "UNVERIFIED"}, {"agent_number": 2, "complexity_added": "VERIFIED"}, {"agent_number": 3, "complexity_added": "VERIFIED"}, {"agent_number": 4, "complexity_added": "UNVERIFIED"}, {"agent_number": 5, "complexity_added": "UNVERIFIED"}, {"agent_number": 6, "complexity_added": "UNVERIFIED"}, {"agent_number": 8, "complexity_added": "VERIFIED"}, {"agent_number": 9, "complexity_added": "UNVERIFIED"}, {"agent_number": 10, "complexity_added": "VERIFIED"}]
+- **Campaign persistence decision:** RECOVERY_BRANCH
+- **Contradictory/unverified evidence:** ['agent_01:UNVERIFIED', 'agent_04:UNVERIFIED', 'agent_09:UNVERIFIED']
