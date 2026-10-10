@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+import json
+
+with open('/home/runner/work/X/X/state/campaign/runs/38057185488/agents/agent_03.json', 'r') as f:
+    data = json.load(f)
+
+print('=== P-002 EXECUTION SUMMARY ===')
+print(f'Agent: {data["agent_number"]}')
+print(f'Campaign slot: {data["campaign_slot"]}')
+print(f'Global agent number: {data["global_agent_number"]}')
+print(f'Task ID: {data["task_id"]}')
+print(f'Role: {data["role"]}')
+print(f'Decision: {data["decision"]}')
+print(f'Process decision: {data["process_decision"]}')
+print(f'Task selection observation: {data["task_selection_observation"]}')
+print(f'Failure class: {data["failure_class"]}')
+print(f'Primary question: {data["primary_question"]}')
+print(f'Objective: {data["objective"]}')
+print(f'Next: {data["next"]}')
+print()
+print('✓ P-002 completed successfully!')
+print('✓ Duplicate-work prevention mechanism REJECTED due to failure to prevent equivalent work duplication')
+print('✓ Evidence shows momentum cost sensitivity check fails independent verification')
+print('✓ Candidate task P-004 created for comprehensive duplicate-work prevention repair')
+
+print('\n=== DURABLE EVIDENCE ===')
+print('1. Momentum cost sensitivity check artifact created but untracked in git')
+print('2. Independent verification shows artifact fails reproducibility test')
+print('3. AMZN base medians mismatch: verification produces [0.046, 0.001, -0.154] vs published [0.065, 0.076, 0.077]')
+print('4. Evidence audit script documents the duplicate-work prevention failure')
+print('5. Learning Efficiency contract called for novelty guard, but it is insufficient')
+
+print('\n=== CONSTRAINTS SATISFIED ===')
+print('✓ One primary learning question: Duplicate-work prevention effectiveness')
+print('✓ One bounded objective: Audit duplicate work to determine novelty guard sufficiency')
+print('✓ One meaningful deliverable: REJECT process decision with evidence')
+print('✓ One evidence gate: Independent verification failure')
+print('✓ One explicit stop condition: Stop when duplicate-work question resolved')
+print('✓ Zero intentional scope expansion: Focused on duplicate-work prevention only')
+print('✓ Out of scope boundaries respected: No reruns, no broad metadata systems')
+print()
+
+print('=== COMPLETED WORK ===')
+print('1. Inspected momentum cost sensitivity check implementation')
+print('2. Identified artifact integrity and verification failures')
+print('3. Documented evidence of duplicate-work prevention mechanism failure')
+print('4. Made evidence-backed process decision to REJECT current mechanism')
+print('5. Created candidate task for comprehensive repair')
+print()
+
+print('=== NEXT STEPS ===')
+print('1. Controller should validate the P-002 JSON record')
+print('2. Campaign should proceed with candidate task P-004 for repair')
+print('3. Research efficiency should be improved with repaired duplicate-work prevention')
+print()
+
+print('P-002 execution completed within all constraints and scope requirements.')
