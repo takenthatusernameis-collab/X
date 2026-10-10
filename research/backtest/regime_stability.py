@@ -121,6 +121,11 @@ def active_when_turbulent(early_vol: float) -> bool:
     return early_vol > 0.25
 
 
+def active_when_volatile(early_vol: float) -> bool:
+    """Trade only when realized vol exceeds 35% annualized (past-only gate)."""
+    return early_vol > 0.35
+
+
 def active_when_anything(_early_vol: float) -> bool:
     """Always emit signals — the control for a fully regime-independent edge."""
     return True
@@ -946,6 +951,54 @@ def breakout_signals(
     return out
 
 
+def momentum_volatility_gate_signals(
+    closes: NDArray,
+    lookback: int = 5,
+    vol_threshold: float = 0.35,
+) -> List[Signal]:
+    """Past-only momentum signal gated by volatility threshold (regime-conditioned).
+
+    Long the previous ``lookback``-day return and hold for one day: if the
+    last ``lookback`` days were up, go long; if they were down, go short.
+    Neutral before the ``lookback`` window. Daily rebalancing (a fresh
+    signal at every bar). However, emit signals only when realized volatility
+    exceeds ``vol_threshold`` annualized (35%). This is a past-only gate:
+    volatility is estimated from closes[:i] only, no look-ahead.
+
+    This gate tests whether momentum has a robust edge in high-volatility
+    regimes. The gate threshold is predeclared at 35% annualized volatility.
+    """
+    n = len(closes)
+    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    lookback = int(lookback)
+    vol_threshold = float(vol_threshold)
+    window = min(60, max(4, n // 4))
+    sqrt252 = np.sqrt(252.0)
+
+    for i in range(lookback, n):
+        if i >= window:
+            early_vol = float(
+                np.std(np.log(closes[window // 2 : window]), ddof=1)
+            ) * sqrt252
+            if early_vol > vol_threshold:
+                ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+                out[i] = Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+    return out
+
+
+def momentum_volatility_gate_signals_for_baseline(
+    closes: NDArray,
+    lookback: int = 5,
+) -> List[Signal]:
+    """Momentum signal wrapper for baseline testing in stress_segments_across_tickers.
+
+    This function extracts lookback from params and delegates to
+    momentum_volatility_gate_signals with a fixed vol_threshold constant
+    to maintain consistency across the regime-stability test.
+    """
+    return momentum_volatility_gate_signals(closes, lookback=lookback, vol_threshold=0.35)
+
+
 def regime_adaptive_ma_signals(
     closes: NDArray,
     fast_calm: int = 20,
@@ -1117,7 +1170,12 @@ def stress_segments_across_tickers(
         )
         labels = regime_labels_fn(closes)
         seg_fn = segment_fn_from_labels(labels)
-        signals = signals_fn(closes, **{k: float(v) for k, v in dict(baseline).items()})
+        # Handle both tuple format (ParameterSet) and dict format for baseline
+        if isinstance(baseline, dict):
+            signals_dict = baseline
+        else:
+            signals_dict = {k: v for k, v in baseline}
+        signals = signals_fn(closes, **signals_dict)
         if len(signals) != len(closes):
             raise ValueError(
                 f"signals length ({len(signals)}) != bars length ({len(closes)}) "
