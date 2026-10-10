@@ -1,0 +1,156 @@
+[0m
+> code · free-kilo
+[0m
+[0m$ [0mfind /home/runner/work/X/X -type f -name "*.py" | head -20
+/home/runner/work/X/X/repro_engine.py
+/home/runner/work/X/X/test_write.py
+/home/runner/work/X/X/debug_diff.py
+/home/runner/work/X/X/smoke_csrs.py
+/home/runner/work/X/X/probe_yahoo.py
+/home/runner/work/X/X/examples/regime_stability_universe.py
+/home/runner/work/X/X/examples/volatility_regime_filter.py
+/home/runner/work/X/X/examples/universe_sweep.py
+/home/runner/work/X/X/examples/regime_stability_real_data.py
+/home/runner/work/X/X/examples/regime_stability_demo.py
+/home/runner/work/X/X/examples/ma_crossover_real_data.py
+/home/runner/work/X/X/examples/regime_stability_nvda.py
+/home/runner/work/X/X/examples/ma_crossover.py
+/home/runner/work/X/X/tmp_art.py
+/home/runner/work/X/X/debug_stress.py
+/home/runner/work/X/X/check_compile2.py
+/home/runner/work/X/X/tmp_read.py
+/home/runner/work/X/X/probe_yahoo3.py
+/home/runner/work/X/X/check_determinism_nvda.py
+/home/runner/work/X/X/tmp_json_check.py
+[0m
+[0m✱ [0mGlob "**/README*"[90m 3 matches[0m
+[0m✱ [0mGlob "**/state/campaign/runs/*/agents/agent_*.json"[90m 7 matches[0m
+[0m✗ [0mRead state/campaign/runs/38033792682/agents/agent_02.json failed
+[91m[1mError: [0mFile not found: /home/runner/work/X/X/state/campaign/runs/38033792682/agents/agent_02.json
+[0m→ [0mRead state/campaign/runs/38033792682/agents/agent_02_contract.json
+[0m→ [0mRead state/campaign/runs/38033792682/agents/agent_01.json
+[0m✱ [0mGlob "**/momentum*.py"[90m 6 matches[0m
+[0m✱ [0mGlob "**/cost*.py"[90m 0 matches[0m
+[0m✱ [0mGlob "**/test*momentum*.py"[90m 0 matches[0m
+[0m→ [0mRead README.md
+[0m→ [0mRead research/checks/momentum.py
+[0m✱ [0mGlob "**/research/backtest/*.py"[90m 9 matches[0m
+[0m→ [0mRead repro_engine.py
+[0m→ [0mRead research/backtest/__init__.py
+[0m→ [0mRead research/backtest/engine.py
+[0m→ [0mRead research/backtest/metrics.py
+[0m→ [0mRead research/backtest/regime_stability.py
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py
+[0m→ [0mRead research/backtest/engine.py[90m [offset=55, limit=30][0m
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py[90m [limit=50, offset=110][0m
+[0m✱ [0mGrep "commission_per_trade|commission_per_share|slippage"[90m in . · 43 matches[0m
+[0m✱ [0mGlob "**/data/manifest.json"[90m 1 match[0m
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py[90m [limit=50, offset=160][0m
+[0m→ [0mRead research/data/manifest.json
+[0m
+[0m← [0mWrite research/checks/momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython -m py_compile /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+(no output)
+[0m
+[0m$ [0mpython /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py 2>&1 | head -100
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 26, in <module>
+    import research.backtest as bt
+ModuleNotFoundError: No module named 'research'
+[0m
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py[90m [limit=45][0m
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -21,9 +21,9 @@
+ from pathlib import Path
+ 
+ import numpy as np
+ 
+-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
++sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+ import research.backtest as bt
+ from research.data.preflight import load_manifest, sha256_file
+ 
+ # Configuration
+
+[0m
+[0m$ [0mpython /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py 2>&1 | head -150
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Cost-sensitivity check for lookback (3, 5, 10) ===
+  Realistic costs: commission_per_trade=2.0, commission_per_share=0.003, slippage_cents=2.0, slippage_proportional=0.0005
+  Params: walk-forward per segment train=252d / test=84d / warmup=60d / overlap=60d, min 400 bars/segment, 4 contiguous volatility blocks, lookback 3/5/10 vs matched null
+
+--- Lookback 3 ---
+  Cost medians: [0.071, 0.052, 0.069, 0.065, 0.073, -0.064, 0.133, 0.113, 0.05, 0.018]
+  Cost verdict counts: {'CONSISTENT_WITH_NOISE': 2, 'REGIME_STABLE': 7, 'REGIME_STABLE_LOSS': 0, 'REGIME_DEPENDENT': 1}
+  Null medians: [0.013, 0.041, -0.004, -0.255, 0.023, 0.428, -1.757, -0.127, -0.02, 0.0]
+
+--- Lookback 5 ---
+  Cost medians: [0.071, 0.052, 0.069, 0.065, 0.073, -0.064, 0.133, 0.113, 0.05, 0.018]
+  Cost verdict counts: {'CONSISTENT_WITH_NOISE': 2, 'REGIME_STABLE': 7, 'REGIME_STABLE_LOSS': 0, 'REGIME_DEPENDENT': 1}
+  Null medians: [-0.01, -0.031, -0.049, 0.008, 0.052, 0.423, 0.112, -0.031, -0.002, -0.009]
+
+--- Lookback 10 ---
+  Cost medians: [0.071, 0.052, 0.069, 0.065, 0.073, -0.064, 0.133, 0.113, 0.05, 0.018]
+  Cost verdict counts: {'CONSISTENT_WITH_NOISE': 2, 'REGIME_STABLE': 7, 'REGIME_STABLE_LOSS': 0, 'REGIME_DEPENDENT': 1}
+  Null medians: [-0.049, 0.003, 0.059, -0.053, 0.058, 0.437, -2.659, -0.195, -0.029, -0.026]
+
+=== Results Summary ===
+  Lookback 3: EDGE (cost robustness)
+  Lookback 5: EDGE (cost robustness)
+  Lookback 10: EDGE (cost robustness)
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution.
+Momentum cost-sensitivity check completed.
+[0m
+[0m→ [0mRead state/check_artifacts/momentum_cost_sensitivity_results.json
+[0m✱ [0mGlob "**/state/campaign/runs/38033792682/agents/agent_*.json"[90m 7 matches[0m
+[0m
+[0m← [0mWrite state/campaign/runs/38033792682/agents/agent_02.json
+Wrote file successfully.
+[0m
+[0m$ [0mls -la /home/runner/work/X/X/.kilo/
+total 56
+drwxr-xr-x  2 runner runner  4096 Oct 10 07:16 .
+drwxr-xr-x 11 runner runner  4096 Oct 10 07:15 ..
+-rw-r--r--  1 runner runner   107 Oct 10 07:16 .gitignore
+-rw-r--r--  1 runner runner  1848 Oct 10 07:15 kilo.json
+-rw-r--r--  1 runner runner 37723 Oct 10 07:15 wakeup-prompt.md
+[0m
+[0m✱ [0mGlob "**/AGENTS.md"[90m 1 match[0m
+[0m✱ [0mGlob "**/README*"[90m 3 matches[0m
+[0m→ [0mRead AGENTS.md
+[0m✱ [0mGlob "**/test*.py"[90m 20 matches[0m
+[0m✱ [0mGlob "**/pytest.ini"[90m 0 matches[0m
+[0m✱ [0mGlob "**/setup.py"[90m 0 matches[0m
+[0m✱ [0mGlob "**/pyproject.toml"[90m 0 matches[0m
+[0m→ [0mRead tests/test_engine.py[90m [limit=50][0m
+[0m
+[0m$ [0mfind /home/runner/work/X/X -name "*.json" -o -name "*.toml" -o -name "*.ini" -o -name "*.cfg" -o -name "*.yml" -o -name "*.yaml" | grep -E "(package|setup|pyproject|tox|Makefile)" | head -10
+(no output)
+[0m
+[0m$ [0mls -la /home/runner/work/X/X/ | grep -E "(Makefile|requirements|environment)"
+(no output)
+[0m
+[0m→ [0mRead .kilo/kilo.json
+## Task Summary
+
