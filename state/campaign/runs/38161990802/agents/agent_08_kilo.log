@@ -1,0 +1,117 @@
+[0m
+> code · free-kilo
+[0m
+[0m$ [0mfind /home/runner/work/X/X -type f -name "*.md" | grep -E "(README|LEARNING_STATE|state|research|momentum)" | head -20
+/home/runner/work/X/X/.pytest_cache/README.md
+/home/runner/work/X/X/state/LEARNING_STATE.md
+/home/runner/work/X/X/state/worker_progress.md
+/home/runner/work/X/X/state/campaign/runs/manual-deep-grind-20261006-0404/deep_grind_engineering_record.md
+/home/runner/work/X/X/state/STATE.md
+/home/runner/work/X/X/README.md
+/home/runner/work/X/X/logs/README.md
+/home/runner/work/X/X/research/README.md
+/home/runner/work/X/X/research/METHODOLOGY.md
+/home/runner/work/X/X/research/REAL_DATA_FEASIBILITY.md
+[0m
+[0m✱ [0mGlob "**/*.py"[90m 100 matches[0m
+[0m→ [0mRead .
+[0m→ [0mRead README.md
+[0m→ [0mRead state/LEARNING_STATE.md
+[0m→ [0mRead research/README.md
+[0m→ [0mRead research/METHODOLOGY.md
+[0m→ [0mRead state/campaign/current_task.json
+[0m→ [0mRead research/checks/momentum.py
+[0m→ [0mRead research/checks/verify_momentum.py
+[0m→ [0mRead research/checks/volatility_targeting.py
+[0m✱ [0mGrep "volatility.*gate|gate.*volatility"[90m 5 matches[0m
+[0m✱ [0mGrep "past.*only.*volatility|past-only.*volatility"[90m 7 matches[0m
+[0m→ [0mRead research/backtest/__init__.py
+[0m→ [0mRead research/backtest/regime_stability.py[90m [limit=100][0m
+[0m→ [0mRead research/backtest/regime_stability.py[90m [offset=90, limit=50][0m
+[0m→ [0mRead research/backtest/regime_stability.py[90m [limit=50, offset=140][0m
+[0m✱ [0mGrep "active_when_.*vol|vol.*active_when"[90m 2 matches[0m
+[0m→ [0mRead research/backtest/regime_stability.py[90m [limit=50, offset=190][0m
+[0m✗ [0mRead research/backtest/regime_stability.py failed[90m [limit=100, offset=2500][0m
+[91m[1mError: [0mOffset 2500 is out of range for this file (1666 lines)
+[0m
+[0m$ [0mtail -n 200 /home/runner/work/X/X/research/backtest/regime_stability.py | grep -n "conditional_signal\|active_when_\|volatility" -A 2 -B 2
+50-
+51-    At each date t >= lookback: compute each ticker's trailing-`lookback`-day
+52:    realized volatility (closes[i-lookback : i], past-only); rank tickers
+53:    descending by volatility; long the bottom_k (lowest-volatility) tickers,
+54:    short the top_k (highest-volatility) tickers with equal capital per leg;
+55-    hold one day; daily rebalance. The spread P&L at bar t equals the mean of
+56-    the long-legs' next-day simple returns minus the mean of the short-legs'
+--
+58-    2*k tickers available, are neutral (P&L = 0).
+59-
+60:    This is the volatility-targeting / low-vol premium signal class on the
+61:    collected universe: rank by past volatility, long bottom-k / short top-k,
+62-    hold 1 day. Past-only by construction.
+63-
+--
+69-        tickers: dict ticker -> BarSequence of adjusted closes (all tickers
+70-            share the same date grid).
+71:        lookback: lookback window in bars for realized volatility.
+72-        top_k, bottom_k: leg sizes.
+73-
+--
+83-                for t in closes}
+84-        sorted_tickers = sorted(vols, key=lambda t: vols[t], reverse=True)
+85:        longs = sorted_tickers[-bottom_k:]   # lowest-volatility leg
+86:        shorts = sorted_tickers[:top_k]      # highest-volatility leg
+87-        if len(longs) < bottom_k or len(shorts) < top_k:
+88-            continue
+--
+96-
+97-def vol_rank_spread_family(family, lookback, top_k, bottom_k):
+98:    """Compute the volatility-targeting spread daily P&L across a synthetic
+99-    family of BarSequence assets (same pattern as vol_rank_spread_daily_returns
+100-    but over a family instead of a dict of tickers).
+--
+129-def vol_rank_null_spread_daily_returns(tickers, lookback=60, top_k=3, bottom_k=3,
+130-                                       seed=42):
+131:    """Coin-flip null of the volatility-targeting spread.
+132-
+133-    Ranks are computed identically (past-only); the long/short assignment is
+--
+165-
+166-def vol_rank_null_spread_family(family, lookback, top_k, bottom_k, seed=42):
+167:    """Coin-flip null of the volatility-targeting spread over a synthetic
+168-    family of assets.
+169-
+[0m
+[0m$ [0mgrep -r "class.*momentum" /home/runner/work/X/X/research/checks/ --include="*.py" | grep -i test
+(no output)
+[0m
+[0m$ [0mls /home/runner/work/X/X/research/checks/*.py | head -5
+/home/runner/work/X/X/research/checks/breakout_20day_cont.py
+/home/runner/work/X/X/research/checks/cross_sectional_momentum.py
+/home/runner/work/X/X/research/checks/cross_sectional_regime_diagnostic.py
+/home/runner/work/X/X/research/checks/cross_sectional_relative_strength.py
+/home/runner/work/X/X/research/checks/determinism_check.py
+[0m
+[0m→ [0mRead research/checks/cross_sectional_momentum.py
+[0m
+[0m$ [0mgrep -r "volatility.*gate\|gate.*volatility" /home/runner/work/X/X --include="*.md" | grep -i "past\|only" | head -10
+/home/runner/work/X/X/logs/ACTIVATION-2026-10-04.md:- `volatility_blocks(closes, n_blocks=4, window=60)` — past-only classification of a series into contiguous date blocks, each labeled 'turbulent' (median trailing-`window`-bar realized vol above series-wide median) or 'calm'; the first `window` bars are labeled 'insufficient' (matching the docstring and the `volatility_segments` classifier) and are dropped as a short leading segment by `stress_segments`. This is the authoritative implementation; the two single-asset examples now delegate to it.
+/home/runner/work/X/X/logs/ACTIVATION-2026-10-05.md:All four tested signal classes on the collected universe (MA crossover, short-horizon reversal, cross-sectional relative strength, volatility targeting) are now falsified with clean negative evidence and independent verification. The highest-value next action is to record the methodology observation (verdict machinery and concentration gate must be read alongside medians for uniformly-negative results) and decide the next hypothesis family — e.g. richer regime features beyond past-only volatility (cross-sectional/macro/liquidity), or a different asset/data regime — rather than adding another equivalent signal class.
+[0m
+[0m$ [0mgrep -r "active_when_turbulent\|conditional_signal" /home/runner/work/X/X --include="*.py" | head -20
+/home/runner/work/X/X/tests/test_regime_stability.py:        cond = bt.conditional_signal(bt.deterministic_edge_signal, bt.active_when_turbulent)
+/home/runner/work/X/X/research/backtest/regime_stability.py:def conditional_signal(
+/home/runner/work/X/X/research/backtest/regime_stability.py:def active_when_turbulent(early_vol: float) -> bool:
+/home/runner/work/X/X/research/backtest/__init__.py:    active_when_turbulent,
+/home/runner/work/X/X/research/backtest/__init__.py:    conditional_signal,
+[0m
+[0m→ [0mRead tests/test_regime_stability.py[90m [limit=100][0m
+[0m✗ [0mWrite  failed
+[91m[1mError: [0mThe write tool was called with invalid arguments: ["filePath"]: is missing and is required.
+Please rewrite the input so it satisfies the expected schema.
+[0m✗ [0mWrite  failed
+[91m[1mError: [0mThe write tool was called with invalid arguments: ["filePath"]: is missing and is required.
+Please rewrite the input so it satisfies the expected schema.
+[0m✗ [0mWrite  failed
+[91m[1mError: [0mThe write tool was called with invalid arguments: ["filePath"]: is missing and is required.
+Please rewrite the input so it satisfies the expected schema.
+[91m[1mError: [0mStopped after 3 consecutive invalid-argument failures for the "write" tool. The model kept re-issuing malformed input, so the turn was aborted to avoid burning tokens.
