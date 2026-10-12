@@ -510,7 +510,8 @@ jobs:
         run: |
           set +e
           mkdir -p state
-          cat > state/worker_progress.md <<EOF
+          if [ "$upstream_retry_count" -eq 0 ]; then
+            cat > state/worker_progress.md <<EOF
           # Worker Progress
           
           activation_id: $GITHUB_RUN_ID
@@ -521,6 +522,9 @@ jobs:
           
           This file is a liveness contract. Update it only after a real research-state transition or verified milestone.
           EOF
+          fi
+          # Never replace worker-produced progress when retrying a transient gateway
+          # failure; each fresh process reuses durable workspace evidence.
           initial_checkpoint_mtime="$(stat -c %Y state/worker_progress.md)"
 
           : > /tmp/kilo-primary.log
