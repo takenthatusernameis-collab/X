@@ -504,7 +504,6 @@ jobs:
         id: kilo
         if: steps.preflight.outcome == 'success' && steps.kilo_smoke.outcome == 'success'
         continue-on-error: true
-        timeout-minutes: 340
         env:
           KILO_DISABLE_EXTERNAL_SKILLS: "true"
         run: |
@@ -548,9 +547,8 @@ jobs:
           - This repository is research/simulation only; there is no live-trading or production-execution path.
           EOF
           cat /tmp/x-activation-environment.txt .kilo/wakeup-prompt.md > /tmp/x-activation-prompt.txt
-          # Retry recognized upstream failures until the internal deadline,
-          # leaving a buffer before the 340-minute step / 355-minute job limit.
-          retry_deadline=$(( $(date +%s) + 325 * 60 ))
+          # Retry recognized transient failures without a per-session deadline.
+          # The enclosing 355-minute GitHub Actions job timeout is authoritative.
           retry_backoff=15
           upstream_retry_count=0
           while true; do
@@ -561,7 +559,6 @@ jobs:
           stdbuf -oL -eL kilo run --model openai-compatible/free-kilo --auto "$(cat /tmp/x-activation-prompt.txt)" > >(tee /tmp/kilo-primary.log) 2>&1 &
           kilo_pid=$!
 
-          stall_seconds=1800
           interval_seconds=30
           stale_for=0
           semantic_progress_seen=0
@@ -610,16 +607,6 @@ jobs:
 
             echo "::notice::Kilo liveness: signal=$last_signal checkpoint_age=$checkpoint_age s output_age=$output_age s stale_for=$stale_for s"
 
-            if [ "$stale_for" -ge "$stall_seconds" ]; then
-              echo "::error::Kilo worker appears stalled: no semantic checkpoint or fresh worker output for $stale_for s."
-              liveness_status="STALLED"
-              echo "KILO_LIVENESS_STATUS=STALLED" >> "$GITHUB_ENV"
-              echo "KILO_LIVENESS_REASON=no semantic checkpoint or fresh worker output for $stale_for s" >> "$GITHUB_ENV"
-              kill -TERM "$kilo_pid" 2>/dev/null || true
-              sleep 10
-              kill -KILL "$kilo_pid" 2>/dev/null || true
-              break
-            fi
           done
 
           wait "$kilo_pid"
@@ -641,25 +628,18 @@ jobs:
           fi
 
           if grep -Eiq 'invalid request error trace_id:|upstream idle timeout exceeded|upstream.{0,40}idle.{0,40}timeout|econnreset|econnrefused|etimedout|eai_again|enetunreach|ehostunreach|socket hang up|fetch failed|temporary failure in name resolution|gateway timeout|bad gateway|service unavailable|too many requests|rate[ _-]?limit|resource[_ -]?exhausted|temporarily unavailable|http.{0,12}(429|500|502|503|504)' /tmp/kilo-primary.log; then
-            remaining=$((retry_deadline - $(date +%s)))
-            if [ "$remaining" -gt "$retry_backoff" ]; then
-              upstream_retry_count=$((upstream_retry_count + 1))
-              cp /tmp/kilo-primary.log "/tmp/kilo-primary-attempt-${upstream_retry_count}.log" || true
-              echo "::warning::Transient Kilo upstream/network failure; retry #${upstream_retry_count} after ${retry_backoff}s. No attempt-count cap; retrying until the internal deadline."
-              echo "KILO_GATEWAY_RECOVERY=TRANSIENT_GATEWAY_RETRIED" >> "$GITHUB_ENV"
-              echo "KILO_GATEWAY_RETRY_COUNT=${upstream_retry_count}" >> "$GITHUB_ENV"
-              echo "KILO_GATEWAY_RECOVERY_REASON=recognized transient upstream/gateway/network error; fresh process retries continue with capped exponential backoff until the internal deadline" >> "$GITHUB_ENV"
-              sleep "$retry_backoff"
-              if [ "$retry_backoff" -lt 300 ]; then
-                retry_backoff=$((retry_backoff * 2))
-                if [ "$retry_backoff" -gt 300 ]; then retry_backoff=300; fi
-              fi
-              continue
-            fi
-            echo "::error::Transient upstream failure remains, but insufficient time remains before the safety deadline for another retry."
-            echo "KILO_GATEWAY_RECOVERY=TRANSIENT_GATEWAY_RETRY_BUDGET_EXHAUSTED" >> "$GITHUB_ENV"
+            upstream_retry_count=$((upstream_retry_count + 1))
+            cp /tmp/kilo-primary.log "/tmp/kilo-primary-attempt-${upstream_retry_count}.log" || true
+            echo "::warning::Transient Kilo upstream/network failure; retry #${upstream_retry_count} after ${retry_backoff}s. No attempt-count or session time limit; retrying until the 355-minute workflow cutoff."
+            echo "KILO_GATEWAY_RECOVERY=TRANSIENT_GATEWAY_RETRIED" >> "$GITHUB_ENV"
             echo "KILO_GATEWAY_RETRY_COUNT=${upstream_retry_count}" >> "$GITHUB_ENV"
-            echo "KILO_GATEWAY_RECOVERY_REASON=transient upstream error persisted until the retry time budget was exhausted" >> "$GITHUB_ENV"
+            echo "KILO_GATEWAY_RECOVERY_REASON=recognized transient upstream/gateway/network error; retries use capped exponential backoff until the 355-minute workflow cutoff" >> "$GITHUB_ENV"
+            sleep "$retry_backoff"
+            if [ "$retry_backoff" -lt 300 ]; then
+              retry_backoff=$((retry_backoff * 2))
+              if [ "$retry_backoff" -gt 300 ]; then retry_backoff=300; fi
+            fi
+            continue
           fi
           exit "$status"
           done
