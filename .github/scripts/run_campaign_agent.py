@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one genuinely fresh Kilo campaign session with bounded liveness and no retry."""
+"""Run fresh Kilo sessions, retrying only transient upstream failures until the agent deadline."""
 
 from __future__ import annotations
 
@@ -48,7 +48,33 @@ def snapshot_workspace(path: Path) -> dict[str, str]:
 
 def classify_failure(output: str, return_code: int, liveness: str) -> str:
     lower = output.lower()
-    if "invalid request error trace_id:" in lower:
+    transient_markers = (
+        "invalid request error trace_id:",
+        "upstream idle timeout exceeded",
+        "idle timeout exceeded",
+        "econnreset",
+        "econnrefused",
+        "etimedout",
+        "eai_again",
+        "enetunreach",
+        "ehostunreach",
+        "socket hang up",
+        "fetch failed",
+        "temporary failure in name resolution",
+        "gateway timeout",
+        "bad gateway",
+        "service unavailable",
+        "too many requests",
+        "rate limit",
+        "resource_exhausted",
+        "temporarily unavailable",
+        "http 429",
+        "http 500",
+        "http 502",
+        "http 503",
+        "http 504",
+    )
+    if any(marker in lower for marker in transient_markers):
         return "TRANSIENT_GATEWAY"
     if liveness in {"STALLED", "TIMED_OUT"}:
         return "LIVENESS"
@@ -118,74 +144,139 @@ def main() -> int:
     log_path = agent_dir / f"agent_{args.agent_number:02d}_kilo.log"
     session_started_utc = utc_now()
     start_mono = time.monotonic()
-    last_progress_mtime = progress.stat().st_mtime
-    last_signal_time = start_mono
-    semantic_progress_seen = False
+    kilo_bin = os.environ.get("KILO_BIN", "kilo")
+    retry_count = 0
+    retry_delay = 15
+    attempt_number = 0
+    return_code = 1
     liveness = "RUNNING"
+    semantic_progress_seen = False
+    failure_class = "UNKNOWN"
     output_chunks: list[str] = []
 
-    kilo_bin = os.environ.get("KILO_BIN", "kilo")
-    proc = subprocess.Popen(
-        [kilo_bin, "run", "--model", args.model, "--auto", prompt],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=1,
-    )
+    # The time budget applies to the whole fresh-session retry sequence, not
+    # separately to each attempt. There is intentionally no attempt-count cap.
+    while True:
+        remaining = args.timeout_seconds - (time.monotonic() - start_mono)
+        if remaining <= 0:
+            return_code = 124
+            liveness = "TIMED_OUT"
+            if failure_class != "TRANSIENT_GATEWAY":
+                failure_class = "LIVENESS"
+            print("::warning::Kilo retry time budget exhausted; no further attempt will start.")
+            break
 
-    selector = selectors.DefaultSelector()
-    if proc.stdout is not None:
-        selector.register(proc.stdout, selectors.EVENT_READ)
-
-    try:
-        with log_path.open("w", encoding="utf-8") as log:
-            while True:
-                now = time.monotonic()
-                if now - start_mono >= args.timeout_seconds:
-                    liveness = "TIMED_OUT"
-                    terminate_process(proc)
-                    break
-
-                events = selector.select(timeout=1.0)
-                if events:
-                    for key, _ in events:
-                        line = key.fileobj.readline()
-                        if line:
-                            print(line, end="")
-                            log.write(line)
-                            log.flush()
-                            output_chunks.append(line)
-                            last_signal_time = time.monotonic()
-
-                current_progress_mtime = progress.stat().st_mtime if progress.exists() else last_progress_mtime
-                if current_progress_mtime > last_progress_mtime:
-                    semantic_progress_seen = True
-                    last_progress_mtime = current_progress_mtime
-                    last_signal_time = time.monotonic()
-
-                if proc.poll() is not None:
-                    break
-
-                if (
-                    time.monotonic() - start_mono >= args.stall_seconds
-                    and time.monotonic() - last_signal_time >= args.stall_seconds
-                ):
-                    liveness = "STALLED"
-                    terminate_process(proc)
-                    break
-    finally:
-        selector.close()
-
-    return_code = proc.returncode if proc.returncode is not None else 124
-    if liveness == "RUNNING":
-        liveness = (
-            "COMPLETED_WITH_SEMANTIC_CHECKPOINTS"
-            if semantic_progress_seen
-            else "COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT"
+        attempt_number += 1
+        attempt_started = time.monotonic()
+        last_progress_mtime = progress.stat().st_mtime if progress.exists() else time.time()
+        last_signal_time = attempt_started
+        attempt_semantic_progress = False
+        attempt_chunks: list[str] = []
+        proc = subprocess.Popen(
+            [kilo_bin, "run", "--model", args.model, "--auto", prompt],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
         )
 
-    output = "".join(output_chunks)
-    failure_class = classify_failure(output, return_code, liveness)
+        selector = selectors.DefaultSelector()
+        if proc.stdout is not None:
+            selector.register(proc.stdout, selectors.EVENT_READ)
+
+        attempt_liveness = "RUNNING"
+        try:
+            with log_path.open("a", encoding="utf-8") as log:
+                if attempt_number == 1:
+                    log.write(f"--- Fresh Kilo session attempt {attempt_number} ---\n")
+                else:
+                    log.write(
+                        f"\n--- Fresh Kilo session retry attempt {attempt_number} "
+                        f"(transient upstream failure; retry #{retry_count}) ---\n"
+                    )
+                log.flush()
+
+                while True:
+                    now = time.monotonic()
+                    if now - start_mono >= args.timeout_seconds:
+                        attempt_liveness = "TIMED_OUT"
+                        terminate_process(proc)
+                        break
+
+                    events = selector.select(timeout=1.0)
+                    if events:
+                        for key, _ in events:
+                            line = key.fileobj.readline()
+                            if line:
+                                print(line, end="")
+                                log.write(line)
+                                log.flush()
+                                attempt_chunks.append(line)
+                                output_chunks.append(line)
+                                last_signal_time = time.monotonic()
+
+                    current_progress_mtime = (
+                        progress.stat().st_mtime if progress.exists() else last_progress_mtime
+                    )
+                    if current_progress_mtime > last_progress_mtime:
+                        attempt_semantic_progress = True
+                        last_progress_mtime = current_progress_mtime
+                        last_signal_time = time.monotonic()
+
+                    if proc.poll() is not None:
+                        break
+
+                    if (
+                        time.monotonic() - attempt_started >= args.stall_seconds
+                        and time.monotonic() - last_signal_time >= args.stall_seconds
+                    ):
+                        attempt_liveness = "STALLED"
+                        terminate_process(proc)
+                        break
+        finally:
+            selector.close()
+
+        return_code = proc.returncode if proc.returncode is not None else 124
+        if attempt_liveness == "RUNNING":
+            attempt_liveness = (
+                "COMPLETED_WITH_SEMANTIC_CHECKPOINTS"
+                if attempt_semantic_progress
+                else "COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT"
+            )
+        liveness = attempt_liveness
+        semantic_progress_seen = semantic_progress_seen or attempt_semantic_progress
+        attempt_failure_class = classify_failure(
+            "".join(attempt_chunks), return_code, attempt_liveness
+        )
+        failure_class = attempt_failure_class
+
+        if return_code == 0 and liveness not in {"STALLED", "TIMED_OUT"}:
+            break
+        if failure_class != "TRANSIENT_GATEWAY":
+            break
+
+        remaining = args.timeout_seconds - (time.monotonic() - start_mono)
+        if remaining <= retry_delay:
+            print(
+                "::warning::Transient upstream error remains, but the remaining agent "
+                "deadline is too short for another retry delay; preserving evidence."
+            )
+            break
+
+        retry_count += 1
+        print(
+            f"::warning::Transient Kilo upstream/network failure; launching a fresh "
+            f"process after {retry_delay}s (retry #{retry_count}; no attempt-count limit)."
+        )
+        with log_path.open("a", encoding="utf-8") as log:
+            log.write(
+                f"Transient upstream failure classified at attempt {attempt_number}; "
+                f"retry #{retry_count} in {retry_delay}s. The time deadline is authoritative.\n"
+            )
+        time.sleep(retry_delay)
+        retry_delay = min(300, retry_delay * 2)
+
+    runtime_output = "".join(output_chunks)
     runtime = {
         "agent_number": args.agent_number,
         "campaign_slot": args.agent_number,
@@ -201,7 +292,9 @@ def main() -> int:
         "log": str(log_path),
         "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
         "worker_progress_sha256": sha(progress),
-        "automatic_retry": False,
+        "automatic_retry": retry_count > 0,
+        "retry_count": retry_count,
+        "retry_policy": "recognized transient upstream/network errors only; retry until per-agent deadline with exponential backoff capped at 300 seconds",
         "previous_session_context_reused": False,
     }
     (agent_dir / f"agent_{args.agent_number:02d}_runtime.json").write_text(
