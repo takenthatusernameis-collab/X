@@ -666,7 +666,6 @@ jobs:
       - name: Verify and persist safe repository changes
         id: persist
         if: always()
-        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
           KILO_OUTCOME: ${{ steps.kilo.outcome }}
@@ -706,29 +705,70 @@ jobs:
           if git diff --cached --quiet; then
             echo "No safe repository changes to persist."
             echo "PERSISTENCE_STATUS=NO_CHANGES" >> "$GITHUB_ENV"
-            exit 0
+            echo "::error::No safe project changes were staged; refusing to report a persisted activation."
+            exit 1
           fi
 
           git config user.name "kilo-research-enterprise"
           git config user.email "kilo-research-enterprise@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
           git commit -m "Kilo activation: update research state"
-          local_commit="$(git rev-parse HEAD)"
-          git fetch origin "$GITHUB_REF_NAME"
-
-          if git rebase "origin/$GITHUB_REF_NAME"; then
-            if git push origin "HEAD:$GITHUB_REF_NAME"; then
-              echo "PERSISTENCE_STATUS=MAIN" >> "$GITHUB_ENV"
-              exit 0
+          attempt=0
+          delay=5
+          while [ "$attempt" -lt 3 ]; do
+            attempt=$((attempt + 1))
+            echo "Main-branch persistence attempt $attempt/3."
+            if git fetch origin "$GITHUB_REF_NAME"; then
+              if git rebase --autostash "origin/$GITHUB_REF_NAME"; then
+                local_commit="$(git rev-parse HEAD)"
+                if git push origin "HEAD:$GITHUB_REF_NAME"; then
+                  remote_sha="$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" 2>/dev/null | awk 'NR==1 {print $1}')"
+                  if [ -n "$remote_sha" ] && [ "$remote_sha" = "$local_commit" ]; then
+                    echo "PERSISTENCE_STATUS=MAIN" >> "$GITHUB_ENV"
+                    echo "Verified main-branch persistence at $remote_sha."
+                    exit 0
+                  fi
+                  echo "::warning::Main-branch push succeeded but exact remote-head verification failed."
+                else
+                  echo "::warning::Main-branch push failed on attempt $attempt."
+                fi
+              else
+                echo "::warning::Rebase failed on attempt $attempt."
+              fi
+            else
+              echo "::warning::Fetch failed on attempt $attempt."
             fi
-          fi
-
+            git rebase --abort >/dev/null 2>&1 || true
+            if [ "$attempt" -lt 3 ]; then
+              sleep "$delay"
+              delay=$((delay * 2))
+            fi
+          done
           git rebase --abort >/dev/null 2>&1 || true
-          recovery_branch="recovery/kilo-run-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          git push origin "${local_commit}:refs/heads/${recovery_branch}"
-          echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
-          echo "PERSISTENCE_RECOVERY_BRANCH=${recovery_branch}" >> "$GITHUB_ENV"
-          echo "::warning::Main integration failed; worker commit preserved on ${recovery_branch}."
+          local_commit="$(git rev-parse HEAD)"
+          recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          attempt=0
+          delay=5
+          while [ "$attempt" -lt 3 ]; do
+            attempt=$((attempt + 1))
+            if git push origin "$local_commit:refs/heads/$recovery_branch"; then
+              remote_sha="$(git ls-remote origin "refs/heads/$recovery_branch" 2>/dev/null | awk 'NR==1 {print $1}')"
+              if [ -n "$remote_sha" ] && [ "$remote_sha" = "$local_commit" ]; then
+                echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
+                echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
+                echo "Verified durable recovery checkpoint at $remote_sha on $recovery_branch."
+                echo "::warning::Main integration failed; the committed worker state was verified on the recovery branch."
+                exit 0
+              fi
+            fi
+            echo "::warning::Recovery-branch persistence attempt $attempt failed verification."
+            if [ "$attempt" -lt 3 ]; then
+              sleep "$delay"
+              delay=$((delay * 2))
+            fi
+          done
+          echo "::error::Could not verify the committed checkpoint on the main branch or a recovery branch."
+          exit 1
       - name: Deep audit — after Verify and persist safe repository changes
         id: deep_audit_13_verify_and_persist_safe_repository_changes
         if: always()
