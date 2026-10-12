@@ -59,10 +59,12 @@ class CampaignArchitectureTests(unittest.TestCase):
         self.assertIn("python3 .github/scripts/scan_staged_secrets.py", self.workflow)
         self.assertNotIn("kilo_[A-Za-z0-9_-]{20,}", self.workflow)
 
-    def test_worker_liveness_cap_leaves_controller_headroom(self):
-        self.assertIn('default=1760', self.runner)
-        self.assertNotIn('default=1680', self.runner)
-        self.assertIn('timeout-minutes: 30', self.workflow)
+    def test_workflow_cutoff_is_the_only_agent_execution_deadline(self):
+        self.assertIn("timeout-minutes: 355", self.workflow)
+        self.assertNotIn("--timeout-seconds", self.runner)
+        self.assertNotIn("--stall-seconds", self.runner)
+        self.assertNotIn("args.timeout_seconds", self.runner)
+        self.assertNotIn('timeout-minutes: 30', self.workflow)
 
     def test_no_recursive_dispatch_or_retry_once_architecture(self):
         for value in (self.workflow, self.oneshot):
@@ -139,13 +141,14 @@ class CampaignArchitectureTests(unittest.TestCase):
         self.assertIn('git", "diff", "--cached", "--name-only"', validator)
         self.assertIn('"tests/test_campaign_architecture.py"', validator)
 
-    def test_fresh_session_runner_retries_transient_upstream_until_deadline(self):
-        self.assertIn("[kilo_bin, \"run\", \"--model\", args.model, \"--auto\", prompt]", self.runner)
+    def test_fresh_session_runner_retries_transient_upstream_without_agent_deadline(self):
+        self.assertIn('[kilo_bin, "run", "--model", args.model, "--auto", prompt]', self.runner)
         self.assertIn('if failure_class != "TRANSIENT_GATEWAY":', self.runner)
-        self.assertIn("args.timeout_seconds - (time.monotonic() - start_mono)", self.runner)
         self.assertIn("retry_delay = min(300, retry_delay * 2)", self.runner)
         self.assertIn('"automatic_retry": retry_count > 0', self.runner)
         self.assertIn('"previous_session_context_reused": False', self.runner)
+        self.assertNotIn("timeout_seconds", self.runner)
+        self.assertNotIn("stall_seconds", self.runner)
         self.assertNotIn("retry_count < 3", self.runner)
         self.assertNotIn("kilo retry", self.runner.lower())
 
