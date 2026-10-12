@@ -139,12 +139,15 @@ class CampaignArchitectureTests(unittest.TestCase):
         self.assertIn('git", "diff", "--cached", "--name-only"', validator)
         self.assertIn('"tests/test_campaign_architecture.py"', validator)
 
-    def test_fresh_session_runner_has_no_retry(self):
+    def test_fresh_session_runner_retries_transient_upstream_until_deadline(self):
         self.assertIn("[kilo_bin, \"run\", \"--model\", args.model, \"--auto\", prompt]", self.runner)
-        self.assertIn('\"automatic_retry\": False', self.runner)
-        self.assertIn('\"previous_session_context_reused\": False', self.runner)
+        self.assertIn('if failure_class != "TRANSIENT_GATEWAY":', self.runner)
+        self.assertIn("args.timeout_seconds - (time.monotonic() - start_mono)", self.runner)
+        self.assertIn("retry_delay = min(300, retry_delay * 2)", self.runner)
+        self.assertIn('"automatic_retry": retry_count > 0', self.runner)
+        self.assertIn('"previous_session_context_reused": False', self.runner)
+        self.assertNotIn("retry_count < 3", self.runner)
         self.assertNotIn("kilo retry", self.runner.lower())
-        self.assertNotIn("retry_pid", self.runner)
 
     def test_task_queue_has_bounded_contracts(self):
         import json
