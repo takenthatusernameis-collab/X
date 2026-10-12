@@ -457,7 +457,7 @@ MANDATORY SESSION FIREWALL:
 - Secondary ideas become candidate_tasks in the durable record; they are NOT current work.
 - Do not redefine the campaign objective.
 - Do not dispatch another workflow.
-- Do not create hidden retries or another Kilo session.
+- Do not create another Kilo session for additional research or recursively dispatch workflows. The controller wrapper may start a fresh Kilo process only after a recognized transient upstream/gateway/network failure, with retries continuing until the assigned agent deadline; use capped exponential backoff and do not retry deterministic tool, permission, coding, or research-task failures.
 - Do not modify .github/workflows/**, .github/scripts/**, .kilo/**, AGENTS.md, ENTERPRISE.md, MANUAL_SETUP.md, or PERSISTENCE_POLICY.md.
 - Do not add cosmetic changes.
 - Do not treat commands executed, files edited, workflow success, tokens, runtime, or confidence as learning evidence.
