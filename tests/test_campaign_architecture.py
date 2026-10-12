@@ -61,10 +61,14 @@ class CampaignArchitectureTests(unittest.TestCase):
 
     def test_workflow_cutoff_is_the_only_agent_execution_deadline(self):
         self.assertIn("timeout-minutes: 355", self.workflow)
-        self.assertNotIn("--timeout-seconds", self.runner)
-        self.assertNotIn("--stall-seconds", self.runner)
-        self.assertNotIn("args.timeout_seconds", self.runner)
-        self.assertNotIn('timeout-minutes: 30', self.workflow)
+        self.assertIn("timeout-minutes: 355", self.oneshot)
+        for workflow in (self.workflow, self.oneshot):
+            self.assertNotIn("--timeout-seconds", self.runner)
+            self.assertNotIn("--stall-seconds", self.runner)
+            self.assertNotIn("args.timeout_seconds", self.runner)
+            self.assertNotIn('timeout-minutes: 30', workflow)
+            self.assertNotIn('timeout-minutes: 5', workflow)
+            self.assertNotIn("45s kilo run", workflow)
 
     def test_no_recursive_dispatch_or_retry_once_architecture(self):
         for value in (self.workflow, self.oneshot):
