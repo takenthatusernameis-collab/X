@@ -104,8 +104,6 @@ def main() -> int:
     ap.add_argument("--agent-number", required=True, type=int)
     ap.add_argument("--model", required=True)
     ap.add_argument("--prompt-file", required=True)
-    ap.add_argument("--timeout-seconds", type=int, default=1760)
-    ap.add_argument("--stall-seconds", type=int, default=900)
     args = ap.parse_args()
 
     run_root = Path("state/campaign/runs") / str(args.run_id)
@@ -143,7 +141,6 @@ def main() -> int:
 
     log_path = agent_dir / f"agent_{args.agent_number:02d}_kilo.log"
     session_started_utc = utc_now()
-    start_mono = time.monotonic()
     kilo_bin = os.environ.get("KILO_BIN", "kilo")
     retry_count = 0
     retry_delay = 15
@@ -154,22 +151,21 @@ def main() -> int:
     failure_class = "UNKNOWN"
     output_chunks: list[str] = []
 
-    # The time budget applies to the whole fresh-session retry sequence, not
-    # separately to each attempt. There is intentionally no attempt-count cap.
-    while True:
-        remaining = args.timeout_seconds - (time.monotonic() - start_mono)
-        if remaining <= 0:
-            return_code = 124
-            liveness = "TIMED_OUT"
-            if failure_class != "TRANSIENT_GATEWAY":
-                failure_class = "LIVENESS"
-            print("::warning::Transient-upstream retry time budget exhausted; no further attempt will start.")
-            break
+    # No per-agent deadline or inactivity kill is applied here.
+    # The enclosing GitHub Actions job/workflow timeout is the sole execution cutoff.
+    kilo_bin = os.environ.get("KILO_BIN", "kilo")
+    retry_count = 0
+    retry_delay = 15
+    attempt_number = 0
+    return_code = 1
+    liveness = "RUNNING"
+    semantic_progress_seen = False
+    failure_class = "UNKNOWN"
+    output_chunks: list[str] = []
 
+    while True:
         attempt_number += 1
-        attempt_started = time.monotonic()
         last_progress_mtime = progress.stat().st_mtime if progress.exists() else time.time()
-        last_signal_time = attempt_started
         attempt_semantic_progress = False
         attempt_chunks: list[str] = []
         proc = subprocess.Popen(
@@ -188,21 +184,15 @@ def main() -> int:
         try:
             with log_path.open("a", encoding="utf-8") as log:
                 if attempt_number == 1:
-                    log.write(f"--- Fresh Kilo session attempt {attempt_number} ---\n")
+                    log.write(f"--- Fresh Kilo session attempt {attempt_number} ---\\n")
                 else:
                     log.write(
-                        f"\n--- Fresh Kilo session retry attempt {attempt_number} "
-                        f"(transient upstream failure; retry #{retry_count}) ---\n"
+                        f"\\n--- Fresh Kilo session retry attempt {attempt_number} "
+                        f"(transient upstream failure; retry #{retry_count}) ---\\n"
                     )
                 log.flush()
 
                 while True:
-                    now = time.monotonic()
-                    if now - start_mono >= args.timeout_seconds:
-                        attempt_liveness = "TIMED_OUT"
-                        terminate_process(proc)
-                        break
-
                     events = selector.select(timeout=1.0)
                     if events:
                         for key, _ in events:
@@ -213,7 +203,6 @@ def main() -> int:
                                 log.flush()
                                 attempt_chunks.append(line)
                                 output_chunks.append(line)
-                                last_signal_time = time.monotonic()
 
                     current_progress_mtime = (
                         progress.stat().st_mtime if progress.exists() else last_progress_mtime
@@ -221,57 +210,40 @@ def main() -> int:
                     if current_progress_mtime > last_progress_mtime:
                         attempt_semantic_progress = True
                         last_progress_mtime = current_progress_mtime
-                        last_signal_time = time.monotonic()
 
                     if proc.poll() is not None:
-                        break
-
-                    if (
-                        time.monotonic() - attempt_started >= args.stall_seconds
-                        and time.monotonic() - last_signal_time >= args.stall_seconds
-                    ):
-                        attempt_liveness = "STALLED"
-                        terminate_process(proc)
                         break
         finally:
             selector.close()
 
-        return_code = proc.returncode if proc.returncode is not None else 124
-        if attempt_liveness == "RUNNING":
-            attempt_liveness = (
-                "COMPLETED_WITH_SEMANTIC_CHECKPOINTS"
-                if attempt_semantic_progress
-                else "COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT"
-            )
+        return_code = proc.returncode if proc.returncode is not None else 1
+        attempt_liveness = (
+            "COMPLETED_WITH_SEMANTIC_CHECKPOINTS"
+            if attempt_semantic_progress
+            else "COMPLETED_WITHOUT_SEMANTIC_CHECKPOINT"
+        )
         liveness = attempt_liveness
         semantic_progress_seen = semantic_progress_seen or attempt_semantic_progress
-        attempt_failure_class = classify_failure(
+        failure_class = classify_failure(
             "".join(attempt_chunks), return_code, attempt_liveness
         )
-        failure_class = attempt_failure_class
 
-        if return_code == 0 and liveness not in {"STALLED", "TIMED_OUT"}:
+        if return_code == 0:
             break
         if failure_class != "TRANSIENT_GATEWAY":
-            break
-
-        remaining = args.timeout_seconds - (time.monotonic() - start_mono)
-        if remaining <= retry_delay:
-            print(
-                "::warning::Transient upstream error remains, but the remaining agent "
-                "deadline is too short for another retry delay; preserving evidence."
-            )
             break
 
         retry_count += 1
         print(
             f"::warning::Transient Kilo upstream/network failure; launching a fresh "
-            f"process after {retry_delay}s (retry #{retry_count}; no attempt-count limit)."
+            f"process after {retry_delay}s (retry #{retry_count}; no attempt-count or "
+            "per-agent time limit; enclosing workflow cutoff remains authoritative)."
         )
         with log_path.open("a", encoding="utf-8") as log:
             log.write(
                 f"Transient upstream failure classified at attempt {attempt_number}; "
-                f"retry #{retry_count} in {retry_delay}s. The time deadline is authoritative.\n"
+                f"retry #{retry_count} in {retry_delay}s. Only the enclosing workflow "
+                "cutoff limits execution.\\n"
             )
         time.sleep(retry_delay)
         retry_delay = min(300, retry_delay * 2)
@@ -294,7 +266,7 @@ def main() -> int:
         "worker_progress_sha256": sha(progress),
         "automatic_retry": retry_count > 0,
         "retry_count": retry_count,
-        "retry_policy": "recognized transient upstream/network errors only; retry until per-agent deadline with exponential backoff capped at 300 seconds",
+        "retry_policy": "recognized transient upstream/network errors only; retry with capped exponential backoff and no per-agent deadline; the enclosing workflow cutoff is authoritative",
         "previous_session_context_reused": False,
     }
     (agent_dir / f"agent_{args.agent_number:02d}_runtime.json").write_text(
@@ -303,7 +275,7 @@ def main() -> int:
     )
     print(f"AGENT_RUNTIME={json.dumps(runtime, sort_keys=True)}")
 
-    return 0 if return_code == 0 and liveness not in {"STALLED", "TIMED_OUT"} else 1
+    return 0 if return_code == 0 else 1
 
 
 if __name__ == "__main__":
