@@ -163,7 +163,7 @@ def main() -> int:
             liveness = "TIMED_OUT"
             if failure_class != "TRANSIENT_GATEWAY":
                 failure_class = "LIVENESS"
-            print("::warning::Kilo retry time budget exhausted; no further attempt will start.")
+            print("::warning::Transient-upstream retry time budget exhausted; no further attempt will start.")
             break
 
         attempt_number += 1
