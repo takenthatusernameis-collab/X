@@ -87,17 +87,6 @@ def classify_failure(output: str, return_code: int, liveness: str) -> str:
     return "NONE"
 
 
-def terminate_process(proc: subprocess.Popen[str]) -> int:
-    if proc.poll() is None:
-        proc.terminate()
-        try:
-            proc.wait(timeout=10)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait(timeout=10)
-    return proc.returncode if proc.returncode is not None else 124
-
-
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--run-id", required=True)
@@ -141,16 +130,6 @@ def main() -> int:
 
     log_path = agent_dir / f"agent_{args.agent_number:02d}_kilo.log"
     session_started_utc = utc_now()
-    kilo_bin = os.environ.get("KILO_BIN", "kilo")
-    retry_count = 0
-    retry_delay = 15
-    attempt_number = 0
-    return_code = 1
-    liveness = "RUNNING"
-    semantic_progress_seen = False
-    failure_class = "UNKNOWN"
-    output_chunks: list[str] = []
-
     # No per-agent deadline or inactivity kill is applied here.
     # The enclosing GitHub Actions job/workflow timeout is the sole execution cutoff.
     kilo_bin = os.environ.get("KILO_BIN", "kilo")
@@ -184,11 +163,11 @@ def main() -> int:
         try:
             with log_path.open("a", encoding="utf-8") as log:
                 if attempt_number == 1:
-                    log.write(f"--- Fresh Kilo session attempt {attempt_number} ---\\n")
+                    log.write(f"--- Fresh Kilo session attempt {attempt_number} ---\n")
                 else:
                     log.write(
-                        f"\\n--- Fresh Kilo session retry attempt {attempt_number} "
-                        f"(transient upstream failure; retry #{retry_count}) ---\\n"
+                        f"\n--- Fresh Kilo session retry attempt {attempt_number} "
+                        f"(transient upstream failure; retry #{retry_count}) ---\n"
                     )
                 log.flush()
 
@@ -243,7 +222,7 @@ def main() -> int:
             log.write(
                 f"Transient upstream failure classified at attempt {attempt_number}; "
                 f"retry #{retry_count} in {retry_delay}s. Only the enclosing workflow "
-                "cutoff limits execution.\\n"
+                "cutoff limits execution.\n"
             )
         time.sleep(retry_delay)
         retry_delay = min(300, retry_delay * 2)
