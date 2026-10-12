@@ -502,14 +502,41 @@ jobs:
           Do not modify the Git repository and stop after verification.
           EOF
           cd /tmp/kilo-smoke
-          kilo run --model openai-compatible/free-kilo --auto "$(cat /tmp/kilo-smoke/prompt.txt)" > /tmp/kilo-smoke.log 2>&1
-          status=$?
-          cat /tmp/kilo-smoke.log
-          test "$status" -eq 0
-          test -s /tmp/kilo-smoke/sentinel.txt
-          test -s /tmp/kilo-smoke/sentinel.txt
-          echo "Smoke sentinel contents (model-chosen): $(cat /tmp/kilo-smoke/sentinel.txt)"
-          echo "Representative Kilo execution-path smoke test passed."
+          smoke_deadline=$(( $(date +%s) + 240 ))
+          smoke_backoff=5
+          smoke_attempt=0
+          while true; do
+            smoke_attempt=$((smoke_attempt + 1))
+            rm -f /tmp/kilo-smoke/sentinel.txt
+            : > /tmp/kilo-smoke.log
+            if timeout --signal=TERM --kill-after=5s 45s kilo run --model openai-compatible/free-kilo --auto "$(cat /tmp/kilo-smoke/prompt.txt)" > /tmp/kilo-smoke.log 2>&1; then
+              status=0
+            else
+              status=$?
+            fi
+            cat /tmp/kilo-smoke.log
+            if [ "$status" -eq 0 ]; then
+              test -s /tmp/kilo-smoke/sentinel.txt
+              echo "Smoke sentinel contents (model-chosen): $(cat /tmp/kilo-smoke/sentinel.txt)"
+              echo "Representative Kilo execution-path smoke test passed."
+              exit 0
+            fi
+            if [ "$status" -eq 124 ] || [ "$status" -eq 137 ] || grep -Eiq 'invalid request error trace_id:|upstream idle timeout exceeded|upstream.{0,40}idle.{0,40}timeout|econnreset|econnrefused|etimedout|eai_again|enetunreach|ehostunreach|socket hang up|fetch failed|temporary failure in name resolution|gateway timeout|bad gateway|service unavailable|too many requests|rate[ _-]?limit|resource[_ -]?exhausted|temporarily unavailable|http.{0,12}(429|500|502|503|504)' /tmp/kilo-smoke.log; then
+              remaining=$((smoke_deadline - $(date +%s)))
+              if [ "$remaining" -gt "$smoke_backoff" ]; then
+                cp /tmp/kilo-smoke.log "/tmp/kilo-smoke-attempt-${smoke_attempt}.log" || true
+                echo "::warning::Transient Kilo smoke-test upstream/network failure; retry #${smoke_attempt} after ${smoke_backoff}s. No attempt-count cap; retrying within the 4-minute safety budget."
+                sleep "$smoke_backoff"
+                if [ "$smoke_backoff" -lt 30 ]; then
+                  smoke_backoff=$((smoke_backoff * 2))
+                  if [ "$smoke_backoff" -gt 30 ]; then smoke_backoff=30; fi
+                fi
+                continue
+              fi
+              echo "::error::Transient Kilo smoke-test failure persisted until the retry safety budget was exhausted."
+            fi
+            exit "$status"
+          done
       - name: Deep audit — after Smoke-test real Kilo execution path
         id: deep_audit_11_smoke_test_real_kilo_execution_path
         if: always()
