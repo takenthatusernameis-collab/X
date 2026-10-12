@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run fresh Kilo sessions, retrying only transient upstream failures until the agent deadline."""
+"""Run fresh Kilo sessions; only the enclosing workflow imposes an execution deadline."""
 
 from __future__ import annotations
 
