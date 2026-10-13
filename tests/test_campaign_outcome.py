@@ -41,8 +41,16 @@ class CampaignOutcomeReportTests(unittest.TestCase):
                 with mock.patch(
                     "sys.argv", ["report_campaign_outcome.py", "--run-id", "123"]
                 ):
-                    with mock.patch("builtins.print"):
-                        return MODULE.main()
+                    with mock.patch.dict(
+                        os.environ,
+                        {
+                            "PERSISTENCE_STATUS": "RECOVERY_BRANCH",
+                            "PERSISTENCE_RECOVERY_BRANCH": "recovery/test",
+                        },
+                        clear=False,
+                    ):
+                        with mock.patch("builtins.print"):
+                            return MODULE.main()
             finally:
                 os.chdir(previous)
 
