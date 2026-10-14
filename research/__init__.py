@@ -1,0 +1,1 @@
+"""Research package for quantitative research and backtesting."""
