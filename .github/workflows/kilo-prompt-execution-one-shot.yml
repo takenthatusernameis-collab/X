@@ -631,9 +631,11 @@ jobs:
             upstream_retry_count=$((upstream_retry_count + 1))
             cp /tmp/kilo-primary.log "/tmp/kilo-primary-attempt-${upstream_retry_count}.log" || true
             echo "::warning::Transient Kilo upstream/network failure; retry #${upstream_retry_count} after ${retry_backoff}s. No attempt-count or session time limit; retrying until the 355-minute workflow cutoff."
-            echo "KILO_GATEWAY_RECOVERY=TRANSIENT_GATEWAY_RETRIED" >> "$GITHUB_ENV"
-            echo "KILO_GATEWAY_RETRY_COUNT=${upstream_retry_count}" >> "$GITHUB_ENV"
-            echo "KILO_GATEWAY_RECOVERY_REASON=recognized transient upstream/gateway/network error; retries use capped exponential backoff until the 355-minute workflow cutoff" >> "$GITHUB_ENV"
+            {
+              echo "KILO_GATEWAY_RECOVERY=TRANSIENT_GATEWAY_RETRIED"
+              echo "KILO_GATEWAY_RETRY_COUNT=${upstream_retry_count}"
+              echo "KILO_GATEWAY_RECOVERY_REASON=recognized transient upstream/gateway/network error; retries use capped exponential backoff until the 355-minute workflow cutoff"
+            } >> "$GITHUB_ENV"
             sleep "$retry_backoff"
             if [ "$retry_backoff" -lt 300 ]; then
               retry_backoff=$((retry_backoff * 2))
