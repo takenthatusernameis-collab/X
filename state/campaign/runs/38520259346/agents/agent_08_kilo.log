@@ -1,0 +1,678 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+[0m→ [0mRead .
+[0m✱ [0mGlob "**/momentum*"[90m 19 matches[0m
+[0m✱ [0mGlob "**/regime*"[90m 7 matches[0m
+[0m✱ [0mGlob "**/test*"[90m 22 matches[0m
+[0m→ [0mRead research/checks/momentum.py
+[0m→ [0mRead research/backtest/regime_stability.py
+[0m→ [0mRead tests/test_regime_stability.py
+[0m→ [0mRead AGENTS.md
+[0m→ [0mRead state/check_artifacts/momentum_results.json
+[0m→ [0mRead LEARNING_EFFICIENCY.md
+[0m✗ [0mpython -c "import sys; sys.path.insert(0, '.'); from research.backtest import regime_stability, bt; import numpy as np; print('Functions available:'); print('  conditional_signal:', hasattr(regime_stability, 'conditional_signal')); print('  active_when_turbulent:', hasattr(regime_stability, 'active_when_turbulent')); print('  momentum_signals:', hasattr(bt, 'momentum_signals')); print('  regime_stress:', hasattr(regime_stability, 'regime_stress')); print('  volatility_blocks:', hasattr(regime_stability, 'volatility_blocks'))" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m→ [0mRead research/backtest
+[0m→ [0mRead research/backtest/__init__.py
+[0m
+[0m← [0mWrite research/checks/regime_conditional_momentum.py
+Wrote file successfully.
+[0m
+[0m→ [0mRead research/data/preflight.py
+[0m
+[0m← [0mEdit research/checks/regime_conditional_momentum.py
+Index: /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
++++ /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+@@ -2,8 +2,9 @@
+ 
+ import json
+ import sys
+ from pathlib import Path
++from typing import List
+ 
+ import numpy as np
+ 
+ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
+[0m
+[0m← [0mEdit research/checks/regime_conditional_momentum.py
+Index: /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
++++ /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+@@ -57,39 +57,11 @@
+ 
+ 
+ def regime_labels(closes, n_blocks=N_BLOCKS, window=WINDOW):
+     """Create past-only volatility regime labels (same as regime_stability.volatility_blocks)."""
+-    n = len(closes)
+-    block_size = n // n_blocks
+-    bar_vols: List[float] = []
+-    for i in range(n):
+-        if i < window:
+-            bar_vols.append(0.0)
+-        else:
+-            bar_vols.append(
+-                float(np.std(np.log(closes[i - window : i]), ddof=1)) * np.sqrt(252.0)
+-            )
+-    active = [v for v in bar_vols if v > 0]
+-    if not active:
+-        raise ValueError("not enough bars to compute realized volatility")
+-    series_med = float(np.median(active))
++    return bt.volatility_blocks(closes, n_blocks=n_blocks, window=window)
+ 
+-    labels: List[str] = []
+-    for i in range(n):
+-        if i < window:
+-            labels.append("insufficient")
+-        else:
+-            block = i // block_size
+-            s, e = block * block_size, (block + 1) * block_size
+-            bmed = float(
+-                np.median([v for v in bar_vols[s:e] if v > 0])
+-                if e - s > window
+-                else 0.0
+-            )
+-            labels.append("turbulent" if bmed > series_med else "calm")
+-    return labels
+ 
+-
+ def run_asset(asset, tickers, use_gate=False):
+     """Run momentum test on one asset with optional volatility gate."""
+     bars = tickers[asset]
+     closes = bars.closes_array()
+
+[0m
+[0m$ [0mpython research/checks/regime_conditional_momentum.py
+=== Regime-Conditional Momentum Gate Test ===
+TEST OBJECTIVE: Evaluate a predeclared past-only volatility gate on lookback-5 momentum
+VOLATILITY GATE: Only trade when past volatility > 25% annualized (vol_window = 60)
+BASELINE: Same momentum without volatility gate
+UNIVERSE: 10 large-cap US equities (AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA, JPM, JNJ, XOM)
+
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Leakage review ===
+  AMZN: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +5.366
+  JPM: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +3.916
+  Past-only: volatility gate uses only closes[:t]; neutral before gate condition met.
+
+=== 3. Momentum vs Gated Momentum on REGIME_DEPENDENT assets ===
+Params: lookback=5, train=252d/test=84d/warmup=60d/overlap=60d, min 400 bars/segment
+Segments: 4 contiguous volatility blocks (calm/turbulent)
+
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 228, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 156, in main
+    res_gate = run_asset(asset, tickers, use_gate=True)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 83, in run_asset
+    res = bt.stress_segments(
+          ^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/X/X/research/backtest/regime_stability.py", line 708, in stress_segments
+    cand_summary = sweep_summary(sweep, baseline)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/X/X/research/backtest/perturbation.py", line 369, in sweep_summary
+    baseline_dict = dict(baseline)
+                    ^^^^^^^^^^^^^^
+ValueError: dictionary update sequence element #0 has length 8; 2 is required
+[0m
+[0m← [0mEdit research/checks/regime_conditional_momentum.py
+Index: /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
++++ /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+@@ -84,9 +84,9 @@
+ signals_fn=signals_fn,
+ bars=list(bars),
+ signals=signals,
+ param_grid=[{"lookback": LOOKBACK}],
+-baseline=("lookback", LOOKBACK),
++baseline=(("lookback", LOOKBACK),),
+ segment_fn=seg_fn,
+ train_window=TRAIN,
+ test_window=TEST,
+ warmup=WARM,
+
+[0m
+[0m$ [0mpython research/checks/regime_conditional_momentum.py
+=== Regime-Conditional Momentum Gate Test ===
+TEST OBJECTIVE: Evaluate a predeclared past-only volatility gate on lookback-5 momentum
+VOLATILITY GATE: Only trade when past volatility > 25% annualized (vol_window = 60)
+BASELINE: Same momentum without volatility gate
+UNIVERSE: 10 large-cap US equities (AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA, JPM, JNJ, XOM)
+
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Leakage review ===
+  AMZN: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +5.366
+  JPM: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +3.916
+  Past-only: volatility gate uses only closes[:t]; neutral before gate condition met.
+
+=== 3. Momentum vs Gated Momentum on REGIME_DEPENDENT assets ===
+Params: lookback=5, train=252d/test=84d/warmup=60d/overlap=60d, min 400 bars/segment
+Segments: 4 contiguous volatility blocks (calm/turbulent)
+
+Asset: AMZN
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 228, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 161, in main
+    print(f"  {'variant':14s} {'segments':28s} {'candidate_medians':28s} {'cand_disp':+10.3f} {'null_disp':+10.3f}  verdict")
+                                                                         ^^^^^^^^^^^^^^^^^^^^
+ValueError: Unknown format code 'f' for object of type 'str'
+[0m
+[0m← [0mEdit research/checks/regime_conditional_momentum.py
+Index: /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
++++ /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+@@ -162,9 +162,12 @@
+     for name, r in res_gate.items():
+         segs = "[" + ",".join(r["segments"]) + "]"
+         meds = "[" + ",".join(str(m) for m in r["medians"]) + "]"
+         print(f"  {name:14s} {segs:28s} {meds:28s} {r['candidate_dispersion']:+10.3f}  {r['null_dispersion']:+10.3f}  {r['verdict']}")
+-    print(f"  {res_base['momentum_baseline']['verdict']:14s} {res_base['momentum_baseline']['segments'][0]:28s} {str(res_base['momentum_baseline']['medians']):28s} {res_base['momentum_baseline']['candidate_dispersion']:+10.3f}  {res_base['momentum_baseline']['null_dispersion']:+10.3f}  {res_base['momentum_baseline']['verdict']}")
++    base_r = res_base['momentum_baseline']
++    base_segs = "[" + ",".join(base_r["segments"]) + "]"
++    base_meds = "[" + ",".join(str(m) for m in base_r["medians"]) + "]"
++    print(f"  {base_r['verdict']:14s} {base_segs:28s} {base_meds:28s} {base_r['candidate_dispersion']:+10.3f}  {base_r['null_dispersion']:+10.3f}  {base_r['verdict']}")
+     print()
+ 
+ print("=== 4. Full-universe generalization ===")
+ tickers_univ = {}
+
+[0m
+[0m$ [0mpython research/checks/regime_conditional_momentum.py
+=== Regime-Conditional Momentum Gate Test ===
+TEST OBJECTIVE: Evaluate a predeclared past-only volatility gate on lookback-5 momentum
+VOLATILITY GATE: Only trade when past volatility > 25% annualized (vol_window = 60)
+BASELINE: Same momentum without volatility gate
+UNIVERSE: 10 large-cap US equities (AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA, JPM, JNJ, XOM)
+
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Leakage review ===
+  AMZN: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +5.366
+  JPM: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +3.916
+  Past-only: volatility gate uses only closes[:t]; neutral before gate condition met.
+
+=== 3. Momentum vs Gated Momentum on REGIME_DEPENDENT assets ===
+Params: lookback=5, train=252d/test=84d/warmup=60d/overlap=60d, min 400 bars/segment
+Segments: 4 contiguous volatility blocks (calm/turbulent)
+
+Asset: AMZN
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 231, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 161, in main
+    print(f"  {'variant':14s} {'segments':28s} {'candidate_medians':28s} {'cand_disp':+10.3f} {'null_disp':+10.3f}  verdict")
+                                                                         ^^^^^^^^^^^^^^^^^^^^
+ValueError: Unknown format code 'f' for object of type 'str'
+[0m
+[0m← [0mEdit research/checks/regime_conditional_momentum.py
+Index: /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
++++ /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+@@ -157,17 +157,17 @@
+     res_base = run_asset(asset, tickers, use_gate=False)
+     results_all[f"{asset}_gate"] = res_gate
+     results_all[f"{asset}_base"] = res_base
+     print(f"Asset: {asset}")
+-    print(f"  {'variant':14s} {'segments':28s} {'candidate_medians':28s} {'cand_disp':+10.3f} {'null_disp':+10.3f}  verdict")
++    print(f"  {'variant':14s} {'segments':28s} {'candidate_medians':28s} {'cand_disp':>10s} {'null_disp':>10s}  verdict")
+     for name, r in res_gate.items():
+         segs = "[" + ",".join(r["segments"]) + "]"
+         meds = "[" + ",".join(str(m) for m in r["medians"]) + "]"
+-        print(f"  {name:14s} {segs:28s} {meds:28s} {r['candidate_dispersion']:+10.3f}  {r['null_dispersion']:+10.3f}  {r['verdict']}")
++        print(f"  {name:14s} {segs:28s} {meds:28s} {r['candidate_dispersion']:>10.3f}  {r['null_dispersion']:>10.3f}  {r['verdict']}")
+     base_r = res_base['momentum_baseline']
+     base_segs = "[" + ",".join(base_r["segments"]) + "]"
+     base_meds = "[" + ",".join(str(m) for m in base_r["medians"]) + "]"
+-    print(f"  {base_r['verdict']:14s} {base_segs:28s} {base_meds:28s} {base_r['candidate_dispersion']:+10.3f}  {base_r['null_dispersion']:+10.3f}  {base_r['verdict']}")
++    print(f"  {base_r['verdict']:14s} {base_segs:28s} {base_meds:28s} {base_r['candidate_dispersion']:>10.3f}  {base_r['null_dispersion']:>10.3f}  {base_r['verdict']}")
+     print()
+ 
+ print("=== 4. Full-universe generalization ===")
+ tickers_univ = {}
+
+[0m
+[0m$ [0mpython research/checks/regime_conditional_momentum.py
+=== Regime-Conditional Momentum Gate Test ===
+TEST OBJECTIVE: Evaluate a predeclared past-only volatility gate on lookback-5 momentum
+VOLATILITY GATE: Only trade when past volatility > 25% annualized (vol_window = 60)
+BASELINE: Same momentum without volatility gate
+UNIVERSE: 10 large-cap US equities (AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA, JPM, JNJ, XOM)
+
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Leakage review ===
+  AMZN: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +5.366
+  JPM: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +3.916
+  Past-only: volatility gate uses only closes[:t]; neutral before gate condition met.
+
+=== 3. Momentum vs Gated Momentum on REGIME_DEPENDENT assets ===
+Params: lookback=5, train=252d/test=84d/warmup=60d/overlap=60d, min 400 bars/segment
+Segments: 4 contiguous volatility blocks (calm/turbulent)
+
+Asset: AMZN
+  variant        segments                     candidate_medians             cand_disp  null_disp  verdict
+  momentum_volatility_gate [turbulent,calm,turbulent]   [0.065,0.076,0.077]               0.005       0.019  REGIME_STABLE
+  REGIME_STABLE  [turbulent,calm,turbulent]   [0.065,0.076,0.077]               0.005       0.019  REGIME_STABLE
+
+Asset: JPM
+  variant        segments                     candidate_medians             cand_disp  null_disp  verdict
+  momentum_volatility_gate [turbulent,calm,turbulent]   [0.113,0.044,0.083]               0.028       0.012  REGIME_DEPENDENT
+  REGIME_DEPENDENT [turbulent,calm,turbulent]   [0.113,0.044,0.083]               0.028       0.012  REGIME_DEPENDENT
+
+=== 4. Full-universe generalization ===
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 231, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 184, in main
+    summary = bt.stress_segments_across_tickers(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/X/X/research/backtest/regime_stability.py", line 1120, in stress_segments_across_tickers
+    signals = signals_fn(closes, **{k: float(v) for k, v in dict(baseline).items()})
+                                                            ^^^^^^^^^^^^^^
+ValueError: dictionary update sequence element #0 has length 8; 2 is required
+[0m
+[0m→ [0mRead research/checks/momentum.py[90m [offset=220, limit=30][0m
+[0m
+[0m← [0mEdit research/checks/regime_conditional_momentum.py
+Index: /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
++++ /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+@@ -175,18 +175,20 @@
+     ticker = entry["ticker"]
+     tickers_univ[ticker] = bt.load_ticker(ticker)[0]
+ 
+ for use_gate, label in [(False, "baseline"), (True, "volatility_gate")]:
+-    signals_fn = (
+-        lambda c, **kw: regime_conditional_momentum_signals(c, lookback=LOOKBACK) 
+-        if use_gate else 
+-        lambda c, **kw: base_momentum_signals(c, lookback=LOOKBACK)
+-    )
++    def make_signals_fn(gated: bool):
++        if gated:
++            return lambda c, **kw: regime_conditional_momentum_signals(c, lookback=LOOKBACK)
++        else:
++            return lambda c, **kw: base_momentum_signals(c, lookback=LOOKBACK)
++    
++    signals_fn = make_signals_fn(use_gate)
+     summary = bt.stress_segments_across_tickers(
+         tickers=tickers_univ,
+         signals_fn=signals_fn,
+-        regime_labels_fn=lambda c: regime_labels(c, n_blocks=N_BLOCKS, window=WINDOW),
+-        baseline=("lookback", LOOKBACK),
++        regime_labels_fn=lambda c: bt.volatility_blocks(c, n_blocks=N_BLOCKS, window=WINDOW),
++        baseline=(("lookback", LOOKBACK),),
+         param_grid=[{"lookback": LOOKBACK}],
+         train_window=TRAIN,
+         test_window=TEST,
+         warmup=WARM,
+
+[0m
+[0m$ [0mpython research/checks/regime_conditional_momentum.py
+=== Regime-Conditional Momentum Gate Test ===
+TEST OBJECTIVE: Evaluate a predeclared past-only volatility gate on lookback-5 momentum
+VOLATILITY GATE: Only trade when past volatility > 25% annualized (vol_window = 60)
+BASELINE: Same momentum without volatility gate
+UNIVERSE: 10 large-cap US equities (AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA, JPM, JNJ, XOM)
+
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Leakage review ===
+  AMZN: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +5.366
+  JPM: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +3.916
+  Past-only: volatility gate uses only closes[:t]; neutral before gate condition met.
+
+=== 3. Momentum vs Gated Momentum on REGIME_DEPENDENT assets ===
+Params: lookback=5, train=252d/test=84d/warmup=60d/overlap=60d, min 400 bars/segment
+Segments: 4 contiguous volatility blocks (calm/turbulent)
+
+Asset: AMZN
+  variant        segments                     candidate_medians             cand_disp  null_disp  verdict
+  momentum_volatility_gate [turbulent,calm,turbulent]   [0.065,0.076,0.077]               0.005       0.019  REGIME_STABLE
+  REGIME_STABLE  [turbulent,calm,turbulent]   [0.065,0.076,0.077]               0.005       0.019  REGIME_STABLE
+
+Asset: JPM
+  variant        segments                     candidate_medians             cand_disp  null_disp  verdict
+  momentum_volatility_gate [turbulent,calm,turbulent]   [0.113,0.044,0.083]               0.028       0.012  REGIME_DEPENDENT
+  REGIME_DEPENDENT [turbulent,calm,turbulent]   [0.113,0.044,0.083]               0.028       0.012  REGIME_DEPENDENT
+
+=== 4. Full-universe generalization ===
+
+BASELINE MOMENTUM (10 assets):
+  Verdict counts: CONSISTENT_WITH_NOISE=2, REGIME_DEPENDENT=1, REGIME_STABLE=7, REGIME_STABLE_LOSS=0
+
+VOLATILITY_GATE MOMENTUM (10 assets):
+  Verdict counts: CONSISTENT_WITH_NOISE=2, REGIME_DEPENDENT=1, REGIME_STABLE=7, REGIME_STABLE_LOSS=0
+
+=== 5. Determinism check ===
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 233, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 207, in main
+    res1 = {a: run_asset(a, tickers, use_gate=True)[f"{a}_gate"] for a in target}
+               ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+KeyError: 'AMZN_gate'
+[0m
+[0m← [0mEdit research/checks/regime_conditional_momentum.py
+Index: /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
++++ /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+@@ -64,22 +64,21 @@
+ def run_asset(asset, tickers, use_gate=False):
+     """Run momentum test on one asset with optional volatility gate."""
+     bars = tickers[asset]
+     closes = bars.closes_array()
+-    labels = regime_labels(closes, n_blocks=N_BLOCKS, window=WINDOW)
++    labels = bt.volatility_blocks(closes, n_blocks=N_BLOCKS, window=WINDOW)
+     seg_fn = bt.segment_fn_from_labels(labels)
+-    results = {}
+ 
+     if use_gate:
+-        name = "momentum_volatility_gate"
+         signals_fn = lambda c, **p: regime_conditional_momentum_signals(c, lookback=LOOKBACK)
++        result_name = f"{asset}_gate"
+     else:
+-        name = "momentum_baseline"
+         signals_fn = lambda c, **p: base_momentum_signals(c, lookback=LOOKBACK)
++        result_name = f"{asset}_base"
+ 
+     signals = signals_fn(closes)
+     if len(signals) != len(closes):
+-        raise ValueError(f"{asset} {name}: signals {len(signals)} != bars {len(closes)}")
++        raise ValueError(f"{asset} {result_name}: signals {len(signals)} != bars {len(closes)}")
+ 
+     res = bt.stress_segments(
+         signals_fn=signals_fn,
+         bars=list(bars),
+@@ -96,17 +95,19 @@
+     )
+ 
+     names = [s.name for s in res.scenarios]
+     medians = [round(s.baseline_median_log_return, 3) for s in res.scenarios]
+-    results[name] = dict(
+-        segments=names,
+-        medians=medians,
+-        candidate_dispersion=round(res.candidate_dispersion, 3),
+-        null_dispersion=round(res.null_dispersion, 3),
+-        verdict=res.overall_verdict,
+-        n_folds=res.n_folds,
+-    )
+-    return results
++    
++    return {
++        result_name: dict(
++            segments=names,
++            medians=medians,
++            candidate_dispersion=round(res.candidate_dispersion, 3),
++            null_dispersion=round(res.null_dispersion, 3),
++            verdict=res.overall_verdict,
++            n_folds=res.n_folds,
++        )
++    }
+ 
+ 
+ def main() -> int:
+     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+
+[0m
+[0m$ [0mpython research/checks/regime_conditional_momentum.py
+=== Regime-Conditional Momentum Gate Test ===
+TEST OBJECTIVE: Evaluate a predeclared past-only volatility gate on lookback-5 momentum
+VOLATILITY GATE: Only trade when past volatility > 25% annualized (vol_window = 60)
+BASELINE: Same momentum without volatility gate
+UNIVERSE: 10 large-cap US equities (AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA, JPM, JNJ, XOM)
+
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Leakage review ===
+  AMZN: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +5.366
+  JPM: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +3.916
+  Past-only: volatility gate uses only closes[:t]; neutral before gate condition met.
+
+=== 3. Momentum vs Gated Momentum on REGIME_DEPENDENT assets ===
+Params: lookback=5, train=252d/test=84d/warmup=60d/overlap=60d, min 400 bars/segment
+Segments: 4 contiguous volatility blocks (calm/turbulent)
+
+Asset: AMZN
+  variant        segments                     candidate_medians             cand_disp  null_disp  verdict
+  AMZN_gate      [turbulent,calm,turbulent]   [0.065,0.076,0.077]               0.005       0.019  REGIME_STABLE
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 234, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/X/X/research/checks/regime_conditional_momentum.py", line 167, in main
+    base_r = res_base['momentum_baseline']
+             ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+KeyError: 'momentum_baseline'
+[0m
+[0m← [0mEdit research/checks/regime_conditional_momentum.py
+Index: /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
++++ /home/runner/work/X/X/research/checks/regime_conditional_momentum.py
+@@ -155,20 +155,20 @@
+ results_all = {}
+ for asset in target:
+     res_gate = run_asset(asset, tickers, use_gate=True)
+     res_base = run_asset(asset, tickers, use_gate=False)
+-    results_all[f"{asset}_gate"] = res_gate
+-    results_all[f"{asset}_base"] = res_base
++    results_all.update(res_gate)
++    results_all.update(res_base)
+     print(f"Asset: {asset}")
+     print(f"  {'variant':14s} {'segments':28s} {'candidate_medians':28s} {'cand_disp':>10s} {'null_disp':>10s}  verdict")
+-    for name, r in res_gate.items():
+-        segs = "[" + ",".join(r["segments"]) + "]"
+-        meds = "[" + ",".join(str(m) for m in r["medians"]) + "]"
+-        print(f"  {name:14s} {segs:28s} {meds:28s} {r['candidate_dispersion']:>10.3f}  {r['null_dispersion']:>10.3f}  {r['verdict']}")
+-    base_r = res_base['momentum_baseline']
+-    base_segs = "[" + ",".join(base_r["segments"]) + "]"
+-    base_meds = "[" + ",".join(str(m) for m in base_r["medians"]) + "]"
+-    print(f"  {base_r['verdict']:14s} {base_segs:28s} {base_meds:28s} {base_r['candidate_dispersion']:>10.3f}  {base_r['null_dispersion']:>10.3f}  {base_r['verdict']}")
++    gate_r = res_gate[f"{asset}_gate"]
++    base_r = res_base[f"{asset}_base"]
++    segs_g = "[" + ",".join(gate_r["segments"]) + "]"
++    meds_g = "[" + ",".join(str(m) for m in gate_r["medians"]) + "]"
++    segs_b = "[" + ",".join(base_r["segments"]) + "]"
++    meds_b = "[" + ",".join(str(m) for m in base_r["medians"]) + "]"
++    print(f"  {asset}_gate    {segs_g:28s} {meds_g:28s} {gate_r['candidate_dispersion']:>10.3f}  {gate_r['null_dispersion']:>10.3f}  {gate_r['verdict']}")
++    print(f"  {asset}_base    {segs_b:28s} {meds_b:28s} {base_r['candidate_dispersion']:>10.3f}  {base_r['null_dispersion']:>10.3f}  {base_r['verdict']}")
+     print()
+ 
+ print("=== 4. Full-universe generalization ===")
+ tickers_univ = {}
+
+[0m
+[0m$ [0mpython research/checks/regime_conditional_momentum.py
+=== Regime-Conditional Momentum Gate Test ===
+TEST OBJECTIVE: Evaluate a predeclared past-only volatility gate on lookback-5 momentum
+VOLATILITY GATE: Only trade when past volatility > 25% annualized (vol_window = 60)
+BASELINE: Same momentum without volatility gate
+UNIVERSE: 10 large-cap US equities (AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA, JPM, JNJ, XOM)
+
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Leakage review ===
+  AMZN: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +5.366
+  JPM: 4465 bars, gated momentum signals 4465, leakage [PASS], total_return +3.916
+  Past-only: volatility gate uses only closes[:t]; neutral before gate condition met.
+
+=== 3. Momentum vs Gated Momentum on REGIME_DEPENDENT assets ===
+Params: lookback=5, train=252d/test=84d/warmup=60d/overlap=60d, min 400 bars/segment
+Segments: 4 contiguous volatility blocks (calm/turbulent)
+
+Asset: AMZN
+  variant        segments                     candidate_medians             cand_disp  null_disp  verdict
+  AMZN_gate    [turbulent,calm,turbulent]   [0.065,0.076,0.077]               0.005       0.019  REGIME_STABLE
+  AMZN_base    [turbulent,calm,turbulent]   [0.065,0.076,0.077]               0.005       0.019  REGIME_STABLE
+
+Asset: JPM
+  variant        segments                     candidate_medians             cand_disp  null_disp  verdict
+  JPM_gate    [turbulent,calm,turbulent]   [0.113,0.044,0.083]               0.028       0.012  REGIME_DEPENDENT
+  JPM_base    [turbulent,calm,turbulent]   [0.113,0.044,0.083]               0.028       0.012  REGIME_DEPENDENT
+
+=== 4. Full-universe generalization ===
+
+BASELINE MOMENTUM (10 assets):
+  Verdict counts: CONSISTENT_WITH_NOISE=2, REGIME_DEPENDENT=1, REGIME_STABLE=7, REGIME_STABLE_LOSS=0
+
+VOLATILITY_GATE MOMENTUM (10 assets):
+  Verdict counts: CONSISTENT_WITH_NOISE=2, REGIME_DEPENDENT=1, REGIME_STABLE=7, REGIME_STABLE_LOSS=0
+
+=== 5. Determinism check ===
+determinism: r1 == r2: True
+
+=== 6. Artifact written ===
+artifact written to: /home/runner/work/X/X/state/check_artifacts/regime_conditional_momentum_results.json
+
+REGIME-CONDITIONAL MOMENTUM TEST COMPLETE
+The volatility gate (0.25 threshold) either demonstrates robustness improvement or is falsified.
+[0m
+[0m→ [0mRead state/check_artifacts/regime_conditional_momentum_results.json
+[0m
+[0m← [0mWrite state/campaign/runs/38520259346/agents/agent_08.json
+Wrote file successfully.
+[0m
+[0m$ [0mpython -m pytest tests/test_regime_stability.py -v
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.1, pluggy-1.6.0 -- /home/runner/work/_temp/x-python/bin/python
+cachedir: .pytest_cache
+rootdir: /home/runner/work/X/X
+collecting ... collected 26 items
+
+tests/test_regime_stability.py::TestScenarioGeneration::test_scenarios_diverse PASSED [  3%]
+tests/test_regime_stability.py::TestScenarioGeneration::test_scenarios_reproducible PASSED [  7%]
+tests/test_regime_stability.py::TestScenarioGeneration::test_series_from_scenario_is_valid PASSED [ 11%]
+tests/test_regime_stability.py::TestRegimeStressDeterminism::test_stress_reproducible PASSED [ 15%]
+tests/test_regime_stability.py::TestNoiseBehavior::test_noise_benchmark_near_zero_per_scenario PASSED [ 19%]
+tests/test_regime_stability.py::TestNoiseBehavior::test_noise_consistent_across_regimes PASSED [ 23%]
+tests/test_regime_stability.py::TestDetectsRegimeDependency::test_adaptive_direction_is_regime_stable PASSED [ 26%]
+tests/test_regime_stability.py::TestDetectsRegimeDependency::test_long_only_swing_is_regime_dependent PASSED [ 30%]
+tests/test_regime_stability.py::TestRegimeStressEdgeCases::test_empty_bars_raises PASSED [ 34%]
+tests/test_regime_stability.py::TestRegimeStressEdgeCases::test_short_series_under_a_scenario PASSED [ 38%]
+tests/test_regime_stability.py::TestRegimeStressEdgeCases::test_signal_length_mismatch_raises PASSED [ 42%]
+tests/test_regime_stability.py::TestStressSegmentsConstruction::test_segment_fn_from_labels_contract PASSED [ 46%]
+tests/test_regime_stability.py::TestStressSegmentsConstruction::test_stress_segments_min_segment_filtering PASSED [ 50%]
+tests/test_regime_stability.py::TestStressSegmentsConstruction::test_stress_segments_segment_boundaries PASSED [ 53%]
+tests/test_regime_stability.py::TestStressSegmentsConstruction::test_stress_segments_short_segments_raise PASSED [ 57%]
+tests/test_regime_stability.py::TestStressSegmentsConstruction::test_stress_segments_signal_length_mismatch_raises PASSED [ 61%]
+tests/test_regime_stability.py::TestStressSegmentsConstruction::test_volatility_segments_past_only_prefix PASSED [ 65%]
+tests/test_regime_stability.py::TestStressSegmentsDeterminism::test_stress_segments_determinism PASSED [ 69%]
+tests/test_regime_stability.py::TestStressSegmentsKnownVertex::test_always_long_across_calm_and_up_drift_is_regime_dependent PASSED [ 73%]
+tests/test_regime_stability.py::TestStressSegmentsKnownVertex::test_stress_segments_coin_flip_stays_bounded_across_real_segments PASSED [ 76%]
+tests/test_regime_stability.py::TestStressSegmentsRealData::test_stress_segments_real_data_structure PASSED [ 80%]
+tests/test_regime_stability.py::TestBreakoutSignals::test_breakout_signals_contract PASSED [ 84%]
+tests/test_regime_stability.py::TestBreakoutSignals::test_breakout_signals_determinism PASSED [ 88%]
+tests/test_regime_stability.py::TestBreakoutSignals::test_breakout_signals_edge_case_short_series PASSED [ 92%]
+tests/test_regime_stability.py::TestBreakoutSignals::test_breakout_signals_in_regime_stress PASSED [ 96%]
+tests/test_regime_stability.py::TestBreakoutSignals::test_breakout_signals_past_only PASSED [100%]
+
+=============================== warnings summary ===============================
+tests/test_regime_stability.py::TestStressSegmentsConstruction::test_stress_segments_min_segment_filtering
+  /home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/fromnumeric.py:3862: RuntimeWarning: Mean of empty slice
+    return _methods._mean(a, axis=axis, dtype=dtype,
+
+tests/test_regime_stability.py::TestStressSegmentsConstruction::test_stress_segments_min_segment_filtering
+  /home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/_methods.py:134: RuntimeWarning: invalid value encountered in divide
+    ret = um.true_divide(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 26 passed, 2 warnings in 3.75s ========================
+[0m
+Successfully completed the regime-conditional momentum gate test as specified in the contract.
+
