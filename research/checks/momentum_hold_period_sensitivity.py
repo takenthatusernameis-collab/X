@@ -7,8 +7,8 @@ collected universe at a one-day hold. This test varies only the holding
 period -- not the lookback -- to answer the primary question:
 
   Does the qualified momentum effect survive a small predeclared
-  holding-period variation without becoming a single-point timing
-  artifact?
+holding-period variation without becoming a single-point timing
+artifact?
 
 Method (fixed a-priori, not tuned to OOS): lookback fixed at 5. Holding
 periods are predeclared as HOLD_PERIODS = (1, 2, 3, 5): at a rebalance bar
@@ -239,8 +239,8 @@ def main() -> int:
           "train={}d / test={}d / warmup={}d / overlap={}d, min {} "
           "bars/segment, 4 contiguous volatility blocks, compared vs coin-flip "
           "null on the same segments\n".format(
-          LOOKBACK, " / ".join(str(h) for h in HOLD_PERIODS), TRAIN, TEST, WARM,
-          OVERLAP, MIN_SEGMENT_BARS))
+              LOOKBACK, " / ".join(str(h) for h in HOLD_PERIODS), TRAIN, TEST, WARM,
+              OVERLAP, MIN_SEGMENT_BARS))
     print("Segments: {} contiguous blocks by date, past-only volatility "
           "classifier (turbulent = block median trailing-{}-bar realized vol "
           "> series-wide median)\n".format(N_BLOCKS, WINDOW))
@@ -262,8 +262,8 @@ def main() -> int:
             )
             print("  {} hold={}: verdict {:18s} cand_disp {:+.3f} null_disp {:+.3f} "
                   "cand_medians {}".format(
-                asset, hold, res.overall_verdict, res.candidate_dispersion,
-                res.null_dispersion, str(medians)))
+                      asset, hold, res.overall_verdict, res.candidate_dispersion,
+                      res.null_dispersion, str(medians)))
         per_asset[asset] = holds
 
     # Full-universe generalization: hold-period grid on all collected tickers.
@@ -402,7 +402,7 @@ def main() -> int:
     print("determinism: r1 == r2: {}".format(out1 == out2))
     assert out1 == out2, "non-deterministic output"
 
-    # Assemble artifact.
+    # Assemble artifact - fixed version of the complex comprehension
     per_asset_out = {}
     for asset in target:
         per_asset_out[asset] = {}
@@ -417,6 +417,30 @@ def main() -> int:
                 verdict=res.overall_verdict,
                 n_folds=res.n_folds,
             )
+
+    # Fixed: Create hold_profiles using a simple loop instead of complex comprehension
+    hold_profiles = {}
+    for t in ticker_order:
+        hold_profiles[t] = {}
+        for h in HOLD_PERIODS:
+            prof = profiles[t][str(h)]
+            is_stable = prof["verdict"] == "REGIME_STABLE" and all(m > 0 for m in prof["medians"])
+            if is_stable:
+                hold_profiles[t][str(h)] = "STABLE_EDGE"
+            else:
+                # Count positive edges at each hold
+                pos_count = sum(
+                    1 for h2 in HOLD_PERIODS
+                    if profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
+                    and all(m > 0 for m in profiles[t][str(h2)]["medians"])
+                )
+                if pos_count == 1:
+                    hold_profiles[t][str(h)] = "SINGULAR"
+                elif pos_count > 1:
+                    hold_profiles[t][str(h)] = "WEAKENS"
+                else:
+                    hold_profiles[t][str(h)] = "NO_EDGE"
+
     artifact = dict(
         dataset_id=DATASET_ID,
         seed=SEED,
@@ -441,38 +465,30 @@ def main() -> int:
                     for t in ticker_order
                 ),
             ) for h in HOLD_PERIODS},
-            hold_profiles={t: {str(h): (
-                "STABLE_EDGE" if all(
-                    profiles[t][str(h)]["verdict"] == "REGIME_STABLE"
-                    and all(m > 0 for m in profiles[t][str(h)]["medians"])
-                ) else (
-                    "SINGULAR" if (
-                        sum(
-                            profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
-                            and all(m > 0 for m in profiles[t][str(h2)]["medians"])
-                        ) == 1 for h2 in HOLD_PERIODS
-                    ) else (
-                        "WEAKENS" if sum(
-                            profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
-                            and all(m > 0 for m in profiles[t][str(h2)]["medians"])
-                        ) > 1 else "NO_EDGE"
-                    )
-                )
-            ) for h in HOLD_PERIODS} for t in ticker_order},
+            hold_profiles=hold_profiles,
             effect_classification=effect_class,
             n_edge_at_h1=n_edge_at_h1,
             n_edge_min_across_grid=n_edge_all,
-            stable_edge_assets=[t for t in ticker_order if all(
-                profiles[t][str(h)]["verdict"] == "REGIME_STABLE"
-                and all(m > 0 for m in profiles[t][str(h)]["medians"])
-                for h in HOLD_PERIODS
-            )],
-            singular_assets=[t for t in ticker_order if any(
-                sum(
+            stable_edge_assets=[
+                t for t in ticker_order
+                if all(
+                    profiles[t][str(h)]["verdict"] == "REGIME_STABLE"
+                    and all(m > 0 for m in profiles[t][str(h)]["medians"])
+                    for h in HOLD_PERIODS
+                )
+            ],
+            singular_assets=[
+                t for t in ticker_order
+                if any(
                     profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
                     and all(m > 0 for m in profiles[t][str(h2)]["medians"])
-                ) == 1 for h2 in HOLD_PERIODS
-            )],
+                    for h2 in HOLD_PERIODS
+                ) and sum(
+                    1 for h2 in HOLD_PERIODS
+                    if profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
+                    and all(m > 0 for m in profiles[t][str(h2)]["medians"])
+                ) == 1
+            ],
             ticker_order=ticker_order,
         ),
         perturbation=pers,
