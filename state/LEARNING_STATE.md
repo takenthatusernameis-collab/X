@@ -67,3 +67,16 @@ Prefer the highest-value unresolved frontier cell over repeating an equivalent e
 5. Preserve negative and inconclusive evidence.
 6. Do not claim a strategy delta worked until its expected effect is actually observed.
 7. When there is insufficient evidence, choose UNVERIFIED rather than forcing RETAIN or REVERT.
+
+
+## Sequential campaign 38558753286
+- **Validated process improvement:** agents NONE
+- **Validated research progress:** agents [6, 8, 10]
+- **Validated negative/rejected evidence:** agents NONE
+- **Unresolved uncertainty:** agents [1, 2, 3, 5]
+- **Odd/even process observations:** [{"even_agent": 2, "even_observation": "UNVERIFIED", "even_task": "R-001", "even_uncertainty_reduced": "none demonstrated", "odd_agent": 1, "odd_process_decision": "UNVERIFIED", "odd_task": "P-001"}, {"even_agent": 4, "even_observation": "UNCHANGED", "even_task": "R-001", "even_uncertainty_reduced": "none demonstrated", "odd_agent": 3, "odd_process_decision": "UNVERIFIED", "odd_task": "P-001"}, {"even_agent": 6, "even_observation": "IMPROVED", "even_task": "R-001", "even_uncertainty_reduced": "The momentum edge shows COST_ROBUST_POSITIVE classification across all lookback periods (3, 5, 10) with median_log_return ~0.064", "odd_agent": 5, "odd_process_decision": "UNVERIFIED", "odd_task": "P-002"}, {"even_agent": 8, "even_observation": "IMPROVED", "even_task": "R-002", "even_uncertainty_reduced": "The holding-period sensitivity test conclusively shows that lookback-5 momentum is robust across small holding-period variations (1-10 days), providing strong evidence that the momentum edge is genuine and not a timing artifact.", "odd_agent": 7, "odd_process_decision": "RETAIN", "odd_task": "P-001"}, {"even_agent": 10, "even_observation": "IMPROVED", "even_task": "R-003", "even_uncertainty_reduced": "The volatility gate test successfully closed the research cell. Evidence demonstrates that volatility conditioning does not improve momentum robustness. This negative result advances the higher-order objective by eliminating a candidate hypothesis, reducing uncertainty about effective gating mechanisms for momentum effects.", "odd_agent": 9, "odd_process_decision": "RETAIN", "odd_task": "P-004"}]
+- **Task-selection observation:** {"1": "UNVERIFIED", "10": "IMPROVED", "2": "UNVERIFIED", "3": "UNVERIFIED", "4": "UNCHANGED", "5": "UNVERIFIED", "6": "IMPROVED", "7": "IMPROVED", "8": "IMPROVED", "9": "IMPROVED"}
+- **Highest-value unresolved next task:** P-003
+- **New complexity introduced:** [{"agent_number": 1, "complexity_added": "UNVERIFIED"}, {"agent_number": 2, "complexity_added": "UNVERIFIED"}, {"agent_number": 3, "complexity_added": "UNVERIFIED"}, {"agent_number": 4, "complexity_added": "UNVERIFIED"}, {"agent_number": 5, "complexity_added": "UNVERIFIED"}, {"agent_number": 6, "complexity_added": "VERIFIED"}, {"agent_number": 7, "complexity_added": "VERIFIED"}, {"agent_number": 8, "complexity_added": "VERIFIED"}, {"agent_number": 9, "complexity_added": "VERIFIED"}, {"agent_number": 10, "complexity_added": "VERIFIED"}]
+- **Campaign persistence decision:** RECOVERY_BRANCH
+- **Contradictory/unverified evidence:** ['agent_01:UNVERIFIED', 'agent_02:UNVERIFIED', 'agent_03:UNVERIFIED', 'agent_05:UNVERIFIED']
