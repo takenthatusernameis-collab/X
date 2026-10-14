@@ -1,0 +1,59 @@
+name: Kilo cutoff-bounded persistence validation
+
+on:
+  push:
+    branches: [main, "infra/**"]
+    paths:
+      - ".github/workflows/kilo-wakeup.yml"
+      - ".github/workflows/kilo-prompt-execution-one-shot.yml"
+      - ".github/workflows/validate-cutoff-persistence.yml"
+  pull_request:
+    paths:
+      - ".github/workflows/kilo-wakeup.yml"
+      - ".github/workflows/kilo-prompt-execution-one-shot.yml"
+      - ".github/workflows/validate-cutoff-persistence.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Validate workflow syntax and embedded shell
+        uses: rhysd/actionlint@v1.7.7
+        with:
+          args: -color .github/workflows/kilo-wakeup.yml .github/workflows/kilo-prompt-execution-one-shot.yml .github/workflows/validate-cutoff-persistence.yml
+
+      - name: Independently parse YAML
+        shell: bash
+        run: |
+          ruby -e 'require "yaml"; ARGV.each { |path| YAML.load_file(path); puts "#{path}: YAML OK" }' \
+            .github/workflows/kilo-wakeup.yml \
+            .github/workflows/kilo-prompt-execution-one-shot.yml \
+            .github/workflows/validate-cutoff-persistence.yml
+
+      - name: Guard cutoff-bounded checkpoint persistence
+        shell: bash
+        run: |
+          set -euo pipefail
+          for workflow in \
+            .github/workflows/kilo-wakeup.yml \
+            .github/workflows/kilo-prompt-execution-one-shot.yml; do
+            grep -Fq 'KILO_WORKFLOW_CUTOFF_EPOCH' "$workflow"
+            grep -Fq 'while true; do' "$workflow"
+            if awk '/attempt.*-lt 3|while.*-lt 3|after three attempts|attempt .*\/3/ { print; found=1 } END { exit !found }' "$workflow"; then
+              echo "::error::A fixed three-attempt persistence limit remains in $workflow."
+              exit 1
+            fi
+          done
+          # The X campaign sizes describe the planned task set, not retry ceilings.
+          grep -Fq 'agent_count=10' .github/workflows/kilo-wakeup.yml
+          grep -Fq 'agent_count=2' .github/workflows/kilo-wakeup.yml
+          grep -Fq '354 * 60' .github/workflows/kilo-wakeup.yml
+          grep -Fq '354 * 60' .github/workflows/kilo-prompt-execution-one-shot.yml
+          echo "Checkpoint persistence retries are count-unbounded and stop at the workflow cutoff; campaign task slots remain unchanged."

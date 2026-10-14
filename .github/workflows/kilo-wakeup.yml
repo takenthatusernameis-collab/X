@@ -42,6 +42,7 @@ jobs:
           AUDIT_PREV_OUTCOME: ${{ steps.audit_source_1_checkout_repository.outcome }}
         run: |
           set +e
+          echo "KILO_WORKFLOW_CUTOFF_EPOCH=$(($(date +%s) + 354 * 60))" >> "$GITHUB_ENV"
           python3 .github/scripts/deep_workflow_audit.py --profile xwake --step "Checkout repository"
           rc=$?
           echo "DEEP_AUDIT_RC=$rc"
@@ -413,7 +414,7 @@ jobs:
             echo "::notice::Recovery branch awaiting inspection: $latest_recovery_branch"
             {
               echo "### Existing Kilo recovery state"
-              printf 'Newest recovery branch: `%s`\n' "$latest_recovery_branch"
+              printf 'Newest recovery branch: %s\n' "$latest_recovery_branch"
               echo "The worker must inspect this quarantine state before starting unrelated new research."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
@@ -563,9 +564,11 @@ jobs:
             identity_mode=PERSISTENT
           fi
           python3 .github/scripts/campaign_controller.py init --run-id "$GITHUB_RUN_ID" --agent-count "$agent_count" --identity-mode "$identity_mode"
-          echo "CAMPAIGN_AGENT_COUNT=$agent_count" >> "$GITHUB_ENV"
-          echo "CAMPAIGN_IDENTITY_MODE=$identity_mode" >> "$GITHUB_ENV"
-          echo "CAMPAIGN_MODE=$mode" >> "$GITHUB_ENV"
+          {
+            echo "CAMPAIGN_AGENT_COUNT=$agent_count"
+            echo "CAMPAIGN_IDENTITY_MODE=$identity_mode"
+            echo "CAMPAIGN_MODE=$mode"
+          } >> "$GITHUB_ENV"
 
       - name: Select Campaign Slot 01 focused task
         id: select_agent_01
@@ -1071,66 +1074,80 @@ jobs:
           git config user.name "kilo-research-enterprise"
           git config user.email "kilo-research-enterprise@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+          git config user.name "kilo-research-enterprise"
+          git config user.email "kilo-research-enterprise@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
           if [ "$persistence" = "MAIN" ]; then
             git commit -m "Kilo campaign: persist validated learning state"
-            attempt=0
-            delay=5
-            while [ "$attempt" -lt 3 ]; do
-              attempt=$((attempt + 1))
-              echo "Main-branch persistence attempt $attempt/3."
+          else
+            git commit -m "Kilo campaign: preserve recovery state"
+          fi
+          recovery_branch="recovery/kilo-campaign-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          cutoff_epoch="${KILO_WORKFLOW_CUTOFF_EPOCH:-$(($(date +%s) + 354 * 60))}"
+          attempt=0
+          delay=5
+          while true; do
+            remaining=$((cutoff_epoch - $(date +%s)))
+            if [ "$remaining" -le 0 ]; then
+              echo "::error::Workflow cutoff reached before checkpoint persistence could be verified."
+              exit 1
+            fi
+            attempt=$((attempt + 1))
+            if [ "$persistence" = "MAIN" ]; then
+              echo "Main-branch persistence attempt $attempt; retrying within the remaining workflow budget."
               if git fetch origin "$GITHUB_REF_NAME"; then
                 if git rebase --autostash "origin/$GITHUB_REF_NAME"; then
                   local_commit="$(git rev-parse HEAD)"
                   if git push origin "HEAD:$GITHUB_REF_NAME"; then
                     remote_sha="$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" 2>/dev/null | awk 'NR==1 {print $1}')"
+                    local_commit="$(git rev-parse HEAD)"
                     if [ -n "$remote_sha" ] && [ "$remote_sha" = "$local_commit" ]; then
                       echo "PERSISTENCE_STATUS=MAIN" >> "$GITHUB_ENV"
                       echo "Verified main-branch persistence at $remote_sha."
                       exit 0
                     fi
-                    echo "::warning::Main-branch push returned success, but exact remote-head verification failed."
+                    echo "::warning::Main-branch push succeeded, but exact remote-head verification failed."
                   else
-                    echo "::warning::Main-branch push failed on attempt $attempt."
+                    echo "::warning::Main-branch push failed on persistence attempt $attempt."
                   fi
                 else
-                  echo "::warning::Rebase failed on attempt $attempt; aborting any partial rebase."
+                  git rebase --abort >/dev/null 2>&1 || true
+                  echo "::warning::Rebase failed on persistence attempt $attempt."
                 fi
               else
-                echo "::warning::Fetch failed on attempt $attempt."
+                echo "::warning::Fetch failed on persistence attempt $attempt."
               fi
               git rebase --abort >/dev/null 2>&1 || true
-              if [ "$attempt" -lt 3 ]; then
-                sleep "$delay"
-                delay=$((delay * 2))
-              fi
-            done
-            echo "::warning::Main-branch persistence was not verified after three attempts; preserving the already-committed state on a recovery branch."
-          else
-            git commit -m "Kilo campaign: preserve recovery state"
-          fi
-          local_commit="$(git rev-parse HEAD)"
-          recovery_branch="recovery/kilo-campaign-$GITHUB_RUN_ID-${{ github.run_attempt }}"
-          attempt=0
-          delay=5
-          while [ "$attempt" -lt 3 ]; do
-            attempt=$((attempt + 1))
-            if git push origin "$local_commit:refs/heads/$recovery_branch"; then
+            fi
+            # This unique per-run recovery branch is a second persistence target. Retry
+            # it on every loop iteration, updating only this run's own checkpoint branch.
+            local_commit="$(git rev-parse HEAD)"
+            if git push --force origin "$local_commit:refs/heads/$recovery_branch"; then
               remote_sha="$(git ls-remote origin "refs/heads/$recovery_branch" 2>/dev/null | awk 'NR==1 {print $1}')"
               if [ -n "$remote_sha" ] && [ "$remote_sha" = "$local_commit" ]; then
                 echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
                 echo "PERSISTENCE_RECOVERY_BRANCH=$recovery_branch" >> "$GITHUB_ENV"
                 echo "Verified durable recovery checkpoint at $remote_sha on $recovery_branch."
+                if [ "$persistence" = "MAIN" ]; then
+                  echo "::warning::Main-branch persistence is not verified; the current checkpoint is durable on the per-run recovery branch."
+                fi
                 exit 0
               fi
             fi
-            echo "::warning::Recovery-branch persistence attempt $attempt failed verification."
-            if [ "$attempt" -lt 3 ]; then
-              sleep "$delay"
+            echo "::warning::Neither main nor recovery-branch persistence was verified on attempt $attempt; retrying while time remains."
+            remaining=$((cutoff_epoch - $(date +%s)))
+            if [ "$remaining" -le 0 ]; then
+              echo "::error::Workflow cutoff reached before the checkpoint could be persisted."
+              exit 1
+            fi
+            sleep_for="$delay"
+            if [ "$sleep_for" -gt "$remaining" ]; then sleep_for="$remaining"; fi
+            if [ "$sleep_for" -gt 0 ]; then sleep "$sleep_for"; fi
+            if [ "$delay" -lt 60 ]; then
               delay=$((delay * 2))
+              if [ "$delay" -gt 60 ]; then delay=60; fi
             fi
           done
-          echo "::error::Could not verify the committed checkpoint on the main branch or a recovery branch."
-          exit 1
       - name: Report campaign outcome
         id: report_campaign
         if: always() && steps.campaign_init.outcome == 'success'

@@ -35,6 +35,7 @@ jobs:
           AUDIT_PREV_OUTCOME: ${{ steps.audit_source_1_checkout_repository.outcome }}
         run: |
           set +e
+          echo "KILO_WORKFLOW_CUTOFF_EPOCH=$(($(date +%s) + 354 * 60))" >> "$GITHUB_ENV"
           python3 .github/scripts/deep_workflow_audit.py --profile xone --step "Checkout repository"
           rc=$?
           echo "DEEP_AUDIT_RC=$rc"
@@ -630,9 +631,11 @@ jobs:
             upstream_retry_count=$((upstream_retry_count + 1))
             cp /tmp/kilo-primary.log "/tmp/kilo-primary-attempt-${upstream_retry_count}.log" || true
             echo "::warning::Transient Kilo upstream/network failure; retry #${upstream_retry_count} after ${retry_backoff}s. No attempt-count or session time limit; retrying until the 355-minute workflow cutoff."
-            echo "KILO_GATEWAY_RECOVERY=TRANSIENT_GATEWAY_RETRIED" >> "$GITHUB_ENV"
-            echo "KILO_GATEWAY_RETRY_COUNT=${upstream_retry_count}" >> "$GITHUB_ENV"
-            echo "KILO_GATEWAY_RECOVERY_REASON=recognized transient upstream/gateway/network error; retries use capped exponential backoff until the 355-minute workflow cutoff" >> "$GITHUB_ENV"
+            {
+              echo "KILO_GATEWAY_RECOVERY=TRANSIENT_GATEWAY_RETRIED"
+              echo "KILO_GATEWAY_RETRY_COUNT=${upstream_retry_count}"
+              echo "KILO_GATEWAY_RECOVERY_REASON=recognized transient upstream/gateway/network error; retries use capped exponential backoff until the 355-minute workflow cutoff"
+            } >> "$GITHUB_ENV"
             sleep "$retry_backoff"
             if [ "$retry_backoff" -lt 300 ]; then
               retry_backoff=$((retry_backoff * 2))
@@ -748,45 +751,45 @@ jobs:
           git config user.email "kilo-research-enterprise@users.noreply.github.com"
           git remote set-url origin "https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY.git"
           git commit -m "Kilo activation: update research state"
+          recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          cutoff_epoch="${KILO_WORKFLOW_CUTOFF_EPOCH:-$(($(date +%s) + 354 * 60))}"
           attempt=0
           delay=5
-          while [ "$attempt" -lt 3 ]; do
+          while true; do
+            remaining=$((cutoff_epoch - $(date +%s)))
+            if [ "$remaining" -le 0 ]; then
+              echo "::error::Workflow cutoff reached before checkpoint persistence could be verified."
+              exit 1
+            fi
             attempt=$((attempt + 1))
-            echo "Main-branch persistence attempt $attempt/3."
+            echo "Main-branch persistence attempt $attempt; retrying within the remaining workflow budget."
             if git fetch origin "$GITHUB_REF_NAME"; then
               if git rebase --autostash "origin/$GITHUB_REF_NAME"; then
                 local_commit="$(git rev-parse HEAD)"
                 if git push origin "HEAD:$GITHUB_REF_NAME"; then
                   remote_sha="$(git ls-remote origin "refs/heads/$GITHUB_REF_NAME" 2>/dev/null | awk 'NR==1 {print $1}')"
+                  local_commit="$(git rev-parse HEAD)"
                   if [ -n "$remote_sha" ] && [ "$remote_sha" = "$local_commit" ]; then
                     echo "PERSISTENCE_STATUS=MAIN" >> "$GITHUB_ENV"
                     echo "Verified main-branch persistence at $remote_sha."
                     exit 0
                   fi
-                  echo "::warning::Main-branch push succeeded but exact remote-head verification failed."
+                  echo "::warning::Main-branch push succeeded, but exact remote-head verification failed."
                 else
-                  echo "::warning::Main-branch push failed on attempt $attempt."
+                  echo "::warning::Main-branch push failed on persistence attempt $attempt."
                 fi
               else
-                echo "::warning::Rebase failed on attempt $attempt."
+                git rebase --abort >/dev/null 2>&1 || true
+                echo "::warning::Rebase failed on persistence attempt $attempt."
               fi
             else
-              echo "::warning::Fetch failed on attempt $attempt."
+              echo "::warning::Fetch failed on persistence attempt $attempt."
             fi
             git rebase --abort >/dev/null 2>&1 || true
-            if [ "$attempt" -lt 3 ]; then
-              sleep "$delay"
-              delay=$((delay * 2))
-            fi
-          done
-          git rebase --abort >/dev/null 2>&1 || true
-          local_commit="$(git rev-parse HEAD)"
-          recovery_branch="recovery/kilo-run-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
-          attempt=0
-          delay=5
-          while [ "$attempt" -lt 3 ]; do
-            attempt=$((attempt + 1))
-            if git push origin "$local_commit:refs/heads/$recovery_branch"; then
+            # This unique per-run recovery branch is the fallback durability target.
+            # Force-updating is scoped to this workflow run's own branch only.
+            local_commit="$(git rev-parse HEAD)"
+            if git push --force origin "$local_commit:refs/heads/$recovery_branch"; then
               remote_sha="$(git ls-remote origin "refs/heads/$recovery_branch" 2>/dev/null | awk 'NR==1 {print $1}')"
               if [ -n "$remote_sha" ] && [ "$remote_sha" = "$local_commit" ]; then
                 echo "PERSISTENCE_STATUS=RECOVERY_BRANCH" >> "$GITHUB_ENV"
@@ -796,14 +799,20 @@ jobs:
                 exit 0
               fi
             fi
-            echo "::warning::Recovery-branch persistence attempt $attempt failed verification."
-            if [ "$attempt" -lt 3 ]; then
-              sleep "$delay"
+            echo "::warning::Neither main nor recovery-branch persistence was verified on attempt $attempt; retrying while time remains."
+            remaining=$((cutoff_epoch - $(date +%s)))
+            if [ "$remaining" -le 0 ]; then
+              echo "::error::Workflow cutoff reached before the checkpoint could be persisted."
+              exit 1
+            fi
+            sleep_for="$delay"
+            if [ "$sleep_for" -gt "$remaining" ]; then sleep_for="$remaining"; fi
+            if [ "$sleep_for" -gt 0 ]; then sleep "$sleep_for"; fi
+            if [ "$delay" -lt 60 ]; then
               delay=$((delay * 2))
+              if [ "$delay" -gt 60 ]; then delay=60; fi
             fi
           done
-          echo "::error::Could not verify the committed checkpoint on the main branch or a recovery branch."
-          exit 1
       - name: Deep audit — after Verify and persist safe repository changes
         id: deep_audit_13_verify_and_persist_safe_repository_changes
         if: always()
