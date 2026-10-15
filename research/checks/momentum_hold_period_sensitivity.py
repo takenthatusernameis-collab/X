@@ -442,10 +442,8 @@ def main() -> int:
                 ),
             ) for h in HOLD_PERIODS},
             hold_profiles={t: {str(h): (
-                "STABLE_EDGE" if all(
-                    profiles[t][str(h)]["verdict"] == "REGIME_STABLE"
-                    and all(m > 0 for m in profiles[t][str(h)]["medians"])
-                ) else (
+                "STABLE_EDGE" if (profiles[t][str(h)]["verdict"] == "REGIME_STABLE" and all(m > 0 for m in profiles[t][str(h)]["medians"]))
+                else (
                     "SINGULAR" if (
                         sum(
                             profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
@@ -463,15 +461,12 @@ def main() -> int:
             n_edge_at_h1=n_edge_at_h1,
             n_edge_min_across_grid=n_edge_all,
             stable_edge_assets=[t for t in ticker_order if all(
-                profiles[t][str(h)]["verdict"] == "REGIME_STABLE"
-                and all(m > 0 for m in profiles[t][str(h)]["medians"])
+                (profiles[t][str(h)]["verdict"] == "REGIME_STABLE" and all(m > 0 for m in profiles[t][str(h)]["medians"]))
                 for h in HOLD_PERIODS
             )],
-            singular_assets=[t for t in ticker_order if any(
-                sum(
-                    profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
-                    and all(m > 0 for m in profiles[t][str(h2)]["medians"])
-                ) == 1 for h2 in HOLD_PERIODS
+            singular_assets=[t for t in ticker_order if (
+                sum(1 for h2 in HOLD_PERIODS
+                    if (profiles[t][str(h2)]["verdict"] == "REGIME_STABLE" and all(m > 0 for m in profiles[t][str(h2)]["medians"]))) == 1
             )],
             ticker_order=ticker_order,
         ),
