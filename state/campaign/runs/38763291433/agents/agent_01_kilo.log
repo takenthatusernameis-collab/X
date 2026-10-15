@@ -1,0 +1,278 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+[0m✱ [0mGlob "**/STATE"[90m 0 matches[0m
+[0m✱ [0mGlob "**/LEARNING_STATE"[90m 0 matches[0m
+[0m✱ [0mGlob "**/campaign/**/agents/agent_*.json"[90m 2 matches[0m
+[0m✱ [0mGlob "**/*LEARNING*"[90m 2 matches[0m
+[0m✱ [0mGlob "**/*state*"[90m 1 match[0m
+[0m→ [0mRead state/campaign/runs/38763291433/agents/agent_01_contract.json
+[0m→ [0mRead state/LEARNING_STATE.md
+[0m→ [0mRead state/campaign/runs/38763291433/agents/agent_01_before.json
+[0m✱ [0mGlob "**/campaign/runs/**/agents/*.json"[90m 2 matches[0m
+[0m✗ [0mls -la /home/runner/work/X/X/state/campaign/runs/37363008074/agents/ 2>/dev/null || echo "Directory not found" || echo "Directory not found" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m✱ [0mGlob "**/activation_records/*.json"[90m 0 matches[0m
+[0m✱ [0mGlob "**/agents/*.json"[90m 2 matches[0m
+[0m→ [0mRead state/STATE.md
+[0m✱ [0mGlob "logs/ACTIVATION-*.md"[90m 5 matches[0m
+[0m→ [0mRead logs/ACTIVATION-2026-10-06.md[90m [limit=200][0m
+[0m→ [0mRead logs/ACTIVATION-2026-10-05.md[90m [limit=200][0m
+[0m
+[0m$ [0mhead -100 /home/runner/work/X/X/logs/ACTIVATION-2026-10-04.md
+# Activation Log — 2026-10-04
+
+Each substantive activation is kept in this daily file and separated by its activation-minute label. Observed UTC timestamps inside each section remain authoritative.
+## Activation — 08:50 UTC
+
+## Observed activation
+
+- Session start: **2026-10-04T08:50:39Z** (observed via environment message time).
+- Finish: **2026-10-04T08:53:31Z** (observed).
+- Objective: verify the corrected real-data loader (`research/backtest/real_data.py`,
+  commit `40a131b`, which reads the CSV `adjclose` field at index `p[5]`).
+  At session start this correction was UNVERIFIED after the edit; the goal of this
+  activation was to close that verification gap.
+
+## Work performed
+
+1. Installed the only declared dependency (numpy) so the suite could execute.
+2. Wrote `tests/test_loader.py`: a 9-test unit suite promoting the prior scratch
+   loader helper (`test_loader_tmp.py`) into durable tooling. Contracts tested:
+   loader returns the CSV `adjclose` field and not the raw `close` field; bar counts
+   match `manifest["per_ticker_bars"]` for all 10 tickers; date mapping starts at
+   each ticker's `first_available_date` and matches CSV row order; full-sample
+   engine run + equity-vs-fill audit and walk-forward pass on real AAPL data
+   (4465 bars); determinism across reruns.
+3. Ran the loader test suite: all 9 tests pass.
+4. Ran the full regression suite: 96 tests, all pass.
+5. Ran the real-data preflight gate: all 57 checks pass; PREFLIGHT PASSED.
+6. Ran all four walk-forward examples: all exit 0, with aggregates matching the
+   STATE.md verified records.
+
+## CHANGED
+
+- `tests/test_loader.py` (new file, 9 tests) — durable loader + real-data pipeline
+  unit tests. Nothing else changed; the loader correction itself was made in the
+  prior activation (commit `40a131b`), and this activation verified it only.
+
+## VERIFIED (exact commands that succeeded)
+
+- `python3 tests/test_loader.py` — 9 tests, all ok. Key assertions:
+  - AAPL first-row close equals CSV `adjclose` (2.714299), not raw `close`
+    (3.241071).
+  - Every ticker's bar count equals `manifest["per_ticker_bars"]`.
+  - `dates[0]` equals `manifest["first_available_date"][ticker]` for all tickers.
+  - Dates match CSV row order exactly.
+  - Real-data walk-forward on AAPL (warmup=60, train=252, test=84) passes
+    `check_signal_integrity`, `check_equity_matches_fills` (full sample), and
+    completes with `n_folds > 0`.
+  - Reruns of the loader produce byte-identical arrays and date lists.
+- `python -m unittest discover -s tests -v` — **96 tests, all OK** (96 in 8.134s;
+  no failures/errors; matches the pre-existing 87 tests plus the 9 new loader tests).
+- `python3 research/data/preflight.py` — all 10 check groups pass, including the
+  known-gaps audit:
+  `PREFLIGHT PASSED: all data-quality and survivorship checks passed`.
+- `python -m examples.ma_crossover` — exits 0; aggregates: folds=88,
+  oos_periods=7392, mean_log_ret=-0.123, median_log_ret=-0.081 (matches the
+  STATE.md verified figures).
+- `python -m examples.volatility_regime_filter` — exits 0; aggregates: folds=90,
+  oos_periods=7560, mean_log_ret=-0.001, median_log_ret=0.000 (matches the
+  STATE.md verified figures).
+- `python -m examples.regime_stability_demo` — exits 0; all three verdicts
+  produced: REGIME_DEPENDENT (long-only on extreme regimes), REGIME_STABLE
+  (direction-following), CONSISTENT_WITH_NOISE (coin-flip and MA crossover on the
+  canonical family).
+- `python -m examples.universe_sweep` — exits 0; verdict NO_EDGE, 0/7 significant
+  assets, best-asset edge share 41.3% (matches the STATE.md verified figures).
+
+## UNVERIFIED
+
+- None remaining. The verification gap flagged at session start
+  ("corrected loader not executed after the final edit; full suite and preflight
+  not run after the edit") is now closed.
+
+## RISKS / notes
+
+- numpy was not present in the fresh shell; it was installed (`python3 -m pip
+  install -q numpy`). It is already the only dependency pinned in
+  `research/backtest/requirements.txt` / METHODOLOGY.md, so this is expected
+  environment setup, not a new dependency.
+- The prior scratch scripts `test_loader_tmp.py` and `test_timer.py` remain in the
+  repository root from the previous activation. The loader verification is now
+  captured in `tests/test_loader.py`, which supersedes `test_loader_tmp.py`. Both
+  are retained per the persistence policy (scratch/debug helpers may persist when
+  useful); `test_loader_tmp.py` in particular is superseded and its logic is now
+  covered by the test suite.
+- No protected/control-plane files were modified (no changes to `.github/`,
+  `.kilo/`, `AGENTS.md`, `ENTERPRISE.md`, `PERSISTENCE_POLICY.md`, or any
+  credential/authority configuration).
+
+## NEXT
+
+1. (Optional) Commit the new `tests/test_loader.py` so the loader verification is
+   recorded in git history alongside the `40a131b` correction. This is optional;
+   the execution record and `state/STATE.md` capture it.
+2. Advance the real-data research pipeline per `research/REAL_DATA_FEASIBILITY.md`
+   and the `state/STATE.md` "Next activation" item: run a research-only
+   walk-forward backtest on the collected universe (start with AAPL) applying the
+   same leakage checks, cost assumptions, perturbation sweep, and preflight gate,
+   before admitting any real-data result to the evidence base.
+3. Keep the regression discipline in `state/STATE.md`: after any research/code
+   change, re-run the full suite (`python -m unittest discover -s tests -v`) plus
+[0m
+[0m$ [0mhead -150 /home/runner/work/X/X/logs/ACTIVATION-2026-10-03.md
+# Activation Record — 2026-10-03 (follow-on: verification + per-asset significance flags)
+
+## Activation goal
+
+1. **Verify the repository's durable state independently.** The prior
+   activation reported 72 tests and seed-42 figures for the examples; those
+   were reported by a previous activation, not independently reproduced here.
+   This activation re-ran the full suite and all four walk-forward examples to
+   confirm the baseline is actually green and reproducible before standing on
+   it.
+2. **Implement the documented next action: per-asset significance flags.**
+   `state/STATE.md` flagged that the universe sweep's global null dispersion
+   can be large with few folds per asset, and recommended reporting a
+   per-asset significance flag (median vs the asset's own coin-flip benchmark)
+   alongside the verdict. This closes the last gap in the robustness
+   tooling.
+
+## Work performed
+
+### 1. Baseline verification (execution now available: numpy installed)
+
+- `pip install -q numpy` (Python 3.12, numpy resolved in this runner).
+- `python3 -m unittest discover -s tests -v`: **77 tests, all passing**
+  (9 data + 19 engine + 8 metrics + 15 perturbation + 11 regime-stability
+  + 15 asset-universe).
+- All four walk-forward examples run end-to-end without error; seed-42 figures
+  reproduce the documented records exactly:
+
+  | Example | Key verified figures |
+  |---|---|
+  | `ma_crossover` | full-sample zero cost: trades=55, total=-106.93%, sharpe=-0.04, max_dd=128.21%, turnover=319.8x; walk-forward: 88 folds, 7392 OOS, mean log ret -0.123, median -0.081, 37/88 positive |
+  | `volatility_regime_filter` | full-sample: trades=10, total=-1.72%, sharpe=-0.05, max_dd=9.60%; walk-forward: 90 folds, 7560 OOS, mean -0.001, median 0.000, 8/90 positive |
+  | `regime_stability_demo` | long-only extreme: medians [+0.055, +0.005, -0.079], dispersion 0.055 > 2x null 0.003, REGIME_DEPENDENT; direction rule: [+0.055, +0.048], dispersion 0.003 < 2x null 0.003, REGIME_STABLE; coin-flip and MA on canonical family: CONSISTENT_WITH_NOISE |
+  | `universe_sweep` | MA on 7-asset family: medians [-0.133..+0.020], best-asset share 41%, null median -0.047, null dispersion +0.109, verdict NO_EDGE |
+
+- Independent determinism check (`research/checks/determinism_check.py`): two
+  independent runs of `asset_sweep_summary(..., per_asset_null=True)` produce
+  identical fields and the same hash (3968836896295251151).
+
+### 2. Per-asset significance flags (the framework improvement)
+
+- `research/backtest/universe.py`:
+  - `AssetSweepSummary` gained `asset_null_medians` (coin-flip baseline per
+    asset), `asset_significance` (per-asset flag: candidate median
+    distinguishable from its own null), and `n_significant_assets`.
+  - The `verdict` property uses per-asset nulls when available: the NO_EDGE
+    check then compares every asset to its own null rather than a single
+    global null. The `per_asset_null=False` default preserves the prior API
+    and all existing verdicts.
+  - `asset_sweep_summary` gained the `per_asset_null=True` option; the null
+    is computed for every asset, and `inspect()` prints per-asset flags plus
+    the effective tolerance.
+- `examples/universe_sweep.py`: runs with `per_asset_null=True`, now printing
+  the flags.
+- `tests/test_universe.py`: new `TestPerAssetNull` class (5 tests:
+  determinism, flat family stays NO_EDGE under the per-asset null, agreement
+  with the global-null path on a clear NO_EDGE case, single significant edge
+  yields CONCENTRATED, and self-consistency of the flags).
+
+Result (seed 42, 7-asset drifted family): null dispersion tightened from
++0.109 (global, first 3 assets) to +0.079 (per-asset, all 7), effective
+tolerance +0.158, 0 / 7 significant assets, verdict NO_EDGE — unchanged from
+the prior run. All 77 tests pass and all four examples run.
+
+## State of the toolkit (after this activation)
+
+All three robustness dimensions from `research/METHODOLOGY.md` are operational,
+tested, and verified:
+- **Perturbation** (`perturbation.py`): parameter-sensitivity sweep with a
+  coin-flip null; the MA crossover shows a flat deviation scan, mixed signs,
+  no single-point peak — no robust edge.
+- **Regime stability** (`regime_stability.py`): stress across regime
+  families; contrived long-only is REGIME_DEPENDENT, a direction-following
+  rule is REGIME_STABLE, noise and the MA crossover are CONSISTENT_WITH_NOISE.
+- **Asset universe** (`universe.py`): sweep across assets with per-asset
+  significance flags; contrived one-strong-asset family → CONCENTRATED,
+  uniform-strong family → CONSISTENT, MA crossover → NO_EDGE.
+
+Synthetic data validates tooling only; none of the two demo signals is a
+live-market edge (both are reliably negative on regime-switching synthetic
+data).
+
+## Files changed / created
+
+- `research/backtest/universe.py` — per-asset null and significance flags.
+- `examples/universe_sweep.py` — enables `per_asset_null=True`.
+- `tests/test_universe.py` — `TestPerAssetNull` (5 new tests).
+- `state/STATE.md` — verification count updated (77 tests); new "Current
+  activation (asset-universe significance flags)" section; next-activation
+  items revised.
+- `logs/ACTIVATION-2026-10-03.md` — this record (consolidates the universe
+  sweep record from earlier this date with the present activation).
+- `research/checks/determinism_check.py` — scratch helper: independent
+  determinism re-run of the universe sweep.
+- `research/checks/test_count.py` — scratch helper: counts unit tests per
+  module.
+
+## Verification (executed)
+
+- `python3 -m unittest discover -s tests`: **77 tests, all passing** (verified
+  three times; latest run: 9 data + 19 engine + 8 metrics + 15 perturbation
+  + 11 regime-stability + 15 asset-universe; 77 total, 9.6s).
+- `python3 -m examples.ma_crossover`, `volatility_regime_filter`,
+  `regime_stability_demo`, `universe_sweep`: all run end-to-end; seed-42
+  figures match the documented records.
+- `python3 research/checks/determinism_check.py`: two independent runs produce
+  identical fields and hash 3968836896295251151.
+
+## Failures / known issues
+
+None. The MA crossover perturbation example prints "Baseline indistinguishable
+from noise: False" on this seed because the coin-flip null happened to have a
+median (+0.065) farther than 0.05 from the baseline (-0.081); this is honest
+reporting of null noise, not a framework defect (the deviation scan is still
+flat and mixed-sign, which is the robustness signal).
+
+Follow-on activation — 2026-10-03 (default per-asset nulls).
+
+## Objective
+
+Enable the per-asset coin-flip null as the `asset_sweep_summary` default. This
+tightens the NO_EDGE check: each asset is judged against its own
+coin-flip baseline rather than a global null estimated from a small sample of
+assets, which can mask asset-specific edges. The path was implemented, tested,
+and demonstrated in the prior record; this activation flips the default and
+confirms the canonical verdicts (NO_EDGE, CONCENTRATED, CONSISTENT) are
+unchanged.
+
+## Work performed
+
+- `research/backtest/universe.py`: `asset_sweep_summary()` default changed
+  from `per_asset_null=False` to `per_asset_null=True`; docstring updated to
+  document the new default and that `noise_n` is ignored in that case.
+- `tests/test_universe.py`: `TestUniverseReproducibility.test_sweep_reproducible`
+  gained an assertion that the default path now reports
+  `asset_null_medians` and `asset_significance` (lengths equal `n_assets`),
+  locking in the documented contract.
+
+## Verification (executed)
+
+- `python3 -m unittest discover -s tests -v`: **77 tests, all passing**
+  (9 data + 19 engine + 8 metrics + 15 perturbation + 11 regime-stability +
+  15 asset-universe); 0 failures/errors. The new per-asset default assertion
+  passes.
+- All four examples exit 0:
+  - `ma_crossover`: full-sample -106.93% (zero cost); walk-forward OOS mean
+    log return -0.123, positive folds 37/88; perturbation sweep best
+    parameter set +0.045, flat scan.
+  - `volatility_regime_filter`: full-sample -1.72%; OOS mean -0.001, median
+    0.000, positive folds 8/90.
+[0m
+Based on my analysis of the recent activation evidence, I can provide the following assessment:
+
