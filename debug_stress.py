@@ -1,45 +1,62 @@
+#!/usr/bin/env python3
 import sys
-import time
-sys.path.insert(0, "/home/runner/work/X/X")
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import research.backtest as bt
+from research.backtest import momentum_signals, stress_segments
+from research.backtest import load_ticker
 from research.data.preflight import load_manifest
 
 manifest = load_manifest()
-bars, dates = bt.load_ticker("AAPL")
+tickers_univ = {}
+for entry in manifest['entries']:
+    ticker = entry['ticker']
+    tickers_univ[ticker] = bt.load_ticker(ticker)[0]
+
+asset = manifest['universe'][0]
+bars = tickers_univ[asset]
 closes = bars.closes_array()
 
-labels = ["segA"] * (len(closes) // 2) + ["segB"] * (len(closes) - len(closes) // 2)
-s, e = 0, len(closes) // 2
-bars_list = list(bars)
-seg_bars = bars_list[s:e]
-seg_signals = [bt.Signal(date=i + 1, weight=(1.0 if i % 2 == 0 else 0.0)) for i in range(len(seg_bars))]
+# Test momentum_signals
+print('Testing momentum_signals...')
+signals = momentum_signals(closes, lookback=5)
+print(f'  Created {len(signals)} signals')
 
-grid = [{"fast": 20, "slow": 60}]
-cfg0 = bt.BacktestConfig(initial_capital=1e6, warmup_periods=60)
+# Test stress_segments
+print('Testing stress_segments...')
+def signals_fn(c, **p):
+    return momentum_signals(c, lookback=5)
 
-print("candidate sweep start")
-t0 = time.time()
-sweep = bt.parameter_sweep(
-    signals_fn=lambda closes, **p: [bt.Signal(date=i + 1, weight=1.0 if i % 3 == 0 else 0.0) for i in range(len(closes))],
-    bars=seg_bars,
-    param_grid=grid,
-    train_window=252,
-    test_window=84,
-    warmup=60,
-    overlap_window=60,
-    cfg=cfg0,
-)
-print("candidate sweep elapsed:", round(time.time() - t0, 2), "s, folds:", sweep.n_folds)
+labels = bt.volatility_blocks(closes, n_blocks=4, window=60)
+seg_fn = bt.segment_fn_from_labels(labels)
 
-print("noise benchmark start")
-t0 = time.time()
-noise = bt.noise_benchmark(
-    seg_bars,
-    param_grid=grid,
-    train_window=252,
-    test_window=84,
-    warmup=0,
-    overlap_window=0,
-    cfg=cfg0,
-)
-print("noise benchmark elapsed:", round(time.time() - t0, 2), "s")
+print('Calling stress_segments...')
+try:
+    cfg = bt.BacktestConfig(initial_capital=1e6, warmup_periods=60)
+    baseline = ('lookback', 5)
+    print(f'baseline type: {type(baseline)}, value: {baseline}')
+    print(f'baseline as tuple: {tuple(baseline) if hasattr(baseline, "__iter__") else "not iterable"}')
+    print(f'baseline wrapped: {(("lookback", 5),)}')
+    res = stress_segments(
+        signals_fn=signals_fn,
+        bars=list(bars),
+        signals=signals_fn(closes),
+        param_grid=[{'lookback': 5}],
+        baseline=(("lookback", 5),),
+        segment_fn=seg_fn,
+        train_window=252,
+        test_window=84,
+        warmup=60,
+        overlap_window=60,
+        periods_per_year=252,
+        min_segment_bars=400,
+        cfg=cfg,
+    )
+    print('Success!')
+    print(f'  Verdict: {res.overall_verdict}')
+except Exception as e:
+    print(f'Error: {e}')
+    import traceback
+    traceback.print_exc()
