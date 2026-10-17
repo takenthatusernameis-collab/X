@@ -1,66 +1,3 @@
-"""Holding-period sensitivity of the qualified lookback-5 momentum signal.
-
-This is the R-002 focused task. The momentum class (long the previous
-lookback-day return, hold 1 day, daily rebalance) has been admitted as
-candidate positive evidence: REGIME_STABLE positive edge in 7/10 of the
-collected universe at a one-day hold. This test varies only the holding
-period -- not the lookback -- to answer the primary question:
-
-  Does the qualified momentum effect survive a small predeclared
-  holding-period variation without becoming a single-point timing
-  artifact?
-
-Method (fixed a-priori, not tuned to OOS): lookback fixed at 5. Holding
-periods are predeclared as HOLD_PERIODS = (1, 2, 3, 5): at a rebalance bar
-the position is set to the signal and carried for HOLD days before the next
-rebalance (signal at bar t is held during bars t .. t+H-1; a fresh
-rebalance occurs at bars lookback + k*H for k = 0, 1, 2, ...). The same
-walk-forward windows, 4 contiguous volatility blocks, min_segment_bars
-threshold, and coin-flip null as the existing momentum check
-(`research/checks/momentum.py`) are used; the only change is a hold-period
-transform applied to the signal series before the walk-forward. The null is
-the framework's coin-flip benchmark run on the same segments -- identical to
-momentum.py -- so the H=1 run is a direct replication of the admitted
-evidence.
-
-Classification scheme (predeclared; applied after the grid runs, not used
-to select parameters):
-  - Per asset per hold: verdict per segment + per-asset verdict
-    (REGIME_STABLE positive / CONSISTENT_WITH_NOISE / REGIME_DEPENDENT /
-     REGIME_STABLE_LOSS).
-  - Hold profile per asset:
-      STABLE_EDGE     = REGIME_STABLE with uniformly positive medians at
-                        every hold in HOLD_PERIODS;
-      WEAKENS         = positive REGIME_STABLE at some holds,
-                        CONSISTENT_WITH_NOISE or regime-dependent at others;
-      SINGULAR        = a positive edge at exactly one hold period
-                        (anywhere in the grid);
-      NO_EDGE         = no positive edge at any hold.
-  - Universe-level classification of the effect:
-      HORIZON_STABLE        = the 7/10 H=1 REGIME_STABLE-positive assets
-                              remain uniformly positive REGIME_STABLE at
-                              all holds in the grid; no asset shows a
-                              SINGULAR hold profile; the effect is not a
-                              single-point timing artifact.
-      HORIZON_SENSITIVE     = the edge's presence depends on hold period:
-                              present at some holds, absent or weaker at
-                              others, but not confined to a single hold.
-      HORIZON_SINGULAR      = the positive edge is confined to exactly one
-                              hold period across the universe -- a
-                              single-point timing artifact.
-      HORIZON_DESTROYED     = no positive edge survives at any hold.
-
-A-priori falsification prediction: if the H=1 edge is a timing artifact of
-daily rebalancing, extending the hold should erase it: medians should
-decline with hold period and the REGIME_STABLE-positive set should collapse
-to zero or become confined to a single hold (HORIZON_SINGULAR /
-HORIZON_DESTROYED). If the edge is a durable short-horizon autocorrelation,
-it should persist with roughly stable sign and magnitude across the small
-grid (HORIZON_STABLE), with perhaps modest decay. Either outcome closes the
-cell.
-
-Research / simulation only. No live trading or production execution.
-"""
 from __future__ import annotations
 
 import json
@@ -326,10 +263,6 @@ def main() -> int:
         profiles[t] = asset_profiles
     for t in ticker_order:
         p = profiles[t]
-        medians = [p[str(h)]["medians"] for h in HOLD_PERIODS]
-        first_seg_medians = [mm[0] for mm in medians]
-        # Positive edge if the canonical first-segment median is positive and
-        # the overall verdict is REGIME_STABLE at that hold.
         has_pos = []
         for h in HOLD_PERIODS:
             prof = p[str(h)]
@@ -442,20 +375,17 @@ def main() -> int:
                 ),
             ) for h in HOLD_PERIODS},
             hold_profiles={t: {str(h): (
-                "STABLE_EDGE" if all(
-                    profiles[t][str(h)]["verdict"] == "REGIME_STABLE"
-                    and all(m > 0 for m in profiles[t][str(h)]["medians"])
-                ) else (
-                    "SINGULAR" if (
-                        sum(
+                "STABLE_EDGE" if all(has_pos) else (
+                    "SINGULAR" if (sum([
+                        profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
+                        and all(m > 0 for m in profiles[t][str(h2)]["medians"])
+                        for h2 in HOLD_PERIODS
+                    ]) == 1) else (
+                        "WEAKENS" if sum([
                             profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
                             and all(m > 0 for m in profiles[t][str(h2)]["medians"])
-                        ) == 1 for h2 in HOLD_PERIODS
-                    ) else (
-                        "WEAKENS" if sum(
-                            profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
-                            and all(m > 0 for m in profiles[t][str(h2)]["medians"])
-                        ) > 1 else "NO_EDGE"
+                            for h2 in HOLD_PERIODS
+                        ]) > 1 else "NO_EDGE"
                     )
                 )
             ) for h in HOLD_PERIODS} for t in ticker_order},
@@ -468,10 +398,10 @@ def main() -> int:
                 for h in HOLD_PERIODS
             )],
             singular_assets=[t for t in ticker_order if any(
-                sum(
+                [(
                     profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
                     and all(m > 0 for m in profiles[t][str(h2)]["medians"])
-                ) == 1 for h2 in HOLD_PERIODS
+                ) for h2 in HOLD_PERIODS]
             )],
             ticker_order=ticker_order,
         ),
