@@ -442,7 +442,7 @@ def main() -> int:
                 ),
             ) for h in HOLD_PERIODS},
             hold_profiles={t: {str(h): (
-                "STABLE_EDGE" if all(
+                "STABLE_EDGE" if (
                     profiles[t][str(h)]["verdict"] == "REGIME_STABLE"
                     and all(m > 0 for m in profiles[t][str(h)]["medians"])
                 ) else (
@@ -468,13 +468,16 @@ def main() -> int:
                 for h in HOLD_PERIODS
             )],
             singular_assets=[t for t in ticker_order if any(
-                sum(
-                    profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
-                    and all(m > 0 for m in profiles[t][str(h2)]["medians"])
-                ) == 1 for h2 in HOLD_PERIODS
+                (
+                    sum(
+                        profiles[t][str(h2)]["verdict"] == "REGIME_STABLE"
+                        and all(m > 0 for m in profiles[t][str(h2)]["medians"])
+                        for h2 in HOLD_PERIODS
+                    ) == 1
+                ) for _ in [0]
             )],
-            ticker_order=ticker_order,
         ),
+        ticker_order=ticker_order,
         perturbation=pers,
     )
     with open(ARTIFACT_PATH, "w") as f:
