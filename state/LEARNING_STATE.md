@@ -67,3 +67,16 @@ Prefer the highest-value unresolved frontier cell over repeating an equivalent e
 5. Preserve negative and inconclusive evidence.
 6. Do not claim a strategy delta worked until its expected effect is actually observed.
 7. When there is insufficient evidence, choose UNVERIFIED rather than forcing RETAIN or REVERT.
+
+
+## Sequential campaign 39267178457
+- **Validated process improvement:** agents NONE
+- **Validated research progress:** agents [4, 8]
+- **Validated negative/rejected evidence:** agents [8]
+- **Unresolved uncertainty:** agents [1, 5, 6, 9, 10]
+- **Odd/even process observations:** [{"even_agent": 2, "even_observation": "UNCHANGED", "even_task": "R-001", "even_uncertainty_reduced": "Created bounded cost-sensitivity test framework that applies conservative transaction costs to both momentum signal and matched null across lookback 3/5/10", "odd_agent": 1, "odd_process_decision": "UNVERIFIED", "odd_task": "P-001"}, {"even_agent": 4, "even_observation": "UNCHANGED", "even_task": "R-002", "even_uncertainty_reduced": "High confidence that momentum lookback 5 does NOT survive holding period variations: 8/10 assets show no edge (CONSISTENT_WITH_NOISE), 2/10 show regime-dependent or loss-stable edges. The holding-period sensitivity has been classified.", "odd_agent": 3, "odd_process_decision": "RETAIN", "odd_task": "P-002"}, {"even_agent": 6, "even_observation": "UNVERIFIED", "even_task": "R-003", "even_uncertainty_reduced": "none demonstrated", "odd_agent": 5, "odd_process_decision": "UNVERIFIED", "odd_task": "P-004"}, {"even_agent": 8, "even_observation": "IMPROVED", "even_task": "R-001", "even_uncertainty_reduced": "Confirmed that the momentum edge survives conservative transaction costs; the cost-robustness qualification is now complete, making the momentum evidence fully admissible with realistic cost assumptions.", "odd_agent": 7, "odd_process_decision": "RETAIN", "odd_task": "P-001"}, {"even_agent": 10, "even_observation": "UNVERIFIED", "even_task": "R-001", "even_uncertainty_reduced": "none demonstrated", "odd_agent": 9, "odd_process_decision": "UNVERIFIED", "odd_task": "P-002"}]
+- **Task-selection observation:** {"1": "UNVERIFIED", "10": "UNVERIFIED", "2": "UNCHANGED", "3": "UNCHANGED", "4": "UNCHANGED", "5": "UNVERIFIED", "6": "UNVERIFIED", "7": "IMPROVED", "8": "IMPROVED", "9": "UNVERIFIED"}
+- **Highest-value unresolved next task:** P-001
+- **New complexity introduced:** [{"agent_number": 1, "complexity_added": "UNVERIFIED"}, {"agent_number": 2, "complexity_added": "UNVERIFIED"}, {"agent_number": 3, "complexity_added": "NONE"}, {"agent_number": 4, "complexity_added": "LOW"}, {"agent_number": 5, "complexity_added": "UNVERIFIED"}, {"agent_number": 6, "complexity_added": "UNVERIFIED"}, {"agent_number": 7, "complexity_added": "LOW"}, {"agent_number": 8, "complexity_added": "LOW"}, {"agent_number": 9, "complexity_added": "UNVERIFIED"}, {"agent_number": 10, "complexity_added": "UNVERIFIED"}]
+- **Campaign persistence decision:** RECOVERY_BRANCH
+- **Contradictory/unverified evidence:** ['agent_01:UNVERIFIED', 'agent_05:UNVERIFIED', 'agent_06:UNVERIFIED', 'agent_09:UNVERIFIED', 'agent_10:UNVERIFIED']
