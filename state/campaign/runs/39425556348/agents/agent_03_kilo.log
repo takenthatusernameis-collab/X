@@ -1,0 +1,285 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+[0m✱ [0mGlob "**/*agent_03*"[90m 3 matches[0m
+[0m✱ [0mGlob "**/state/**/*.json"[90m 30 matches[0m
+[0m✱ [0mGlob "**/LEARNING*"[90m 2 matches[0m
+[0m→ [0mRead .
+[0m→ [0mRead state/campaign/current_task.json
+[0m→ [0mRead state/campaign/runs/39425556348/agents/agent_02.json
+[0m→ [0mRead state/LEARNING_STATE.md
+[0m→ [0mRead LEARNING_EFFICIENCY.md
+[0m→ [0mRead state/campaign/runs/39425556348/agents/agent_03_contract.json
+[0m→ [0mRead state/campaign/runs/39425556348/agents/agent_03_before.json
+[0m→ [0mRead state/campaign/runs/39425556348/campaign_status.json
+[0m→ [0mRead state/campaign/global_agent_counter.json
+[0m→ [0mRead research/checks/momentum.py
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py
+[0m→ [0mRead research/checks/momentum_cost_robustness.py
+[0m→ [0mRead state/campaign/task_queue.json
+[0m→ [0mRead research/checks/momentum_longer_horizon.py
+[0m
+[0m$ [0mcd /home/runner/work/X/X && git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   state/campaign/global_agent_counter.json
+	modified:   state/campaign/task_queue.json
+	modified:   state/worker_progress.md
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	research/checks/momentum_cost_robustness.py
+	state/campaign/current_task.json
+	state/campaign/runs/39425556348/
+	state/check_artifacts/momentum_cost_robustness.json
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[0m
+[0m→ [0mRead state/campaign/runs/39425556348/agents/agent_02_contract.json
+[0m
+[0m← [0mWrite state/campaign/current_task.json
+Wrote file successfully.
+[0m
+[0m← [0mWrite state/campaign/runs/39425556348/agents/agent_03.json
+Wrote file successfully.
+[0m
+[0m→ [0mRead state/campaign/runs/39425556348/agents/agent_03.json
+[0m→ [0mRead research/backtest/engine.py[90m [offset=1, limit=100][0m
+[0m✱ [0mGrep "def.*signal|def.*detect|def.*guard|def.*novelty"[90m in research/backtest · 14 matches[0m
+[0m✱ [0mGrep "momentum|lookback|robustness"[90m in research/backtest/engine.py · 0 matches[0m
+[0m→ [0mRead research/backtest/regime_stability.py[90m [limit=100][0m
+[0m→ [0mRead research/backtest/regime_stability.py[90m [limit=50, offset=880][0m
+[0m
+[0m← [0mEdit research/backtest/regime_stability.py
+Index: /home/runner/work/X/X/research/backtest/regime_stability.py
+===================================================================
+--- /home/runner/work/X/X/research/backtest/regime_stability.py
++++ /home/runner/work/X/X/research/backtest/regime_stability.py
+@@ -885,8 +885,10 @@
+ 
+ def momentum_signals(
+     closes: NDArray,
+     lookback: int = 5,
++    *,
++    _prevent_duplicate: bool = False,
+ ) -> List[Signal]:
+     """Past-only short-horizon momentum signal (new signal class).
+ 
+     Long the previous ``lookback``-day return and hold for one day: if the
+@@ -902,9 +904,32 @@
+     5-day-lookback direction bet is a robust edge on this universe.
+ 
+     No look-ahead: each signal uses only closes up to and including its own
+     bar.
++
++    If _prevent_duplicate is True and a momentum signal with identical
++    lookback already exists in durable evidence, raises ValueError to
++    prevent redundant equivalent experiments. This supports research
++    efficiency by stopping duplicate momentum tests while allowing
++    genuinely new variations (different lookback, new hypothesis class,
++    diagnostic purpose, or new data).
+     """
++    if _prevent_duplicate:
++        from pathlib import Path
++        evidence_path = Path.cwd() / "state" / "LEARNING_STATE.md"
++        if evidence_path.exists():
++            content = evidence_path.read_text()
++            # Count distinct momentum lookback values that have been tested
++            import re
++            momentum_lookbacks = re.findall(r'lookback (\d+)', content)
++            momentum_lookbacks = set(int(x) for x in momentum_lookbacks)
++            if lookback in momentum_lookbacks:
++                raise ValueError(
++                    f"Momentum lookback {lookback} has already been tested and "
++                    f"established in durable evidence. Equivalent momentum "
++                    f"experiments are prevented to improve research efficiency. "
++                    f"Use a different lookback, new hypothesis, or diagnostic purpose."
++                )
+     n = len(closes)
+     out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+     lookback = int(lookback)
+     for i in range(lookback, n):
+
+[0m
+[0m→ [0mRead research/backtest/regime_stability.py[90m [limit=60, offset=885][0m
+[0m
+[0m← [0mWrite state/campaign/runs/39425556348/agents/agent_03.json
+Wrote file successfully.
+[0m
+[0m$ [0mcd /home/runner/work/X/X && git status
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   research/backtest/regime_stability.py
+	modified:   state/campaign/global_agent_counter.json
+	modified:   state/campaign/task_queue.json
+	modified:   state/worker_progress.md
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	research/checks/momentum_cost_robustness.py
+	state/campaign/current_task.json
+	state/campaign/runs/39425556348/
+	state/check_artifacts/momentum_cost_robustness.json
+
+no changes added to commit (use "git add" and/or "git commit -a")
+[0m
+[0m$ [0mcd /home/runner/work/X/X && git diff --stat
+research/backtest/regime_stability.py    |  25 +++
+ state/campaign/global_agent_counter.json |  13 +-
+ state/campaign/task_queue.json           | 333 ++++++++++++++++---------------
+ state/worker_progress.md                 |  43 +---
+ 4 files changed, 210 insertions(+), 204 deletions(-)
+[0m
+[0m→ [0mRead state/campaign/current_task.json
+[0m
+[0m$ [0mcd /home/runner/work/X/X && git diff research/backtest/regime_stability.py | head -60
+diff --git a/research/backtest/regime_stability.py b/research/backtest/regime_stability.py
+index 09a3cdd..8ff7fb3 100644
+--- a/research/backtest/regime_stability.py
++++ b/research/backtest/regime_stability.py
+@@ -886,6 +886,8 @@ def mean_reversion_signals(
+ def momentum_signals(
+     closes: NDArray,
+     lookback: int = 5,
++    *,
++    _prevent_duplicate: bool = False,
+ ) -> List[Signal]:
+     """Past-only short-horizon momentum signal (new signal class).
+ 
+@@ -903,7 +905,30 @@ def momentum_signals(
+ 
+     No look-ahead: each signal uses only closes up to and including its own
+     bar.
++
++    If _prevent_duplicate is True and a momentum signal with identical
++    lookback already exists in durable evidence, raises ValueError to
++    prevent redundant equivalent experiments. This supports research
++    efficiency by stopping duplicate momentum tests while allowing
++    genuinely new variations (different lookback, new hypothesis class,
++    diagnostic purpose, or new data).
+     """
++    if _prevent_duplicate:
++        from pathlib import Path
++        evidence_path = Path.cwd() / "state" / "LEARNING_STATE.md"
++        if evidence_path.exists():
++            content = evidence_path.read_text()
++            # Count distinct momentum lookback values that have been tested
++            import re
++            momentum_lookbacks = re.findall(r'lookback (\d+)', content)
++            momentum_lookbacks = set(int(x) for x in momentum_lookbacks)
++            if lookback in momentum_lookbacks:
++                raise ValueError(
++                    f"Momentum lookback {lookback} has already been tested and "
++                    f"established in durable evidence. Equivalent momentum "
++                    f"experiments are prevented to improve research efficiency. "
++                    f"Use a different lookback, new hypothesis, or diagnostic purpose."
++                )
+     n = len(closes)
+     out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+     lookback = int(lookback)
+[0m
+[0m→ [0mRead state/campaign/current_task.json
+[0m
+[0m← [0mWrite state/campaign/runs/39425556348/agents/agent_03.json
+Wrote file successfully.
+[0m
+[0m$ [0mcd /home/runner/work/X/X && find . -name "*.py" -exec grep -l "momentum_signals" {} \; | head -10
+./diag_fold_detail.py
+./diag_mom_vs_rev.py
+./state/check_smoke/smoke_momentum.py
+./research/checks/momentum.py
+./research/checks/momentum_horizon_gap_analysis.py
+./research/checks/verify_momentum_lookback_sweep.py
+./research/checks/verify_momentum.py
+./research/checks/momentum_longer_horizon.py
+./research/checks/verify_momentum_longer_horizon.py
+./research/checks/momentum_cost_robustness.py
+find: ‘grep’ terminated by signal 13
+find: ‘grep’ terminated by signal 13
+find: ‘grep’ terminated by signal 13
+find: ‘grep’ terminated by signal 13
+find: ‘grep’ terminated by signal 13
+[0m
+[0m$ [0mcd /home/runner/work/X/X && find . -path "./state/campaign/runs/39425556348/agents/agent_03*" -type f
+./state/campaign/runs/39425556348/agents/agent_03.json
+./state/campaign/runs/39425556348/agents/agent_03_before.json
+./state/campaign/runs/39425556348/agents/agent_03_kilo.log
+./state/campaign/runs/39425556348/agents/agent_03_contract.json
+[0m
+[0m✗ [0mcd /home/runner/work/X/X && git diff research/backtest/regime_stability.py | wc -l failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m→ [0mRead state/campaign/global_agent_counter.json
+[0m
+[0m$ [0mcd /home/runner/work/X/X && ls -la state/campaign/runs/39425556348/agents/ | head -20
+total 152
+drwxr-xr-x 2 runner runner  4096 Oct 20 13:01 .
+drwxr-xr-x 3 runner runner  4096 Oct 20 12:52 ..
+-rw-r--r-- 1 runner runner  1308 Oct 20 12:54 agent_01.json
+-rw-r--r-- 1 runner runner 21220 Oct 20 12:52 agent_01_before.json
+-rw-r--r-- 1 runner runner  1910 Oct 20 12:52 agent_01_contract.json
+-rw-r--r-- 1 runner runner  3268 Oct 20 12:54 agent_01_kilo.log
+-rw-r--r-- 1 runner runner   861 Oct 20 12:54 agent_01_runtime.json
+-rw-r--r-- 1 runner runner  1410 Oct 20 12:54 agent_01_validation.json
+-rw-r--r-- 1 runner runner  2043 Oct 20 12:59 agent_02.json
+-rw-r--r-- 1 runner runner 22027 Oct 20 12:54 agent_02_before.json
+-rw-r--r-- 1 runner runner  3253 Oct 20 12:54 agent_02_contract.json
+-rw-r--r-- 1 runner runner 12685 Oct 20 12:59 agent_02_kilo.log
+-rw-r--r-- 1 runner runner   861 Oct 20 12:59 agent_02_runtime.json
+-rw-r--r-- 1 runner runner  1728 Oct 20 12:59 agent_02_validation.json
+-rw-r--r-- 1 runner runner  2386 Oct 20 13:02 agent_03.json
+-rw-r--r-- 1 runner runner 23080 Oct 20 12:59 agent_03_before.json
+-rw-r--r-- 1 runner runner  3849 Oct 20 12:59 agent_03_contract.json
+-rw-r--r-- 1 runner runner  9903 Oct 20 13:02 agent_03_kilo.log
+[0m
+[0m→ [0mRead state/campaign/runs/39425556348/agents/agent_01.json[90m [limit=50][0m
+[0m
+[0m$ [0mcd /home/runner/work/X/X && git status --porcelain
+M research/backtest/regime_stability.py
+ M state/campaign/global_agent_counter.json
+ M state/campaign/task_queue.json
+ M state/worker_progress.md
+?? research/checks/momentum_cost_robustness.py
+?? state/campaign/current_task.json
+?? state/campaign/runs/39425556348/
+?? state/check_artifacts/momentum_cost_robustness.json
+[0m
+[0m$ [0mcd /home/runner/work/X/X && git diff --name-only
+research/backtest/regime_stability.py
+state/campaign/global_agent_counter.json
+state/campaign/task_queue.json
+state/worker_progress.md
+[0m
+[0m$ [0mcd /home/runner/work/X/X && git diff research/backtest/regime_stability.py | tail -20
+"""
++    if _prevent_duplicate:
++        from pathlib import Path
++        evidence_path = Path.cwd() / "state" / "LEARNING_STATE.md"
++        if evidence_path.exists():
++            content = evidence_path.read_text()
++            # Count distinct momentum lookback values that have been tested
++            import re
++            momentum_lookbacks = re.findall(r'lookback (\d+)', content)
++            momentum_lookbacks = set(int(x) for x in momentum_lookbacks)
++            if lookback in momentum_lookbacks:
++                raise ValueError(
++                    f"Momentum lookback {lookback} has already been tested and "
++                    f"established in durable evidence. Equivalent momentum "
++                    f"experiments are prevented to improve research efficiency. "
++                    f"Use a different lookback, new hypothesis, or diagnostic purpose."
++                )
+     n = len(closes)
+     out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+     lookback = int(lookback)
+[0m
+[0m→ [0mRead state/campaign/runs/39425556348/agents/agent_03.json
+## Summary
+
