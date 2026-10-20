@@ -67,3 +67,16 @@ Prefer the highest-value unresolved frontier cell over repeating an equivalent e
 5. Preserve negative and inconclusive evidence.
 6. Do not claim a strategy delta worked until its expected effect is actually observed.
 7. When there is insufficient evidence, choose UNVERIFIED rather than forcing RETAIN or REVERT.
+
+
+## Sequential campaign 39495608897
+- **Validated process improvement:** agents NONE
+- **Validated research progress:** agents [6]
+- **Validated negative/rejected evidence:** agents [3, 5, 8, 9]
+- **Unresolved uncertainty:** agents [1, 2, 4, 10]
+- **Odd/even process observations:** [{"even_agent": 2, "even_observation": "UNVERIFIED", "even_task": "R-001", "even_uncertainty_reduced": "none demonstrated", "odd_agent": 1, "odd_process_decision": "UNVERIFIED", "odd_task": "P-001"}, {"even_agent": 4, "even_observation": "UNVERIFIED", "even_task": "R-002", "even_uncertainty_reduced": "none demonstrated", "odd_agent": 3, "odd_process_decision": "REJECT", "odd_task": "P-001"}, {"even_agent": 6, "even_observation": "WORSENED", "even_task": "R-001", "even_uncertainty_reduced": "yes demonstrated", "odd_agent": 5, "odd_process_decision": "REJECT", "odd_task": "P-001"}, {"even_agent": 8, "even_observation": "UNCHANGED", "even_task": "R-003", "even_uncertainty_reduced": "yes demonstrated: the evidence falsifies the hypothesis that the same conditioning that was falsified on MA crossover would rescue the momentum edge.", "odd_agent": 7, "odd_process_decision": "RETAIN", "odd_task": "P-002"}, {"even_agent": 10, "even_observation": "UNVERIFIED", "even_task": "R-005", "even_uncertainty_reduced": "none demonstrated", "odd_agent": 9, "odd_process_decision": "REJECT", "odd_task": "P-004"}]
+- **Task-selection observation:** {"1": "UNVERIFIED", "10": "UNVERIFIED", "2": "UNVERIFIED", "3": "WORSENED", "4": "UNVERIFIED", "5": "WORSENED", "6": "WORSENED", "7": "UNCHANGED", "8": "UNCHANGED", "9": "WORSENED"}
+- **Highest-value unresolved next task:** P-001
+- **New complexity introduced:** [{"agent_number": 1, "complexity_added": "UNVERIFIED"}, {"agent_number": 2, "complexity_added": "UNVERIFIED"}, {"agent_number": 3, "complexity_added": "UNVERIFIED"}, {"agent_number": 4, "complexity_added": "UNVERIFIED"}, {"agent_number": 5, "complexity_added": "UNVERIFIED"}, {"agent_number": 6, "complexity_added": "UNVERIFIED"}, {"agent_number": 7, "complexity_added": "NONE"}, {"agent_number": 8, "complexity_added": "NONE"}, {"agent_number": 9, "complexity_added": "UNVERIFIED"}, {"agent_number": 10, "complexity_added": "UNVERIFIED"}]
+- **Campaign persistence decision:** RECOVERY_BRANCH
+- **Contradictory/unverified evidence:** ['agent_01:UNVERIFIED', 'agent_02:UNVERIFIED', 'agent_03:WORSENED_SELECTION_EFFECT', 'agent_04:UNVERIFIED', 'agent_05:WORSENED_SELECTION_EFFECT', 'agent_06:WORSENED_SELECTION_EFFECT', 'agent_09:WORSENED_SELECTION_EFFECT', 'agent_10:UNVERIFIED']
