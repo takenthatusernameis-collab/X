@@ -67,3 +67,16 @@ Prefer the highest-value unresolved frontier cell over repeating an equivalent e
 5. Preserve negative and inconclusive evidence.
 6. Do not claim a strategy delta worked until its expected effect is actually observed.
 7. When there is insufficient evidence, choose UNVERIFIED rather than forcing RETAIN or REVERT.
+
+
+## Sequential campaign 39561148442
+- **Validated process improvement:** agents NONE
+- **Validated research progress:** agents [4, 10]
+- **Validated negative/rejected evidence:** agents [9]
+- **Unresolved uncertainty:** agents [1, 2, 5, 6, 7, 8]
+- **Odd/even process observations:** [{"even_agent": 2, "even_observation": "UNVERIFIED", "even_task": "R-001", "even_uncertainty_reduced": "none demonstrated", "odd_agent": 1, "odd_process_decision": "UNVERIFIED", "odd_task": "P-001"}, {"even_agent": 4, "even_observation": "UNCHANGED", "even_task": "R-001", "even_uncertainty_reduced": "The momentum edge is cost-robust for 60% of the universe (6/10 ROBUST) but not for 40% (4/10 NO_EDGE). The remaining 20% are REGIME_DEPENDENT (1 asset) or CONSISTENT_WITH_NOISE (2 assets), and 1 asset shows REGIME_STABLE but with no positive edge.", "odd_agent": 3, "odd_process_decision": "RETAIN", "odd_task": "P-002"}, {"even_agent": 6, "even_observation": "UNVERIFIED", "even_task": "R-002", "even_uncertainty_reduced": "none demonstrated", "odd_agent": 5, "odd_process_decision": "RETAIN", "odd_task": "P-001"}, {"even_agent": 8, "even_observation": "UNVERIFIED", "even_task": "R-001", "even_uncertainty_reduced": "none demonstrated", "odd_agent": 7, "odd_process_decision": "UNVERIFIED", "odd_task": "P-001"}, {"even_agent": 10, "even_observation": "UNCHANGED", "even_task": "R-001", "even_uncertainty_reduced": "The evidence shows that the momentum edge survives realistic transaction costs for a majority of the universe (6/10 ROBUST), providing robust candidate positive evidence for the higher-order learning process.", "odd_agent": 9, "odd_process_decision": "REJECT", "odd_task": "P-001"}]
+- **Task-selection observation:** {"1": "UNVERIFIED", "10": "UNCHANGED", "2": "UNVERIFIED", "3": "UNCHANGED", "4": "UNCHANGED", "5": "UNVERIFIED", "6": "UNVERIFIED", "7": "UNVERIFIED", "8": "UNVERIFIED", "9": "UNVERIFIED"}
+- **Highest-value unresolved next task:** R-002
+- **New complexity introduced:** [{"agent_number": 1, "complexity_added": "UNVERIFIED"}, {"agent_number": 2, "complexity_added": "UNVERIFIED"}, {"agent_number": 3, "complexity_added": "NONE"}, {"agent_number": 4, "complexity_added": "NONE"}, {"agent_number": 5, "complexity_added": "NONE"}, {"agent_number": 6, "complexity_added": "UNVERIFIED"}, {"agent_number": 7, "complexity_added": "UNVERIFIED"}, {"agent_number": 8, "complexity_added": "UNVERIFIED"}, {"agent_number": 9, "complexity_added": "NONE"}, {"agent_number": 10, "complexity_added": "NONE"}]
+- **Campaign persistence decision:** RECOVERY_BRANCH
+- **Contradictory/unverified evidence:** ['agent_01:UNVERIFIED', 'agent_02:UNVERIFIED', 'agent_05:UNVERIFIED', 'agent_06:UNVERIFIED', 'agent_07:UNVERIFIED', 'agent_08:UNVERIFIED']
