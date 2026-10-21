@@ -9,7 +9,7 @@ was flat on the null.
 
 Momentum is the direct competing hypothesis to reversal: go LONG the previous
 N-day return instead of shorting it, hold 1 day, daily rebalance. The
-contraposition is clean — reversal and momentum use the same lookback window,
+contraposition is clean \u2014 reversal and momentum use the same lookback window,
 the same walk-forward, and the same coin-flip null; they differ only in signal
 sign. If reversal loses in every segment of every asset, the momentum variant
 should make the opposite mistake. This test settles whether the 5-day-lookback
@@ -18,7 +18,7 @@ direction sign attached.
 
 Falsification prediction: momentum either shows CONSISTENT_WITH_NOISE (no edge
 anywhere) or REGIME_DEPENDENT (the positive run concentrates in one historical
-regime mix, notably 2009-2013), or REGIME_STABLE_LOSS (uniformly negative —
+regime mix, notably 2009-2013), or REGIME_STABLE_LOSS (uniformly negative \u2014
 which would be reversal winning on both sides, an inconsistency to explain).
 Either outcome is a negative conclusion and closes the cell.
 
@@ -45,6 +45,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 import research.backtest as bt
 from research.data.preflight import load_manifest, sha256_file
 
+# Constants for volatility-normalized sizing
+VOL_TARGET = 0.20
+MAX_SCALING = 2.0
+MIN_SCALING = 0.1
+
 DATASET_ID = "yf-ohlcv-universe-2009-to-2026-10-03"
 SEED = 42
 LOOKBACK = 5
@@ -66,47 +71,6 @@ def base_signals(closes, fast, slow):
         sm = float(np.mean(closes[i - slow + 1 : i + 1]))
         out[i] = bt.Signal(date=i + 1, weight=1.0 if fm > sm else -1.0)
     return out
-
-
-def run_asset(asset, tickers):
-    bars = tickers[asset]
-    closes = bars.closes_array()
-    labels = bt.volatility_blocks(closes, n_blocks=N_BLOCKS, window=WINDOW)
-    seg_fn = bt.segment_fn_from_labels(labels)
-    results = {}
-
-    for name, sig, params in [
-        ("base_ma", lambda c, **p: base_signals(c, 20, 60), {"fast": 20, "slow": 60}),
-        ("momentum", lambda c, **p: bt.momentum_signals(c, lookback=LOOKBACK), {"lookback": LOOKBACK}),
-    ]:
-        signals = sig(closes)
-        if len(signals) != len(closes):
-            raise ValueError(f"{asset} {name}: signals {len(signals)} != bars {len(closes)}")
-        res = bt.stress_segments(
-            signals_fn=sig,
-            bars=list(bars),
-            signals=signals,
-            param_grid=[params],
-            baseline=tuple(params.items()),
-            segment_fn=seg_fn,
-            train_window=TRAIN,
-            test_window=TEST,
-            warmup=WARM,
-            overlap_window=OVERLAP,
-            periods_per_year=252,
-            min_segment_bars=MIN_SEGMENT_BARS,
-        )
-        names = [s.name for s in res.scenarios]
-        medians = [round(s.baseline_median_log_return, 3) for s in res.scenarios]
-        results[name] = dict(
-            segments=names,
-            medians=medians,
-            candidate_dispersion=round(res.candidate_dispersion, 3),
-            null_dispersion=round(res.null_dispersion, 3),
-            verdict=res.overall_verdict,
-            n_folds=res.n_folds,
-        )
-    return results
 
 
 def perturbation_sweep(n_bars=600):
@@ -148,6 +112,122 @@ def perturbation_sweep(n_bars=600):
         effective_tolerance=round(summary.effective_tolerance, 4),
         n_folds=summary.n_folds,
     )
+
+
+def run_asset(asset, tickers):
+    """Run momentum analysis for a single asset."""
+    bars = tickers[asset]
+    closes = bars.closes_array()
+    labels = bt.volatility_blocks(closes, n_blocks=N_BLOCKS, window=WINDOW)
+    seg_fn = bt.segment_fn_from_labels(labels)
+    results = {}
+
+    for name, sig, params in [
+        ("base_ma", lambda c, **p: base_signals(c, 20, 60), {"fast": 20, "slow": 60}),
+        ("momentum", lambda c, **p: bt.momentum_signals(c, lookback=LOOKBACK), {"lookback": LOOKBACK}),
+    ]:
+        signals = sig(closes)
+        if len(signals) != len(closes):
+            raise ValueError(f"{asset} {name}: signals {len(signals)} != bars {len(closes)}")
+        res = bt.stress_segments(
+            signals_fn=sig,
+            bars=list(bars),
+            signals=signals,
+            param_grid=[params],
+            baseline=tuple(params.items()),
+            segment_fn=seg_fn,
+            train_window=TRAIN,
+            test_window=TEST,
+            warmup=WARM,
+            overlap_window=OVERLAP,
+            periods_per_year=252,
+            min_segment_bars=MIN_SEGMENT_BARS,
+        )
+        names = [s.name for s in res.scenarios]
+        medians = [round(s.baseline_median_log_return, 3) for s in res.scenarios]
+        results[name] = dict(
+            segments=names,
+            medians=medians,
+            candidate_dispersion=round(res.candidate_dispersion, 3),
+            null_dispersion=round(res.null_dispersion, 3),
+            verdict=res.overall_verdict,
+            n_folds=res.n_folds,
+        )
+    return results
+
+
+def volatility_normalizing_sizing(
+    closes: np.ndarray,
+    window: int = 60,
+    target_vol: float = 0.20,
+    max_scaling: float = 2.0,
+    min_scaling: float = 0.1,
+) -> np.ndarray:
+    """Volatility-normalized sizing factor for each bar.
+
+    Computes trailing realized volatility (annualized) and scales position exposure
+    so that portfolio volatility targets a fixed level. This is a fixed a-priori
+    sizing rule, not tuned to OOS.
+
+    Args:
+        closes: closing prices series (past-only).
+        window: trailing bar window for realized volatility calculation.
+        target_vol: target annualized volatility (e.g., 0.20 = 20% per year).
+        max_scaling: maximum exposure scaling factor (e.g., 2.0 = 2x).
+        min_scaling: minimum exposure scaling factor (e.g., 0.1 = 0.1x).
+
+    Returns:
+        Sizing factors array with same length as closes, suitable for multiplying
+        the base signal weight. Bars before the window return min_scaling.
+    """
+    n = len(closes)
+    sizing = np.full(n, min_scaling, dtype=np.float64)
+    if n < window:
+        return sizing
+    for i in range(window, n):
+        # trailing realized volatility (annualized)
+        vol = float(
+            np.std(np.log(closes[i - window : i]), ddof=1)
+        ) * np.sqrt(252.0)
+        # scale to target volatility, capped by max/min bounds
+        scaling = target_vol / max(vol, 1e-8)
+        if scaling > max_scaling:
+            scaling = max_scaling
+        if scaling < min_scaling:
+            scaling = min_scaling
+        sizing[i] = scaling
+    return sizing
+
+
+def volatility_normalized_momentum_signals(
+    closes: np.ndarray,
+    lookback: int = 5,
+    vol_window: int = 60,
+    vol_target: float = 0.20,
+    **kwargs,
+) -> list[bt.Signal]:
+    """Momentum signal with volatility-normalized sizing integrated.
+
+    This wraps the base momentum_signals with a volatility-normalized sizing factor
+    that adjusts position exposure based on trailing realized volatility. The sizing
+    is applied at the signal generation stage so that walk-forward tests evaluate
+    the complete strategy including the volatility-adaptive sizing rule.
+    """
+    momentum_base_signals = bt.momentum_signals(closes, lookback=lookback)
+    sizing = volatility_normalizing_sizing(
+        closes,
+        window=vol_window,
+        target_vol=vol_target,
+        max_scaling=MAX_SCALING,
+        min_scaling=MIN_SCALING,
+    )
+    # Multiply signal weights by sizing factor (signals already have weight in [-1,1])
+    for i in range(len(momentum_base_signals)):
+        momentum_base_signals[i] = bt.Signal(
+            date=momentum_base_signals[i].date,
+            weight=momentum_base_signals[i].weight * sizing[i],
+        )
+    return momentum_base_signals
 
 
 def main() -> int:
