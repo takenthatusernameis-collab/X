@@ -1,0 +1,124 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+[0m→ [0mRead state/LEARNING_STATE.md
+[0m→ [0mRead state/STATE.md
+[0m✱ [0mGlob "**/agent_*.json"[90m 12 matches[0m
+[0m→ [0mRead state/campaign/runs/40225056621/agents/agent_02_runtime.json
+[0m→ [0mRead state/campaign/runs/40225056621/agents/agent_02_contract.json
+[0m→ [0mRead state/campaign/runs/40225056621/agents/agent_02_before.json
+[0m→ [0mRead research/checks/momentum.py
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py
+[0m→ [0mRead research/checks/momentum_longer_horizon.py
+[0m→ [0mRead state/check_artifacts/momentum_results.json
+[0m→ [0mRead state/check_artifacts/momentum_cost_robustness.json
+[0m
+[0m# [0mTodos
+[•] Audit frontier cell statuses from STATE.md and LEARNING_STATE.md for duplicate work
+[ ] Examine momentum research artifacts and their testing chronology
+[ ] Analyze campaign queue semantics and task selection history
+[ ] Evaluate current novelty guard effectiveness and identify gaps
+[ ] Draft JSON decision record with evidence-backed conclusions
+[0m
+[0m→ [0mRead state/STATE.md[90m [offset=30, limit=100][0m
+[0m→ [0mRead state/STATE.md[90m [limit=80, offset=15][0m
+[0m✱ [0mGrep "\|.*\|.*\|.*\|.*\|"[90m in state/STATE.md · 12 matches[0m
+[0m✱ [0mGrep "## Frontier"[90m in state/STATE.md · 0 matches[0m
+[0m
+[0m$ [0mgrep -n "## Frontier" /home/runner/work/X/X/state/STATE.md
+(no output)
+[0m
+[0m$ [0mgrep -n "MA crossover" /home/runner/work/X/X/state/STATE.md | head -5
+130:MA crossover (warmup=60, 252d/84d walk-forward, train+test):
+164:- MA crossover on the canonical realistic family: medians near zero in all
+192:- Added `examples/universe_sweep.py`: MA crossover walk-forward across a
+197:only): the MA crossover on a 7-asset drifted family reports medians near zero
+254:`NO_EDGE` (MA crossover on the 7-asset family; flat family). `universe_sweep`
+[0m
+[0m$ [0msed -n '1140,1200p' /home/runner/work/X/X/state/STATE.md
+warmup=60d/overlap=60d):
+
+| Ticker | n_folds | mean log ret | median | t_stat | 95% CI | sig_5pct |
+|---|---|---|---|---|---|---|
+| AAPL | 170 | +0.0309 | +0.0242 | +2.75 | [+0.0089, +0.0529] | yes |
+| MSFT | 170 | -0.0200 | +0.0142 | -1.48 | [-0.0466, +0.0065] | no |
+| GOOGL | 170 | -0.0042 | +0.0091 | -0.36 | [-0.0273, +0.0188] | no |
+| AMZN | 170 | -0.0378 | +0.0188 | -1.82 | [-0.0787, +0.0030] | no |
+| META | 135 | +0.0309 | +0.0515 | +2.64 | [+0.0079, +0.0539] | yes |
+| NVDA | 170 | -0.3002 | +0.0291 | -1.30 | [-0.7515, +0.1512] | no |
+| TSLA | 154 | -1.1604 | -0.0452 | -2.68 | [-2.0097, -0.3112] | yes |
+| JPM | 170 | +0.0073 | +0.0077 | +0.64 | [-0.0150, +0.0297] | no |
+| JNJ | 170 | -0.0167 | -0.0150 | -2.04 | [-0.0328, -0.0006] | yes |
+| XOM | 170 | -0.0126 | -0.0207 | -1.14 | [-0.0345, +0.0092] | no |
+
+- AAPL cross-checks exactly against the independent diagnostic:
+  170 folds, mean +0.0309, median +0.0242, std +0.1463, 101/170 positive,
+  t=2.75 (df=169), 95% CI [0.0089, 0.0529].
+- Cross-asset summary: 4 / 10 nominally significant at 5% (AAPL +, META +,
+  TSLA -, JNJ -); 0 / 10 survive the Bonferroni family-wise correction at
+  alpha 0.005. Nothing is a robust cross-asset feature under the
+  multiple-testing-aware criterion.
+- The two nominally-positive assets (AAPL, META) carry positive mean fold
+  returns consistent with the prior AAPL walk-forward finding; META has
+  fewer folds (135) because its series starts later (2012-05-18).
+- TSLA's significance is tail-driven rather than a stable edge: mean log
+  return -1.1604 vs median -0.0452, std 5.377, CI [-2.01, -0.31] — an
+  extreme negative tail dominates the mean; the CI is correspondingly wide.
+  Recorded as a negative/quality finding, not an edge.
+- The t-test answers and the coin-flip null answers diverge by design for
+  this candidate (AAPL significant by t-test, within the noise band by the
+  null), confirming the documented complementary role of the two checks.
+
+Assessment: no MA-crossover edge survives a family-wise correction across
+the collected universe; the per-asset significant results are consistent
+with the established finding that the AAPL MA crossover is exploratory,
+within noise, and not admitted to the evidence base.
+
+## Current activation (regime-dependence deep-dive of AMZN and JPM)
+
+Deep-dived the two REGIME_DEPENDENT assets from the universe-level
+regime-stability run (`examples/regime_stability_universe.py`, seed 42) to
+answer which regime mix drives the swing and whether a regime-filtered
+variant rescues the edge. Added `research/checks/regime_dependent_deep_dive.py`:
+block-by-block breakdown (segment dates, length, realized vol, candidate vs
+null median, folds) plus the same asset run with the MA crossover active only
+inside turbulent segments; both variants go through the same
+`stress_segments` pipeline with the coin-flip null. Determinism and an
+independent recomputation path (fresh implementation via `walk_forward`) are
+asserted.
+
+Block-by-block (MA(20/60), train=252d/test=84d, warmup=60d, overlap=60d,
+4 contiguous blocks by date, min_segment_bars=400):
+
+- AMZN (4465 bars): [turbulent 2009-03-31..2013-06-10 / calm 2013-06-11..2022-
+  04-20 / turbulent 2022-04-21..2026-10-01], medians
+  [+0.046, +0.001, -0.154]; first turbulent segment shows a pos edge
+  (19/28 folds positive), calm shows no edge, second turbulent shows a neg
+  edge. Verdict REGIME_DEPENDENT (dispersion +0.086 > 2x null +0.043).
+- JPM (4465 bars): same three segments, medians
+  [+0.109, -0.006, +0.033]; pos edge in the first turbulent segment
+[0m
+[0m$ [0mgrep -n -A 20 "| Area / hypothesis" /home/runner/work/X/X/state/STATE.md
+(no output)
+[0m
+[0m$ [0mgrep -n "Rejected from evidence base" /home/runner/work/X/X/state/STATE.md | head -10
+(no output)
+[0m
+[0m✗ [0mwc -l /home/runner/work/X/X/state/STATE.md failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m→ [0mRead state/STATE.md[90m [offset=1500][0m
+[0m
+[0m# [0mTodos
+[✓] Audit frontier cell statuses from STATE.md and LEARNING_STATE.md for duplicate work
+[✓] Examine momentum research artifacts and their testing chronology
+[✓] Analyze campaign queue semantics and task selection history
+[✓] Evaluate current novelty guard effectiveness and identify gaps
+[•] Draft JSON decision record with evidence-backed conclusions
+[0m
+[0m← [0mWrite state/campaign/runs/40225056621/agents/agent_03.json
+Wrote file successfully.
+[0m
+[0m→ [0mRead state/campaign/runs/40225056621/agents/agent_03.json
+## Task Completion Summary
+
