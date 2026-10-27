@@ -14,6 +14,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+CONTROLLER_OWNED_STATE_PATHS = (
+    "state/campaign/task_queue.json",
+    "state/campaign/current_task.json",
+    "state/campaign/global_agent_counter.json",
+)
+
+
+def snapshot_controller_state(root: Path) -> dict[str, str | None]:
+    """Capture controller-owned state before an agent can modify the worktree."""
+    snapshot: dict[str, str | None] = {}
+    for rel in CONTROLLER_OWNED_STATE_PATHS:
+        path = root / rel
+        snapshot[rel] = path.read_text(encoding="utf-8") if path.is_file() else None
+    return snapshot
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -106,7 +122,15 @@ def main() -> int:
 
     before = snapshot_workspace(Path("."))
     (agent_dir / f"agent_{args.agent_number:02d}_before.json").write_text(
-        json.dumps({"hashes": before, "captured_utc": utc_now()}, indent=2, sort_keys=True) + "\n",
+        json.dumps(
+            {
+                "hashes": before,
+                "controller_state": snapshot_controller_state(Path(".")),
+                "captured_utc": utc_now(),
+            },
+            indent=2,
+            sort_keys=True,
+        ) + "\n",
         encoding="utf-8",
     )
 
