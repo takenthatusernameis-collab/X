@@ -163,23 +163,25 @@ def validate_record(record: dict, agent: int, contract: dict) -> list[str]:
     return failures
 
 
+def controller_state_paths(run_root: Path) -> tuple[str, ...]:
+    """All controller-owned files affected by selection and quarantine rollback."""
+    return (
+        *CONTROLLER_OWNED_STATE_PATHS,
+        str(run_root / "campaign_status.json"),
+    )
+
+
 def controller_state_to_preserve(
     agent: int,
     run_root: Path,
     runtime: dict[str, Any] | None = None,
 ) -> tuple[dict[str, str | None], str]:
     """Prefer the controller-written post-worker snapshot; support legacy records."""
+    paths = controller_state_paths(run_root)
     runtime_snapshot = runtime.get("controller_state_snapshot") if isinstance(runtime, dict) else None
-    if isinstance(runtime_snapshot, dict) and all(
-        path in runtime_snapshot for path in CONTROLLER_OWNED_STATE_PATHS
-    ):
-        if all(
-            runtime_snapshot[path] is None or isinstance(runtime_snapshot[path], str)
-            for path in CONTROLLER_OWNED_STATE_PATHS
-        ):
-            return {
-                path: runtime_snapshot[path] for path in CONTROLLER_OWNED_STATE_PATHS
-            }, "restored_from_controller_runtime"
+    if isinstance(runtime_snapshot, dict) and all(path in runtime_snapshot for path in paths):
+        if all(runtime_snapshot[path] is None or isinstance(runtime_snapshot[path], str) for path in paths):
+            return {path: runtime_snapshot[path] for path in paths}, "restored_from_controller_runtime"
 
     before_path = run_root / "agents" / f"agent_{agent:02d}_before.json"
     if not before_path.is_file():
@@ -190,16 +192,16 @@ def controller_state_to_preserve(
         return {}, "invalid_before_snapshot"
 
     snapshot = before.get("controller_state")
-    if isinstance(snapshot, dict) and all(path in snapshot for path in CONTROLLER_OWNED_STATE_PATHS):
-        if all(snapshot[path] is None or isinstance(snapshot[path], str) for path in CONTROLLER_OWNED_STATE_PATHS):
-            return {path: snapshot[path] for path in CONTROLLER_OWNED_STATE_PATHS}, "restored_from_snapshot"
+    if isinstance(snapshot, dict) and all(path in snapshot for path in paths):
+        if all(snapshot[path] is None or isinstance(snapshot[path], str) for path in paths):
+            return {path: snapshot[path] for path in paths}, "restored_from_snapshot"
 
     # Backward compatibility for older agent-before records: only keep a file if
     # its current hash still matches the pre-agent hash, proving the worker left
     # that controller-owned file untouched.
     hashes = before.get("hashes", {})
     unchanged: dict[str, str | None] = {}
-    for rel in CONTROLLER_OWNED_STATE_PATHS:
+    for rel in paths:
         path = Path(rel)
         if hashes.get(rel) == sha(path):
             unchanged[rel] = path.read_text(encoding="utf-8") if path.is_file() else None
