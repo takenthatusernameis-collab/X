@@ -14,6 +14,26 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
+CONTROLLER_OWNED_STATE_PATHS = (
+    "state/campaign/task_queue.json",
+    "state/campaign/current_task.json",
+    "state/campaign/global_agent_counter.json",
+)
+
+
+def snapshot_controller_state(root: Path, run_id: str) -> dict[str, str | None]:
+    """Capture controller-owned state, including the campaign selection ledger."""
+    paths = (
+        *CONTROLLER_OWNED_STATE_PATHS,
+        str(Path("state") / "campaign" / "runs" / str(run_id) / "campaign_status.json"),
+    )
+    snapshot: dict[str, str | None] = {}
+    for rel in paths:
+        path = root / rel
+        snapshot[rel] = path.read_text(encoding="utf-8") if path.is_file() else None
+    return snapshot
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -105,10 +125,19 @@ def main() -> int:
     )
 
     before = snapshot_workspace(Path("."))
-    (agent_dir / f"agent_{args.agent_number:02d}_before.json").write_text(
-        json.dumps({"hashes": before, "captured_utc": utc_now()}, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    controller_state = snapshot_controller_state(Path("."), str(args.run_id))
+    before_text = json.dumps(
+        {
+            "hashes": before,
+            "controller_state": controller_state,
+            "captured_utc": utc_now(),
+        },
+        indent=2,
+        sort_keys=True,
+    ) + "\n"
+    before_path = agent_dir / f"agent_{args.agent_number:02d}_before.json"
+    before_path.write_text(before_text, encoding="utf-8")
+    before_snapshot_sha256 = hashlib.sha256(before_text.encode("utf-8")).hexdigest()
 
     progress.write_text(
         "\n".join(
@@ -247,6 +276,10 @@ def main() -> int:
         "retry_count": retry_count,
         "retry_policy": "recognized transient upstream/network errors only; retry with capped exponential backoff and no per-agent deadline; the enclosing workflow cutoff is authoritative",
         "previous_session_context_reused": False,
+        # This is written by the controller only after the worker process exits;
+        # use it as the trusted source if the worker changed its visible before-file.
+        "controller_state_snapshot": controller_state,
+        "before_snapshot_sha256": before_snapshot_sha256,
     }
     (agent_dir / f"agent_{args.agent_number:02d}_runtime.json").write_text(
         json.dumps(runtime, indent=2, sort_keys=True) + "\n",
