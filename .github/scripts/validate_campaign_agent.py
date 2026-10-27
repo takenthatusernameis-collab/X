@@ -163,8 +163,24 @@ def validate_record(record: dict, agent: int, contract: dict) -> list[str]:
     return failures
 
 
-def controller_state_to_preserve(agent: int, run_root: Path) -> tuple[dict[str, str | None], str]:
-    """Return trusted pre-agent state; legacy snapshots preserve only unchanged files."""
+def controller_state_to_preserve(
+    agent: int,
+    run_root: Path,
+    runtime: dict[str, Any] | None = None,
+) -> tuple[dict[str, str | None], str]:
+    """Prefer the controller-written post-worker snapshot; support legacy records."""
+    runtime_snapshot = runtime.get("controller_state_snapshot") if isinstance(runtime, dict) else None
+    if isinstance(runtime_snapshot, dict) and all(
+        path in runtime_snapshot for path in CONTROLLER_OWNED_STATE_PATHS
+    ):
+        if all(
+            runtime_snapshot[path] is None or isinstance(runtime_snapshot[path], str)
+            for path in CONTROLLER_OWNED_STATE_PATHS
+        ):
+            return {
+                path: runtime_snapshot[path] for path in CONTROLLER_OWNED_STATE_PATHS
+            }, "restored_from_controller_runtime"
+
     before_path = run_root / "agents" / f"agent_{agent:02d}_before.json"
     if not before_path.is_file():
         return {}, "missing_before_snapshot"
@@ -202,7 +218,12 @@ def restore_controller_state(snapshot: dict[str, str | None]) -> None:
         path.write_text(content, encoding="utf-8")
 
 
-def quarantine_workspace(agent: int, run_root: Path, failures: list[str]) -> dict[str, object]:
+def quarantine_workspace(
+    agent: int,
+    run_root: Path,
+    failures: list[str],
+    runtime: dict[str, Any] | None = None,
+) -> dict[str, object]:
     quarantine = run_root / "quarantine" / f"agent_{agent:02d}"
     quarantine.mkdir(parents=True, exist_ok=True)
     rc, diff = run(["git", "diff", "--binary"])
@@ -227,7 +248,7 @@ def quarantine_workspace(agent: int, run_root: Path, failures: list[str]) -> dic
         moved.append(rel)
     (quarantine / "untracked_moved.json").write_text(json.dumps(moved, indent=2) + "\n", encoding="utf-8")
 
-    controller_state, controller_state_status = controller_state_to_preserve(agent, run_root)
+    controller_state, controller_state_status = controller_state_to_preserve(agent, run_root, runtime)
     run(["git", "restore", "--staged", "--worktree", "--", "."])
     restore_controller_state(controller_state)
     return {
@@ -326,6 +347,10 @@ def main() -> int:
 
     if protected:
         failures.append("protected_control_plane_modified")
+    expected_snapshot_sha = runtime.get("before_snapshot_sha256") if isinstance(runtime, dict) else None
+    if expected_snapshot_sha and sha(before_path) != expected_snapshot_sha:
+        failures.append("controller_snapshot_modified")
+        warnings.append("controller before-snapshot digest changed during worker execution")
     if args.worker_exit_code != 0:
         warnings.append(f"worker_exit_code={args.worker_exit_code}")
 
@@ -346,7 +371,9 @@ def main() -> int:
     }
 
     if status != "VERIFIED_SESSION":
-        validation["quarantine"] = quarantine_workspace(args.agent_number, run_root, failures)
+        validation["quarantine"] = quarantine_workspace(
+            args.agent_number, run_root, failures, runtime=runtime
+        )
 
     out_path = agent_dir / f"agent_{args.agent_number:02d}_validation.json"
     out_path.write_text(json.dumps(validation, indent=2, sort_keys=True) + "\n", encoding="utf-8")
