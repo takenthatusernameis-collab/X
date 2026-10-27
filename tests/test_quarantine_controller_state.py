@@ -165,7 +165,14 @@ class QuarantineControllerStateTests(unittest.TestCase):
                 }
                 hashes = {
                     str(path.relative_to(repo)): MODULE.sha(path)
-                    for path in (queue_path, current_path, counter_path, repo / "worker_output.txt")
+                    for path in (
+                        queue_path,
+                        current_path,
+                        counter_path,
+                        repo / "worker_output.txt",
+                        run_root / "campaign_status.json",
+                        agent_dir / "agent_01_contract.json",
+                    )
                 }
                 (agent_dir / "agent_01_before.json").write_text(
                     json.dumps({"hashes": hashes, "controller_state": controller_state}),
