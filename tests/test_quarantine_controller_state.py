@@ -30,6 +30,7 @@ class QuarantineControllerStateTests(unittest.TestCase):
                 "state/campaign/task_queue.json": '{"tasks":[{"task_id":"R-001","status":"OPEN"}]}\n',
                 "state/campaign/current_task.json": '{"task_id":"R-001"}\n',
                 "state/campaign/global_agent_counter.json": '{"next_global_agent_number":11}\n',
+                "state/campaign/runs/run-1/campaign_status.json": '{"phase":"SETUP","selected_tasks":[]}\n',
                 "worker_output.txt": "baseline\n",
             }
             for rel, content in files.items():
@@ -46,6 +47,7 @@ class QuarantineControllerStateTests(unittest.TestCase):
                 "state/campaign/task_queue.json": '{"tasks":[{"task_id":"R-001","status":"SELECTED"}]}\n',
                 "state/campaign/current_task.json": '{"task_id":"R-001","agent_number":1}\n',
                 "state/campaign/global_agent_counter.json": '{"next_global_agent_number":11}\n',
+                "state/campaign/runs/run-1/campaign_status.json": '{"phase":"AGENT_01_SELECTED","selected_tasks":[{"agent_number":1,"task_id":"R-001"}]}\n',
             }
             for rel, content in selected_state.items():
                 (repo / rel).write_text(content, encoding="utf-8")
@@ -161,7 +163,12 @@ class QuarantineControllerStateTests(unittest.TestCase):
 
                 controller_state = {
                     str(path.relative_to(repo)): path.read_text(encoding="utf-8")
-                    for path in (queue_path, current_path, counter_path)
+                    for path in (
+                        queue_path,
+                        current_path,
+                        counter_path,
+                        run_root / "campaign_status.json",
+                    )
                 }
                 hashes = {
                     str(path.relative_to(repo)): MODULE.sha(path)
