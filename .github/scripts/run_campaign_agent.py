@@ -121,18 +121,19 @@ def main() -> int:
     )
 
     before = snapshot_workspace(Path("."))
-    (agent_dir / f"agent_{args.agent_number:02d}_before.json").write_text(
-        json.dumps(
-            {
-                "hashes": before,
-                "controller_state": snapshot_controller_state(Path(".")),
-                "captured_utc": utc_now(),
-            },
-            indent=2,
-            sort_keys=True,
-        ) + "\n",
-        encoding="utf-8",
-    )
+    controller_state = snapshot_controller_state(Path("."))
+    before_text = json.dumps(
+        {
+            "hashes": before,
+            "controller_state": controller_state,
+            "captured_utc": utc_now(),
+        },
+        indent=2,
+        sort_keys=True,
+    ) + "\n"
+    before_path = agent_dir / f"agent_{args.agent_number:02d}_before.json"
+    before_path.write_text(before_text, encoding="utf-8")
+    before_snapshot_sha256 = hashlib.sha256(before_text.encode("utf-8")).hexdigest()
 
     progress.write_text(
         "\n".join(
@@ -271,6 +272,10 @@ def main() -> int:
         "retry_count": retry_count,
         "retry_policy": "recognized transient upstream/network errors only; retry with capped exponential backoff and no per-agent deadline; the enclosing workflow cutoff is authoritative",
         "previous_session_context_reused": False,
+        # This is written by the controller only after the worker process exits;
+        # use it as the trusted source if the worker changed its visible before-file.
+        "controller_state_snapshot": controller_state,
+        "before_snapshot_sha256": before_snapshot_sha256,
     }
     (agent_dir / f"agent_{args.agent_number:02d}_runtime.json").write_text(
         json.dumps(runtime, indent=2, sort_keys=True) + "\n",
