@@ -21,10 +21,14 @@ CONTROLLER_OWNED_STATE_PATHS = (
 )
 
 
-def snapshot_controller_state(root: Path) -> dict[str, str | None]:
-    """Capture controller-owned state before an agent can modify the worktree."""
+def snapshot_controller_state(root: Path, run_id: str) -> dict[str, str | None]:
+    """Capture controller-owned state, including the campaign selection ledger."""
+    paths = (
+        *CONTROLLER_OWNED_STATE_PATHS,
+        str(Path("state") / "campaign" / "runs" / str(run_id) / "campaign_status.json"),
+    )
     snapshot: dict[str, str | None] = {}
-    for rel in CONTROLLER_OWNED_STATE_PATHS:
+    for rel in paths:
         path = root / rel
         snapshot[rel] = path.read_text(encoding="utf-8") if path.is_file() else None
     return snapshot
@@ -121,7 +125,7 @@ def main() -> int:
     )
 
     before = snapshot_workspace(Path("."))
-    controller_state = snapshot_controller_state(Path("."))
+    controller_state = snapshot_controller_state(Path("."), str(args.run_id))
     before_text = json.dumps(
         {
             "hashes": before,
