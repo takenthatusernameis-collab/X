@@ -32,6 +32,11 @@ FAILURES = controller.FAILURE_CLASSES
 
 
 CONTROLLER_IDENTITY_FIELDS = ("agent_number", "campaign_slot", "global_agent_number")
+CONTROLLER_OWNED_STATE_PATHS = (
+    "state/campaign/task_queue.json",
+    "state/campaign/current_task.json",
+    "state/campaign/global_agent_counter.json",
+)
 
 
 def bind_controller_identity(record: dict, agent: int, contract: dict) -> tuple[dict, list[str]]:
@@ -158,6 +163,45 @@ def validate_record(record: dict, agent: int, contract: dict) -> list[str]:
     return failures
 
 
+def controller_state_to_preserve(agent: int, run_root: Path) -> tuple[dict[str, str | None], str]:
+    """Return trusted pre-agent state; legacy snapshots preserve only unchanged files."""
+    before_path = run_root / "agents" / f"agent_{agent:02d}_before.json"
+    if not before_path.is_file():
+        return {}, "missing_before_snapshot"
+    try:
+        before = json.loads(before_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}, "invalid_before_snapshot"
+
+    snapshot = before.get("controller_state")
+    if isinstance(snapshot, dict) and all(path in snapshot for path in CONTROLLER_OWNED_STATE_PATHS):
+        if all(snapshot[path] is None or isinstance(snapshot[path], str) for path in CONTROLLER_OWNED_STATE_PATHS):
+            return {path: snapshot[path] for path in CONTROLLER_OWNED_STATE_PATHS}, "restored_from_snapshot"
+
+    # Backward compatibility for older agent-before records: only keep a file if
+    # its current hash still matches the pre-agent hash, proving the worker left
+    # that controller-owned file untouched.
+    hashes = before.get("hashes", {})
+    unchanged: dict[str, str | None] = {}
+    for rel in CONTROLLER_OWNED_STATE_PATHS:
+        path = Path(rel)
+        if hashes.get(rel) == sha(path):
+            unchanged[rel] = path.read_text(encoding="utf-8") if path.is_file() else None
+    return unchanged, "legacy_unchanged_only" if unchanged else "legacy_snapshot_no_safe_state"
+
+
+def restore_controller_state(snapshot: dict[str, str | None]) -> None:
+    """Restore a controller-owned state snapshot after discarding worker changes."""
+    for rel, content in snapshot.items():
+        path = Path(rel)
+        if content is None:
+            if path.exists():
+                path.unlink()
+            continue
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+
 def quarantine_workspace(agent: int, run_root: Path, failures: list[str]) -> dict[str, object]:
     quarantine = run_root / "quarantine" / f"agent_{agent:02d}"
     quarantine.mkdir(parents=True, exist_ok=True)
@@ -183,8 +227,16 @@ def quarantine_workspace(agent: int, run_root: Path, failures: list[str]) -> dic
         moved.append(rel)
     (quarantine / "untracked_moved.json").write_text(json.dumps(moved, indent=2) + "\n", encoding="utf-8")
 
+    controller_state, controller_state_status = controller_state_to_preserve(agent, run_root)
     run(["git", "restore", "--staged", "--worktree", "--", "."])
-    return {"path": str(quarantine), "moved_untracked": moved, "diff_return_code": rc}
+    restore_controller_state(controller_state)
+    return {
+        "path": str(quarantine),
+        "moved_untracked": moved,
+        "diff_return_code": rc,
+        "controller_state_status": controller_state_status,
+        "controller_state_paths_restored": sorted(controller_state),
+    }
 
 
 def main() -> int:
