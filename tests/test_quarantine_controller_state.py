@@ -118,8 +118,8 @@ class QuarantineControllerStateTests(unittest.TestCase):
             agent_dir.mkdir(parents=True)
             queue_path.parent.mkdir(parents=True, exist_ok=True)
             queue_path.write_text(json.dumps({"tasks": [
-                make_task("R-001", "LEARNING_PROCESS"),
-                make_task("P-001", "HIGHER_ORDER_OBJECTIVE"),
+                make_task("task-01-quarantine-target", "LEARNING_PROCESS"),
+                make_task("task-02-eligible-next", "HIGHER_ORDER_OBJECTIVE"),
             ]}), encoding="utf-8")
             current_path.write_text("{}\n", encoding="utf-8")
             counter_path.write_text('{"next_global_agent_number": 3}\n', encoding="utf-8")
