@@ -24,6 +24,14 @@ def load_controller():
     return module
 
 
+def load_runner():
+    spec = importlib.util.spec_from_file_location("run_campaign_agent", RUNNER)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 class CampaignArchitectureTests(unittest.TestCase):
     def setUp(self):
         self.workflow = WORKFLOW.read_text(encoding="utf-8")
@@ -145,15 +153,21 @@ class CampaignArchitectureTests(unittest.TestCase):
         self.assertIn('git", "diff", "--cached", "--name-only"', validator)
         self.assertIn('"tests/test_campaign_architecture.py"', validator)
 
-    def test_fresh_session_runner_retries_transient_upstream_without_agent_deadline(self):
+    def test_fresh_session_runner_bounds_transient_retries_without_agent_deadline(self):
+        runner = load_runner()
+        self.assertEqual(runner.MAX_TRANSIENT_GATEWAY_RETRIES, 3)
+        self.assertTrue(runner.may_retry_transient_gateway("TRANSIENT_GATEWAY", 0))
+        self.assertTrue(runner.may_retry_transient_gateway("TRANSIENT_GATEWAY", 2))
+        self.assertFalse(runner.may_retry_transient_gateway("TRANSIENT_GATEWAY", 3))
+        self.assertFalse(runner.may_retry_transient_gateway("RESEARCH_EXECUTION", 0))
         self.assertIn('[kilo_bin, "run", "--model", args.model, "--auto", prompt]', self.runner)
-        self.assertIn('if failure_class != "TRANSIENT_GATEWAY":', self.runner)
+        self.assertIn("if not may_retry_transient_gateway(failure_class, retry_count):", self.runner)
         self.assertIn("retry_delay = min(300, retry_delay * 2)", self.runner)
         self.assertIn('"automatic_retry": retry_count > 0', self.runner)
+        self.assertIn('"retry_budget_exhausted":', self.runner)
         self.assertIn('"previous_session_context_reused": False', self.runner)
         self.assertNotIn("timeout_seconds", self.runner)
         self.assertNotIn("stall_seconds", self.runner)
-        self.assertNotIn("retry_count < 3", self.runner)
         self.assertNotIn("kilo retry", self.runner.lower())
 
     def test_task_queue_has_bounded_contracts(self):
