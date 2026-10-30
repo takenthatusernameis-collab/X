@@ -18,6 +18,14 @@ def utc_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
+MAX_TRANSIENT_GATEWAY_RETRIES = 3
+
+
+def may_retry_transient_gateway(failure_class: str, retry_count: int) -> bool:
+    """Allow a small recovery budget for transient gateway failures only."""
+    return failure_class == "TRANSIENT_GATEWAY" and retry_count < MAX_TRANSIENT_GATEWAY_RETRIES
+
+
 def sha(path: Path) -> str | None:
     if not path.exists() or not path.is_file():
         return None
@@ -209,20 +217,30 @@ def main() -> int:
 
         if return_code == 0:
             break
-        if failure_class != "TRANSIENT_GATEWAY":
+        if not may_retry_transient_gateway(failure_class, retry_count):
+            if failure_class == "TRANSIENT_GATEWAY":
+                print(
+                    "::error::Transient Kilo upstream/network failure persisted after "
+                    f"{retry_count} retries; ending this agent session so the campaign "
+                    "controller can proceed."
+                )
+                with log_path.open("a", encoding="utf-8") as log:
+                    log.write(
+                        f"Transient gateway retry budget exhausted after {retry_count} "
+                        f"retries at attempt {attempt_number}; ending this agent session.\n"
+                    )
             break
 
         retry_count += 1
         print(
             f"::warning::Transient Kilo upstream/network failure; launching a fresh "
-            f"process after {retry_delay}s (retry #{retry_count}; no attempt-count or "
-            "per-agent time limit; enclosing workflow cutoff remains authoritative)."
+            f"process after {retry_delay}s (retry #{retry_count}/{MAX_TRANSIENT_GATEWAY_RETRIES}; "
+            "the enclosing workflow remains the only execution deadline)."
         )
         with log_path.open("a", encoding="utf-8") as log:
             log.write(
                 f"Transient upstream failure classified at attempt {attempt_number}; "
-                f"retry #{retry_count} in {retry_delay}s. Only the enclosing workflow "
-                "cutoff limits execution.\n"
+                f"retry #{retry_count}/{MAX_TRANSIENT_GATEWAY_RETRIES} in {retry_delay}s.\n"
             )
         time.sleep(retry_delay)
         retry_delay = min(300, retry_delay * 2)
@@ -245,7 +263,9 @@ def main() -> int:
         "worker_progress_sha256": sha(progress),
         "automatic_retry": retry_count > 0,
         "retry_count": retry_count,
-        "retry_policy": "recognized transient upstream/network errors only; retry with capped exponential backoff and no per-agent deadline; the enclosing workflow cutoff is authoritative",
+        "max_transient_gateway_retries": MAX_TRANSIENT_GATEWAY_RETRIES,
+        "retry_budget_exhausted": failure_class == "TRANSIENT_GATEWAY" and retry_count >= MAX_TRANSIENT_GATEWAY_RETRIES,
+        "retry_policy": "recognized transient upstream/network errors only; at most 3 fresh-process retries (4 total attempts) with capped exponential backoff; no per-agent execution deadline; the enclosing workflow cutoff remains authoritative",
         "previous_session_context_reused": False,
     }
     (agent_dir / f"agent_{args.agent_number:02d}_runtime.json").write_text(
