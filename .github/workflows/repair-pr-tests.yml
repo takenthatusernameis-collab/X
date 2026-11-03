@@ -1,0 +1,34 @@
+name: Controller quarantine repair tests
+
+on:
+  pull_request:
+    paths:
+      - ".github/scripts/run_campaign_agent.py"
+      - ".github/scripts/validate_campaign_agent.py"
+      - "tests/test_quarantine_controller_state.py"
+      - "tests/test_campaign_agent_validation.py"
+      - "tests/test_campaign_architecture.py"
+  push:
+    branches:
+      - fix/quarantine-preserve-controller-state-20261027
+
+permissions:
+  contents: read
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Compile changed controller scripts
+        run: python -m py_compile .github/scripts/run_campaign_agent.py .github/scripts/validate_campaign_agent.py
+      - name: Campaign-agent validation tests
+        run: python -m unittest discover -s tests -p "test_campaign_agent_validation.py" -v
+      - name: Controller architecture tests
+        run: python -m unittest discover -s tests -p "test_campaign_architecture.py" -v
+      - name: Quarantine state-preservation regression tests
+        run: python -m unittest discover -s tests -p "test_quarantine_controller_state.py" -v
