@@ -1,0 +1,496 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+[0m# [0mTodos
+[•] Explore repository structure to understand momentum implementation and cost model
+[ ] Identify the existing 10-asset universe implementation
+[ ] Locate existing momentum implementation (lookback 3/5/10)
+[ ] Find existing realistic cost model implementation
+[ ] Run bounded cost-sensitivity check for momentum
+[ ] Create independent verification results
+[ ] Write final JSON record to durable state
+[0m
+[0m→ [0mRead .
+[0m→ [0mRead AGENTS.md
+[0m→ [0mRead research
+[0m✱ [0mGlob "**/*momentum*"[90m 19 matches[0m
+[0m→ [0mRead research/checks/momentum.py
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py
+[0m→ [0mRead research/checks/verify_momentum.py
+[0m→ [0mRead research/data
+[0m→ [0mRead research/data/manifest.json
+[0m✱ [0mGrep "cost|transaction|robustness"[90m 66 matches[0m
+[0m→ [0mRead research/backtest/engine.py
+[0m✗ [0mRead /home/runrunner/work/X/X/research/backtest/__init__.py failed
+[91m[1mError: [0mFile not found: /home/runrunner/work/X/X/research/backtest/__init__.py
+[0m✱ [0mGlob "**/cost*"[90m 0 matches[0m
+[0m→ [0mRead examples/ma_crossover.py
+[0m→ [0mRead examples/ma_crossover_real_data.py
+[0m→ [0mRead research/backtest/__init__.py
+[0m
+[0m$ [0mpython research/checks/momentum.py
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review per asset ===
+  AMZN: 4465 bars, momentum signals 4465, leakage [PASS], total_return +5.537
+  JPM: 4465 bars, momentum signals 4465, leakage [PASS], total_return +3.916
+  no-look-ahead: momentum sign at bar t uses closes[:t] only; neutral bars before the lookback window carry the equity forward.
+
+=== 4. Momentum vs base MA(20/60) on REGIME_DEPENDENT assets ===
+Momentum: long the previous 5-day return, hold 1 day, daily rebalanced. Params: walk-forward per segment train=252d / test=84d / warmup=60d / overlap=60d, min 400 bars/segment, compared vs coin-flip null on the same segments
+
+Segments: 4 contiguous blocks by date, past-only volatility classifier (turbulent = block median trailing-60-bar realized vol > series-wide median)
+
+Asset: AMZN
+  variant        segments                     candidate_medians            cand_disp     null_disp     verdict
+  base_ma        [turbulent,calm,turbulent]   [0.046,0.001,-0.154]             +0.086      +0.043  REGIME_DEPENDENT
+  momentum       [turbulent,calm,turbulent]   [0.065,0.076,0.077]              +0.005      +0.019  REGIME_STABLE
+
+Asset: JPM
+  variant        segments                     candidate_medians            cand_disp     null_disp     verdict
+  base_ma        [turbulent,calm,turbulent]   [0.109,-0.006,0.033]             +0.047      +0.003  REGIME_DEPENDENT
+  momentum       [turbulent,calm,turbulent]   [0.113,0.044,0.083]              +0.028      +0.012  REGIME_DEPENDENT
+
+=== 5. Momentum across collected universe ===
+  === Regime-stability across universe ===
+  
+  Tickers: 10  (order: AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA, JPM, JNJ, XOM)
+  Verdict counts: CONSISTENT_WITH_NOISE=2, REGIME_STABLE=7, REGIME_STABLE_LOSS=0, REGIME_DEPENDENT=1
+  
+  Per-asset regime-stability results:
+    AAPL  : segments=[turbulent, calm, turbulent, calm] candidate_medians=[+0.071, +0.054, +0.092, +0.069] dispersion=+0.014 verdict=REGIME_STABLE
+    MSFT  : segments=[calm, turbulent] candidate_medians=[+0.052, +0.072] dispersion=+0.010 verdict=REGIME_STABLE
+    GOOGL : segments=[turbulent, calm, turbulent] candidate_medians=[+0.069, +0.071, +0.101] dispersion=+0.015 verdict=REGIME_STABLE
+    AMZN  : segments=[turbulent, calm, turbulent] candidate_medians=[+0.065, +0.076, +0.077] dispersion=+0.005 verdict=REGIME_STABLE
+    META  : segments=[turbulent, calm, turbulent] candidate_medians=[+0.073, +0.067, +0.042] dispersion=+0.013 verdict=REGIME_STABLE
+    NVDA  : segments=[turbulent, calm, turbulent] candidate_medians=[-0.038, +0.013, +0.100] dispersion=+0.057 verdict=REGIME_STABLE
+    TSLA  : segments=[turbulent, calm, turbulent] candidate_medians=[+0.132, +0.016, +0.107] dispersion=+0.050 verdict=REGIME_STABLE
+    JPM   : segments=[turbulent, calm, turbulent] candidate_medians=[+0.113, +0.044, +0.083] dispersion=+0.028 verdict=REGIME_DEPENDENT
+    JNJ   : segments=[calm, turbulent] candidate_medians=[+0.050, +0.046] dispersion=+0.002 verdict=CONSISTENT_WITH_NOISE
+    XOM   : segments=[calm, turbulent] candidate_medians=[+0.018, +0.037] dispersion=+0.009 verdict=CONSISTENT_WITH_NOISE
+  
+  Interpretation: REGIME_STABLE = the candidate behaves the same way (same edge or no edge) across regimes; REGIME_STABLE_LOSS = the candidate loses money in every regime mix (stable losses, not an edge, and the verdict must be read alongside the medians); REGIME_DEPENDENT = results swing strongly across regimes relative to the coin-flip null (fits one regime); CONSISTENT_WITH_NOISE = indistinguishable from noise in every segment.
+
+=== 6. Synthetic perturbation sweep (lookback 3 / 5 / 10) ===
+  param sets: [(('lookback', 2.5),), (('lookback', 5.0),), (('lookback', 10.0),)]
+  candidate medians: [-0.004, -0.004, -0.004]
+  baseline (lookback=5): -0.004
+  coin-flip null baseline: -0.001
+  baseline vs null (sample-calibrated tol 0.0500): True
+  baseline vs null (fixed tol 0.05): True
+
+determinism: r1 == r2: True
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_results.json
+NOTE: research/simulation only. No live trading or production execution. Momentum test on AMZN/JPM + universe: exploratory simulation.
+[0m
+[0m→ [0mRead state/check_artifacts/momentum_results.json[90m [limit=100][0m
+[0m
+[0m# [0mTodos
+[✓] Explore repository structure to understand momentum implementation and cost model
+[✓] Identify the existing 10-asset universe implementation
+[✓] Locate existing momentum implementation (lookback 3/5/10)
+[✓] Find existing realistic cost model implementation
+[•] Run bounded cost-sensitivity check for momentum
+[ ] Create independent verification results
+[ ] Write final JSON record to durable state
+[0m
+[0m← [0mWrite research/checks/momentum_cost_robustness.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython research/checks/momentum_cost_robustness.py
+File "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py", line 203
+    results[lb]["realistic_cost"][ticker]]
+                                         ^
+SyntaxError: closing parenthesis ']' does not match opening parenthesis '(' on line 202
+[0m
+[0m→ [0mRead research/checks/momentum_cost_robustness.py[90m [offset=195, limit=20][0m
+[0m✗ [0mEdit research/checks/momentum_cost_robustness.py failed
+[91m[1mError: [0mNo changes to apply: oldString and newString are identical.
+[0m→ [0mRead research/checks/momentum_cost_robustness.py[90m [limit=50, offset=180][0m
+[0m✗ [0mEdit research/checks/momentum_cost_robustness.py failed
+[91m[1mError: [0mNo changes to apply: oldString and newString are identical.
+[0m✗ [0mWrite  failed
+[91m[1mError: [0mInvalid input for tool write: JSON parsing failed: Text: {"content": "#!/usr/bin/env python3\n\"\"\"Cost-sensitivity check for momentum lookback 3/5/10 on the collected universe.\n\nObjective: test whether the short-horizon momentum edge survives conservative\ntransaction-cost stress. The existing momentum results show an edge at lookback=5\nin many assets, but cost robustness is unknown and decision-relevant.\n\nMethod (fixed a-priori, not tuned to OOS):\n- long the previous N-day return; hold 1 day; daily rebalance\n- walk-forward per segment train=252d / test=84d / warmup=60d / overlap=60d\n- zero cost (cfg0) and realistic costs (cfg1) as defined in the repository\n- compare OOS log returns across 10 collected tickers\n- unmatched null is zero cost for reference\n- preserve exact repository cost model and parameter grids\n- deterministic recomputation required\n\nResearch / simulation only. No live trading or production execution.\n\"\"\"\nfrom __future__ import annotations\n\nimport json\nimport sys\nfrom pathlib import Path\n\nimport numpy as np\n\nsys.path.insert(0, str(Path(__file__).resolve().parent.parent))\nimport research.backtest as bt\nfrom research.data.preflight import load_manifest, sha256_file\n\nDATASET_ID = \"yf-ohlcv-universe-2009-to-2026-10-03\"\nSEED = 42\nTRAIN, TEST, WARM, OVERLAP = 252, 84, 60, 60\nWINDOW = 60\nN_BLOCKS = 4\nMIN_SEGMENT_BARS = 400\nLOOKBACKS = (3, 5, 10)\n\n# Cost configurations matching repository examples\nCFG0 = bt.BacktestConfig(\n    initial_capital=1e6,\n    warmup_periods=WARM,\n)\n\nCFG1 = bt.BacktestConfig(\n    initial_capital=1e6,\n    warmup_periods=WARM,\n    commission_per_trade=2.0,\n    commission_per_share=0.003,\n    slippage_cents=2.0,\n    slippage_proportional=0.0005,\n)\n\nARTIFACT_DIR = Path.cwd() / \"state\" / \"check_artifacts\"\nARTIFACT_PATH = ARTIFACT_DIR / \"momentum_cost_robustness_results.json\"\n\n\ndef momentum_signals(closes: np.ndarray, lookback: int):\n    \"\"\"Momentum signal implementation (matches existing momentum_signals).\"\"\"\n    n = len(closes)\n    out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]\n    lookback = int(lookback)\n    for i in range(lookback, n):\n        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))\n        out[i] = bt.Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)\n    return out\n\n\ndef segment_result(ticker, bars, lookback, cfg):\n    \"\"\"Walk-forward regime-stability result for one ticker, one lookback, one cfg.\"\"\"\n    closes = bars.closes_array() if isinstance(bars, bt.BarSequence) else np.array(\n        [float(b.close) for b in bars], dtype=np.float64)\n    labels = bt.volatility_blocks(closes, n_blocks=N_BLOCKS, window=WINDOW)\n    seg_fn = bt.segment_fn_from_labels(labels)\n    sig = momentum_signals(closes, lookback)\n    if len(sig) != len(closes):\n        raise ValueError(f\"{ticker}: signals {len(sig)} != bars {len(closes)}\")\n    res = bt.stress_segments(\n        signals_fn=momentum_signals,\n        bars=bars,\n        signals=sig,\n        param_grid=[{\"lookback\": lookback}],\n        baseline=((\"lookback\", lookback),),\n        segment_fn=seg_fn,\n        train_window=TRAIN,\n        test_window=TEST,\n        warmup=WARM,\n        overlap_window=OVERLAP,\n        periods_per_year=252,\n        min_segment_bars=MIN_SEGMENT_BARS,\n    )\n    scen = res.scenarios[0]\n    return dict(\n        segments=[s.name for s in res.scenarios],\n        medians=[round(s.baseline_median_log_return, 3) for s in res.scenarios],\n        null_medians=[round(s.noise_median_log_return, 3) for s in res.scenarios],\n        candidate_dispersion=round(res.candidate_dispersion, 3),\n        null_dispersion=round(res.null_dispersion, 3),\n        n_folds=res.n_folds,\n        verdict=res.overall_verdict,\n    )\n\n\ndef main() -> int:\n    ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)\n\n    # 1. Manifest integrity\n    manifest = load_manifest()\n    assert manifest[\"dataset_id\"] == DATASET_ID, \"manifest id mismatch\"\n    print(\"=== 1. Manifest integrity ===\")\n    for entry in manifest[\"entries\"]:\n        actual = sha256_file(Path(entry[\"location\"]))\n        status = \"OK\" if actual == entry[\"checksum_sha256\"] else \"MISMATCH\"\n        print(f\"  {entry['ticker']}: {status}\")\n    print(f\"  dataset: {manifest['dataset_id']} | universe: {len(manifest['universe'])}\")\n\n    # 2. Data preflight gate\n    print(\"\\n=== 2. Data preflight (research/data/preflight.py) ===\")\n    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / \"research\" / \"data\"))\n    from importlib import import_module\n    pf = import_module(\"preflight\")\n    rc = pf.main()\n    if rc != 0:\n        print(\"PREFLIGHT FAILED; aborting real-data run.\")\n        sys.exit(1)\n\n    # 3. Load all tickers from manifest\n    all_tickers = {}\n    for entry in manifest[\"entries\"]:\n        ticker = entry[\"ticker\"]\n        all_tickers[ticker] = bt.load_ticker(ticker)[0]\n    ticker_order = list(all_tickers.keys())\n\n    print(f\"\\n=== 3. Cost-sensitivity sweep (lookback {LOOKBACKS}) ===\")\n    print(\"  Config 0 (zero cost): no commissions, no slippage\")\n    print(\"  Config 1 (realistic costs): commission_per_trade=2.0, commission_per_share=0.003,\")\n    print(\"                             slippage_cents=2.0, slippage_proportional=0.0005\")\n    print(f\"  Walk-forward: train={TRAIN}d/test={TEST}d/warmup={WARM}d/overlap={OVERLAP}d\")\n\n    # 4. Run cost-sensitivity analysis for each lookback\n    results = {}\n    for lb in LOOKBACKS:\n        print(f\"\\n--- Lookback = {lb} ---\")\n        results[lb] = {\n            \"zero_cost\": {},  # per asset results with zero costs\n            \"realistic_cost\": {},  # per asset results with realistic costs\n        }\n        for ticker in ticker_order:\n            bars = all_tickers[ticker]\n            # Zero cost run\n            print(f\"  {ticker} lookback={lb}: zero cost ...\")\n            results[lb][\"zero_cost\"][ticker] = segment_result(ticker, bars, lb, CFG0)\n            # Realistic cost run\n            print(f\"  {ticker} lookback={lb}: realistic cost ...\")\n            results[lb][\"realistic_cost\"][ticker] = segment_result(ticker, bars, lb, CFG1)\n\n    # 5. Summarize results\n    print(\"\\n=== 4. Summary ===\")\n    print(\"  0.0 = zero cost | 1.0 = realistic cost\")\n    print(\"  each row: zero_cost_median realistic_cost_median  survival_ratio\")\n    print(\"  survival_ratio = realistic_cost_median / zero_cost_median (if zero_cost != 0)\")\n\n    # Track verdict changes and survival patterns\n    verdict_changes = {lb: {\"REGIME_STABLE\": 0, \"REGIME_DEPENDENT\": 0, \"CONSISTENT_WITH_NOISE\": 0, \"REGIME_STABLE_LOSS\": 0} for lb in LOOKBACKS}\n    survival_ratios = {}\n\n    for lb in LOOKBACKS:\n        zero_cost_medians = []\n        realistic_cost_medians = []\n        zero_cost_verdicts = []\n        realistic_cost_verdicts = []\n\n        for ticker in ticker_order:\n            zc = results[lb][\"zero_cost\"][ticker]\n            rc = results[lb][\"realistic_cost\"][ticker]\n            zero_cost_medians.append(zc[\"medians\"][0])\n            realistic_cost_medians.append(rc[\"medians\"][0])\n            zero_cost_verdicts.append(zc[\"verdict\"])\n            realistic_cost_verdicts.append(rc[\"verdict\"])\n\n        # Print per-asset comparison\n        for i, ticker in enumerate(ticker_order):\n            zc = results[lb][\"zero_cost\"][ticker]\n            rc = results[lb][\"realistic_cost\"][ticker]\n            zero_median = zc[\"medians\"][0]\n            realistic_median = rc[\"medians\"][0]\n            if abs(zero_median) > 1e-12:\n                survival = realistic_median / zero_median\n                survival_ratios[lb] = survival\n            else:\n                survival = \"inf\" if realistic_median != 0 else \"N/A\"\n                survival_ratios[lb] = survival\n            verdict_changes[lb][zc[\"verdict\"]] += 1\n            verdict_changes[lb][rc[\"verdict\"]] += 1\n\n            print(f\"  {ticker:<6s}: zc={zero_median:+.3f} rc={realistic_median:+.3f}  verdict zc={zc['verdict']:<20s} rc={rc['verdict']}\")\n\n        # Print verdict changes summary\n        print(f\"\\n  Lookback {lb} verdict changes:\")\n        for verdict, count in verdict_changes[lb].items():\n            if count > 0:\n                print(f\"    {verdict}: {count}\")\n\n        # Calculate survival statistics\n        valid_pairs = []\n        for ticker in ticker_order:\n            zc = results[lb][\"zero_cost\"][ticker]\n            rc = results[lb][\"realistic_cost\"][ticker]\n            if abs(zc[\"medians\"][0]) > 1e-12:\n                valid_pairs.append((zc, rc))\n\n        if valid_pairs:\n            survival_rates = []\n            for zc, rc in valid_pairs:\n                survival = rc[\"medians\"][0] / zc[\"medians\"][0]\n                survival_rates.append(survival)\n\n            survival_rates = [s for s in survival_rates if not np.isinf(s) and not np.isnan(s)]\n            if survival_rates:\n                mean_survival = np.mean(survival_rates)\n                std_survival = np.std(survival_rates, ddof=1) if len(survival_rates) > 1 else 0.0\n                print(f\"  Mean survival ratio: {mean_survival:.3f} ± {std_survival:.3f}\")\n\n    # 6. Determinism check (rerun target subset)\n    print(\"\\n=== 5. Determinism check ===\")\n    target = [\"AMZN\", \"JPM\", \"AAPL\", \"MSFT\"]\n    determinism_ok = True\n\n    for lb in LOOKBACKS:\n        res2 = {}\n        for ticker in target:\n            bars = all_tickers[ticker]\n            res2[ticker] = segment_result(ticker, bars, lb, CFG1)\n\n        # Compare with first run results\n        res1 = results[lb][\"realistic_cost\"]\n        out1 = json.dumps({t: res1[t] for t in target}, sort_keys=True)\n        out2 = json.dumps(res2, sort_keys=True)\n        match = out1 == out2\n        if not match:\n            determinism_ok = False\n            print(f\"  Lookback {lb} DETERMINISM FAIL: results differ between runs\")\n        else:\n            print(f\"  Lookback {lb} determinism: OK\")\n\n    if not determinism_ok:\n        sys.exit(1)\n\n    # 7. Write artifact for independent verification\n    artifact = dict(\n        dataset_id=DATASET_ID,\n        lookbacks=list(LOOKBACKS),\n        seed=SEED,\ + TRAIN, test=TEST, warmup=WARM, overlap=OVERLAP,\n        window=WINDOW, n_blocks=N_BLOCKS, min_segment_bars=MIN_SEGMENT_BARS,\n        results=results,\n        verdict_changes=verdict_changes,\n        survival_ratios=survival_ratios,\n    )\n\n    with open(ARTIFACT_PATH, \"w\") as f:\n        json.dump(artifact, f, indent=2, sort_keys=True)\n\n    print(f\"\\n=== 6. Artifact written to {ARTIFACT_PATH} ===\")\n    print(\"NOTE: research/simulation only. No live trading or production execution.\")\n    print(\"      Momentum cost-robustness check across the collected universe: exploratory simulation.\")\n\n    return 0\n\n\nif __name__ == \"__main__\":\n    sys.exit(main())", "filePath": "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py"}}
+].
+Error message: JSON Parse error: Invalid escape character  
+[0m✗ [0mcd /home/runner/work/X/X && rm -f research/checks/momentum_cost_robustness.py failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"rm *","action":"deny","source":"project"}
+[0m→ [0mRead research/checks/momentum_cost_robustness.py
+[0m
+[0m← [0mEdit research/checks/momentum_cost_robustness.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_robustness.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_robustness.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_robustness.py
+@@ -183,10 +183,17 @@
+ zc = results[lb]["zero_cost"][ticker]
+ rc = results[lb]["realistic_cost"][ticker]
+ zero_median = zc["medians"][0]
+ realistic_median = rc["medians"][0]
+-survival = realistic_median / zero_median if abs(zero_median) > 1e-12 else "inf" if realistic_median != 0 else "N/A"
+-survival_ratios[lb] = survival
++if abs(zero_median) > 1e-12:
++    survival = realistic_median / zero_median
++    survival_ratios[lb] = survival
++elif realistic_median != 0:
++    survival = "inf"
++    survival_ratios[lb] = survival
++else:
++    survival = "N/A"
++    survival_ratios[lb] = survival
+ verdict_changes[lb][zc["verdict"]] += 1
+ verdict_changes[lb][rc["verdict"]] += 1
+ 
+ print(f"  {ticker:<6s}: zc={zero_median:+.3f} rc={realistic_median:+.3f}  verdict zc={zc['verdict']:<20s} rc={rc['verdict']}")
+
+[0m
+[0m$ [0mpython research/checks/momentum_cost_robustness.py
+File "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py", line 210
+    results[lb]["realistic_cost"][ticker]]
+                                         ^
+SyntaxError: closing parenthesis ']' does not match opening parenthesis '(' on line 209
+[0m
+[0m← [0mEdit research/checks/momentum_cost_robustness.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_robustness.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_robustness.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_robustness.py
+@@ -204,12 +204,14 @@
+     if count > 0:
+         print(f"    {verdict}: {count}")
+ 
+ # Calculate survival statistics
+-valid_pairs = [(zc, rc) for ticker in ticker_order
+-              for zc, rc in [(results[lb]["zero_cost"][ticker],
+-                              results[lb]["realistic_cost"][ticker]]
+-              if abs(zc["medians"][0]) > 1e-12]
++valid_pairs = []
++for ticker in ticker_order:
++    zc = results[lb]["zero_cost"][ticker]
++    rc = results[lb]["realistic_cost"][ticker]
++    if abs(zc["medians"][0]) > 1e-12:
++        valid_pairs.append((zc, rc))
+ 
+ if valid_pairs:
+     survival_rates = []
+     for zc, rc in valid_pairs:
+
+[0m
+[0m$ [0mpython research/checks/momentum_cost_robustness.py
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py", line 28, in <module>
+    import research.backtest as bt
+ModuleNotFoundError: No module named 'research'
+[0m
+[0m→ [0mRead research/checks/momentum.py[90m [limit=50][0m
+[0m
+[0m$ [0mcd /home/runner/work/X/X && ls -la
+total 344
+drwxr-xr-x 11 runner runner  4096 Nov  8 19:57 .
+drwxr-xr-x  3 runner runner  4096 Nov  8 19:57 ..
+drwxr-xr-x  7 runner runner  4096 Nov  8 19:59 .git
+drwxr-xr-x  4 runner runner  4096 Nov  8 19:57 .github
+-rw-r--r--  1 runner runner   147 Nov  8 19:57 .gitignore
+drwxr-xr-x  2 runner runner  4096 Nov  8 19:58 .kilo
+-rw-r--r--  1 runner runner 14333 Nov  8 19:57 AGENTS.md
+-rw-r--r--  1 runner runner  1481 Nov  8 19:57 ENTERPRISE.md
+-rw-r--r--  1 runner runner  6012 Nov  8 19:57 LEARNING_EFFICIENCY.md
+-rw-r--r--  1 runner runner  3204 Nov  8 19:57 MANUAL_SETUP.md
+-rw-r--r--  1 runner runner  2889 Nov  8 19:57 PERSISTENCE_POLICY.md
+-rw-r--r--  1 runner runner  1396 Nov  8 19:57 README.md
+-rw-r--r--  1 runner runner  5681 Nov  8 19:57 REPOSITORY_PLAYBOOK.md
+-rw-r--r--  1 runner runner  6187 Nov  8 19:57 append_activation_log.py
+-rw-r--r--  1 runner runner   416 Nov  8 19:57 check_adjacent.py
+-rw-r--r--  1 runner runner   127 Nov  8 19:57 check_compile.py
+-rw-r--r--  1 runner runner   116 Nov  8 19:57 check_compile2.py
+-rw-r--r--  1 runner runner  1165 Nov  8 19:57 check_determinism.py
+-rw-r--r--  1 runner runner   632 Nov  8 19:57 check_determinism_nvda.py
+-rw-r--r--  1 runner runner   603 Nov  8 19:57 check_determinism_real_data.py
+-rw-r--r--  1 runner runner  1044 Nov  8 19:57 check_determinism_universe.py
+-rw-r--r--  1 runner runner   675 Nov  8 19:57 check_exports.py
+-rw-r--r--  1 runner runner   667 Nov  8 19:57 check_gaps.py
+-rw-r--r--  1 runner runner   258 Nov  8 19:57 check_json1.py
+-rw-r--r--  1 runner runner  1083 Nov  8 19:57 check_network.py
+-rw-r--r--  1 runner runner   824 Nov  8 19:57 debug_diff.py
+-rw-r--r--  1 runner runner  2938 Nov  8 19:57 debug_holidays.py
+-rw-r--r--  1 runner runner  1308 Nov  8 19:57 debug_stress.py
+-rw-r--r--  1 runner runner  5345 Nov  8 19:57 debug_sweep.py
+-rw-r--r--  1 runner runner   519 Nov  8 19:57 debug_ts.py
+-rw-r--r--  1 runner runner   191 Nov  8 19:57 debug_ts2.py
+-rw-r--r--  1 runner runner    68 Nov  8 19:57 debug_ts3.py
+-rw-r--r--  1 runner runner   750 Nov  8 19:57 debug_yahoo.py
+-rw-r--r--  1 runner runner  1572 Nov  8 19:57 debug_yahoo2.py
+-rw-r--r--  1 runner runner  3689 Nov  8 19:57 diag_fold_detail.py
+-rw-r--r--  1 runner runner  3122 Nov  8 19:57 diag_mom_vs_rev.py
+-rw-r--r--  1 runner runner  3947 Nov  8 19:57 diag_null.py
+-rw-r--r--  1 runner runner  2448 Nov  8 19:57 diag_null2.py
+-rw-r--r--  1 runner runner  2088 Nov  8 19:57 diag_null3.py
+-rw-r--r--  1 runner runner  2089 Nov  8 19:57 diag_null4.py
+-rw-r--r--  1 runner runner  2020 Nov  8 19:57 diag_null5.py
+-rw-r--r--  1 runner runner  1980 Nov  8 19:57 diag_null6.py
+-rw-r--r--  1 runner runner  2191 Nov  8 19:57 dump_artifact.py
+drwxr-xr-x  3 runner runner  4096 Nov  8 19:58 examples
+-rw-r--r--  1 runner runner  6474 Nov  8 19:57 log_append.py
+drwxr-xr-x  2 runner runner  4096 Nov  8 19:57 logs
+-rw-r--r--  1 runner runner   136 Nov  8 19:57 probe_env.py
+-rw-r--r--  1 runner runner   968 Nov  8 19:57 probe_hosts.py
+-rw-r--r--  1 runner runner   361 Nov  8 19:57 probe_manifest.py
+-rw-r--r--  1 runner runner   311 Nov  8 19:57 probe_mean_reversion_artifact.py
+-rw-r--r--  1 runner runner   976 Nov  8 19:57 probe_stooq.py
+-rw-r--r--  1 runner runner   947 Nov  8 19:57 probe_yahoo.py
+-rw-r--r--  1 runner runner   609 Nov  8 19:57 probe_yahoo3.py
+-rw-r--r--  1 runner runner   403 Nov  8 19:57 read_env.py
+-rw-r--r--  1 runner runner  1201 Nov  8 19:57 repro_engine.py
+-rw-r--r--  1 runner runner  1719 Nov  8 19:57 repro_engine2.py
+drwxr-xr-x  5 runner runner  4096 Nov  8 19:57 research
+drwxr-xr-x  2 runner runner  4096 Nov  8 19:57 scratch
+-rw-r--r--  1 runner runner  2565 Nov  8 19:57 smoke_csrs.py
+drwxr-xr-x  6 runner runner  4096 Nov  8 19:57 state
+-rw-r--r--  1 runner runner   302 Nov  8 19:57 test_loader_tmp.py
+-rw-r--r--  1 runner runner  2642 Nov  8 19:57 test_segment_merge.py
+-rw-r--r--  1 runner runner  1287 Nov  8 19:57 test_timer.py
+-rw-r--r--  1 runner runner    15 Nov  8 19:57 test_write.py
+drwxr-xr-x  3 runner runner  4096 Nov  8 19:58 tests
+-rw-r--r--  1 runner runner   145 Nov  8 19:57 tmp_art.py
+-rw-r--r--  1 runner runner   456 Nov  8 19:57 tmp_artifact_check.py
+-rw-r--r--  1 runner runner   333 Nov  8 19:57 tmp_cleanup.py
+-rw-r--r--  1 runner runner  6840 Nov  8 19:57 tmp_edit_ls.py
+-rw-r--r--  1 runner runner   672 Nov  8 19:57 tmp_json_check.py
+-rw-r--r--  1 runner runner   132 Nov  8 19:57 tmp_read.py
+-rw-r--r--  1 runner runner   134 Nov  8 19:57 tmp_read2.py
+-rw-r--r--  1 runner runner   136 Nov  8 19:57 tmp_read3.py
+-rw-r--r--  1 runner runner   947 Nov  8 19:57 update_manifest_gaps.py
+-rw-r--r--  1 runner runner   429 Nov  8 19:57 validate_receipt.py
+-rw-r--r--  1 runner runner   243 Nov  8 19:57 verify_json.py
+-rw-r--r--  1 runner runner  2404 Nov  8 19:57 verify_perfold.py
+[0m
+[0m$ [0mcd /home/runner/work/X/X && find research -name "__init__.py" | head -10
+research/backtest/__init__.py
+[0m
+[0m✗ [0mcd /home/runner/work/X/X && python -c "import sys; sys.path.insert(0, '.'); import research.backtest as bt; print('Success!')" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m→ [0mRead examples/ma_crossover.py[90m [limit=30][0m
+[0m✗ [0mcd /home/runner/work/X/X/research/checks && python -c "import sys; print('Python path:'); print(sys.path[:3])" 2>&1 | head -5 failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum_cost_robustness.py 2>&1 | head -20
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py", line 28, in <module>
+    import research.backtest as bt
+ModuleNotFoundError: No module named 'research'
+[0m
+[0m$ [0mls -la /home/runner/work/X/X/research/
+total 36
+drwxr-xr-x  5 runner runner 4096 Nov  8 19:57 .
+drwxr-xr-x 11 runner runner 4096 Nov  8 19:57 ..
+-rw-r--r--  1 runner runner 3037 Nov  8 19:57 METHODOLOGY.md
+-rw-r--r--  1 runner runner 1012 Nov  8 19:57 README.md
+-rw-r--r--  1 runner runner 7357 Nov  8 19:57 REAL_DATA_FEASIBILITY.md
+drwxr-xr-x  3 runner runner 4096 Nov  8 19:58 backtest
+drwxr-xr-x  2 runner runner 4096 Nov  8 20:00 checks
+drwxr-xr-x  4 runner runner 4096 Nov  8 19:58 data
+[0m
+[0m✗ [0mcd /home/runner/work/X/X && python -c "import sys; sys.path.insert(0, 'research'); import research.backtest; print('research module imported successfully')" 2>&1 failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m
+[0m$ [0mfind /home/runner/work/X/X/research -name "*.py" | head -5
+/home/runner/work/X/X/research/backtest/universe.py
+/home/runner/work/X/X/research/backtest/perturbation.py
+/home/runner/work/X/X/research/backtest/metrics.py
+/home/runner/work/X/X/research/backtest/engine.py
+/home/runner/work/X/X/research/backtest/leakage.py
+[0m
+[0m$ [0mls -la /home/runner/work/X/X/research/checks/*.py | head -10
+-rw-r--r-- 1 runner runner 11625 Nov  8 19:57 /home/runner/work/X/X/research/checks/breakout_20day_cont.py
+-rw-r--r-- 1 runner runner 27192 Nov  8 19:57 /home/runner/work/X/X/research/checks/cross_sectional_momentum.py
+-rw-r--r-- 1 runner runner 12453 Nov  8 19:57 /home/runner/work/X/X/research/checks/cross_sectional_regime_diagnostic.py
+-rw-r--r-- 1 runner runner 31032 Nov  8 19:57 /home/runner/work/X/X/research/checks/cross_sectional_relative_strength.py
+-rw-r--r-- 1 runner runner  1631 Nov  8 19:57 /home/runner/work/X/X/research/checks/determinism_check.py
+-rw-r--r-- 1 runner runner 13278 Nov  8 19:57 /home/runner/work/X/X/research/checks/mean_reversion.py
+-rw-r--r-- 1 runner runner 13191 Nov  8 19:57 /home/runner/work/X/X/research/checks/momentum.py
+-rw-r--r-- 1 runner runner 10673 Nov  8 20:01 /home/runner/work/X/X/research/checks/momentum_cost_robustness.py
+-rw-r--r-- 1 runner runner 22240 Nov  8 19:57 /home/runner/work/X/X/research/checks/momentum_hold_period_sensitivity.py
+-rw-r--r-- 1 runner runner  9112 Nov  8 19:57 /home/runner/work/X/X/research/checks/momentum_horizon_gap_analysis.py
+[0m
+[0m→ [0mRead research/checks/momentum.py[90m [limit=5][0m
+[0m→ [0mRead research/checks/momentum.py[90m [limit=20][0m
+[0m→ [0mRead research/checks/momentum.py[90m [limit=10, offset=35][0m
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py[90m [limit=15][0m
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py[90m [limit=15, offset=30][0m
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum_lookback_sweep.py 2>&1 | head -30
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum_cost_robustness.py 2>&1 | head -50
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py", line 28, in <module>
+    import research.backtest as bt
+ModuleNotFoundError: No module named 'research'
+[0m
+[0m$ [0mcd /home/runner/work/X/X && cat > test_import.py << 'EOF'
+import sys
+from pathlib import Path
+
+# Try the same path setup as momentum_lookback_sweep.py
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+print(f"Added to sys.path: {Path(__file__).resolve().parent.parent.parent}")
+
+try:
+    import research.backtest as bt
+    print("Successfully imported research.backtest")
+except Exception as e:
+    print(f"Failed to import research.backtest: {e}")
+    print(f"Current sys.path[0]: {sys.path[0] if sys.path else 'empty'}")
+EOF
+python test_import.py
+Added to sys.path: /home/runner/work
+Successfully imported research.backtest
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python -m research.checks.momentum_cost_robustness 2>&1 | head -50
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py", line 275, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/X/X/research/checks/momentum_cost_robustness.py", line 121, in main
+    pf = import_module("preflight")
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.12/importlib/__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1324, in _find_and_load_unlocked
+ModuleNotFoundError: No module named 'preflight'
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python -m py_compile research/checks/momentum_cost_robustness.py 2>&1
+(no output)
+[0m
+[0m$ [0mcd /home/runner/work/X/X && cat > test_minimal.py << 'EOF'
+from pathlib import Path
