@@ -1,0 +1,611 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+I'll start by inspecting the durable evidence before any action. Let me look at the repository structure and key state files.
+[0m✱ [0mGlob "**/*.py"[90m 100 matches[0m
+[0m✱ [0mGlob "state/**/*.md"[90m 4 matches[0m
+[0m✱ [0mGlob "state/**/*.json"[90m 24 matches[0m
+[0m→ [0mRead state/LEARNING_STATE.md
+[0m→ [0mRead state/STATE.md
+[0m→ [0mRead research/checks/momentum.py
+[0m→ [0mRead research/checks/verify_momentum.py
+[0m→ [0mRead research/backtest/engine.py
+[0m→ [0mRead research/backtest/real_data.py
+[0m✱ [0mGrep "slippage_proportional|commission_per_trade|realistic.*cost|cost_model|cost_grid"[90m 24 matches[0m
+[0m→ [0mRead examples/ma_crossover.py
+[0m→ [0mRead research/checks/verify_momentum_lookback_sweep.py
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py
+[0m→ [0mRead research/backtest/regime_stability.py
+[0m→ [0mRead state/campaign/task_queue.json
+[0m→ [0mRead state/campaign/runs/43081592227/agents/agent_01.json
+[0m→ [0mRead state/campaign/runs/43081592227/campaign_status.json
+[0m→ [0mRead state/worker_progress.md
+[0m→ [0mRead state/campaign/runs/43081592227/agents/agent_02_contract.json
+[0m→ [0mRead state/campaign/runs/43081592227/agents/agent_02_before.json
+[0m✱ [0mGrep "cost|slippage|commission|bps"[90m 44 matches[0m
+[0m→ [0mRead state/check_artifacts/momentum_lookback_sweep_results.json[90m [limit=120][0m
+[0m→ [0mRead research/backtest/perturbation.py
+Now let me verify the execution environment and baseline before writing code.
+[0m✗ [0mpython3 -c "import numpy; print('numpy', numpy.__version__)" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python3 -c *","action":"deny","source":"project"}
+[0m
+[0m$ [0mgit status --short
+M state/campaign/global_agent_counter.json
+ M state/campaign/task_queue.json
+ M state/worker_progress.md
+?? state/campaign/current_task.json
+?? state/campaign/runs/43081592227/
+[0m
+[0m$ [0mpython3 --version
+Python 3.12.3
+[0m
+[0m$ [0mpython3 research/checks/test_count.py
+10  test_activation_receipt
+  2  test_campaign_agent_validation
+ 17  test_campaign_architecture
+  3  test_campaign_outcome
+  9  test_data
+ 19  test_engine
+  5  test_kilo_outcome
+  9  test_loader
+  8  test_metrics
+ 15  test_perturbation
+ 10  test_preflight
+ 26  test_regime_stability
+ 14  test_regime_universe
+  6  test_staged_secret_scan
+ 15  test_universe
+168 total
+[0m
+Python works and there are 168 tests. Let me establish the baseline regression suite before any changes.
+[0m$ [0mpython3 -m unittest discover -s tests 2>&1 | tail -n 15
+................................................................................./home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/_methods.py:219: RuntimeWarning: Degrees of freedom <= 0 for slice
+  ret = _var(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+/home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/_methods.py:211: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+.........................................../home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/fromnumeric.py:3862: RuntimeWarning: Mean of empty slice
+  return _methods._mean(a, axis=axis, dtype=dtype,
+/home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/_methods.py:134: RuntimeWarning: invalid value encountered in divide
+  ret = um.true_divide(
+............................................
+----------------------------------------------------------------------
+Ran 168 tests in 12.198s
+
+OK
+[0m
+Let me confirm the existing lookback-sweep check runs and reproduces its artifact (this is the zero-cost reference my check will cross-check against).
+[0m$ [0mpython3 research/checks/momentum_lookback_sweep.py 2>&1 | tail -n 30
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review per asset (lookback=5 reference) ===
+  AMZN: 4465 bars, momentum signals 4465, leakage [PASS], total_return +5.537
+  JPM: 4465 bars, momentum signals 4465, leakage [PASS], total_return +3.916
+  no-look-ahead: momentum sign at bar t uses closes[:t] only; neutral bars before the lookback window carry the equity forward.
+
+=== 4. Momentum lookback sweep (3 / 5 / 10) across collected universe ===
+  Params: walk-forward per segment train=252d / test=84d / warmup=60d / overlap=60d, min 400 bars/segment, 4 contiguous volatility blocks, each lookback vs a coin-flip null on the same segments
+
+  lookback 5 (reference) verdict counts across universe: {'REGIME_STABLE': 7, 'CONSISTENT_WITH_NOISE': 2, 'REGIME_DEPENDENT': 1, 'REGIME_STABLE_LOSS': 0}
+  lookback-robustness verdict counts: ROBUST=6 (>=2 lookbacks positive edge) | SENSITIVE=0 (edge at exactly one lookback) | NO_EDGE=4
+
+  Per-asset perturbation profiles:
+    AAPL   segments=['turbulent', 'calm', 'turbulent', 'calm'] medians3510=3: 0.071 REGIME_STABLE, 5: 0.071 REGIME_STABLE, 10: 0.071 REGIME_DEPENDENT rob=ROBUST   edge_counts={'EDGE': 2, 'LOSS': 0, 'NO_EDGE': 1}
+    MSFT   segments=['calm', 'turbulent'] medians3510=3: 0.052 REGIME_STABLE, 5: 0.052 REGIME_STABLE, 10: 0.052 REGIME_STABLE rob=ROBUST   edge_counts={'EDGE': 3, 'LOSS': 0, 'NO_EDGE': 0}
+    GOOGL  segments=['turbulent', 'calm', 'turbulent'] medians3510=3: 0.069 REGIME_STABLE, 5: 0.069 REGIME_STABLE, 10: 0.069 REGIME_STABLE rob=ROBUST   edge_counts={'EDGE': 3, 'LOSS': 0, 'NO_EDGE': 0}
+    AMZN   segments=['turbulent', 'calm', 'turbulent'] medians3510=3: 0.065 REGIME_STABLE, 5: 0.065 REGIME_STABLE, 10: 0.065 REGIME_STABLE rob=ROBUST   edge_counts={'EDGE': 3, 'LOSS': 0, 'NO_EDGE': 0}
+    META   segments=['turbulent', 'calm', 'turbulent'] medians3510=3: 0.073 REGIME_STABLE, 5: 0.073 REGIME_STABLE, 10: 0.073 REGIME_STABLE rob=ROBUST   edge_counts={'EDGE': 3, 'LOSS': 0, 'NO_EDGE': 0}
+    NVDA   segments=['turbulent', 'calm', 'turbulent'] medians3510=3:-0.038 REGIME_DEPENDENT, 5:-0.038 REGIME_STABLE, 10:-0.038 REGIME_STABLE rob=NO_EDGE  edge_counts={'EDGE': 0, 'LOSS': 0, 'NO_EDGE': 3}
+    TSLA   segments=['turbulent', 'calm', 'turbulent'] medians3510=3: 0.132 REGIME_STABLE, 5: 0.132 REGIME_STABLE, 10: 0.132 REGIME_STABLE rob=ROBUST   edge_counts={'EDGE': 3, 'LOSS': 0, 'NO_EDGE': 0}
+    JPM    segments=['turbulent', 'calm', 'turbulent'] medians3510=3: 0.113 REGIME_DEPENDENT, 5: 0.113 REGIME_DEPENDENT, 10: 0.113 REGIME_DEPENDENT rob=NO_EDGE  edge_counts={'EDGE': 0, 'LOSS': 0, 'NO_EDGE': 3}
+    JNJ    segments=['calm', 'turbulent'] medians3510=3: 0.050 CONSISTENT_WITH_NOISE, 5: 0.050 CONSISTENT_WITH_NOISE, 10: 0.050 CONSISTENT_WITH_NOISE rob=NO_EDGE  edge_counts={'EDGE': 0, 'LOSS': 0, 'NO_EDGE': 3}
+    XOM    segments=['calm', 'turbulent'] medians3510=3: 0.018 CONSISTENT_WITH_NOISE, 5: 0.018 CONSISTENT_WITH_NOISE, 10: 0.018 CONSISTENT_WITH_NOISE rob=NO_EDGE  edge_counts={'EDGE': 0, 'LOSS': 0, 'NO_EDGE': 3}
+
+determinism: r1 == r2: True
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_lookback_sweep_results.json
+NOTE: research/simulation only. No live trading or production execution. Momentum lookback sweep across the collected universe: exploratory simulation.
+[0m
+[0m✗ [0msha256sum state/check_artifacts/momentum_lookback_sweep_results.json failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+Let me confirm the framework exports I plan to use.
+[0m→ [0mRead research/backtest/__init__.py
+I have the full picture. Now I'll write the cost-sensitivity check, reusing the existing framework (`stress_segments` + matched `noise_benchmark` null) with a predeclared cost grid.
+[0m
+[0m← [0mWrite research/checks/momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+Now let me run the cost-sensitivity check.
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py 2>&1 | tail -n 45
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review per asset (lookback=5, zero cost) ===
+  AMZN: 4465 bars, momentum signals 4465, leakage [PASS], total_return +5.537
+  JPM: 4465 bars, momentum signals 4465, leakage [PASS], total_return +3.916
+  no-look-ahead: momentum sign at bar t uses closes[:t] only; costs are applied identically to candidate and matched null.
+
+=== 4. Cost x lookback x ticker grid ===
+  cost levels: zero, realistic, conservative
+  realistic = commission $2/trade + $0.003/share, 2c fixed + 5bps prop
+  conservative = 2x realistic
+
+  lookback 3: {'COST_ROBUST': 10, 'COST_DEGRADED': 0, 'COST_ERASED': 0, 'NO_ZERO_COST_EDGE': 0}
+  lookback 5: {'COST_ROBUST': 10, 'COST_DEGRADED': 0, 'COST_ERASED': 0, 'NO_ZERO_COST_EDGE': 0}
+  lookback 10: {'COST_ROBUST': 9, 'COST_DEGRADED': 1, 'COST_ERASED': 0, 'NO_ZERO_COST_EDGE': 0}
+
+  Per-asset lookback-5 cost profile (mean segment median; class):
+    AAPL   zero=+0.072 real=+0.072 cons=+0.072 gap_real=+0.070 gap_cons=+0.078 pos_seg=4/4 -> COST_ROBUST
+    MSFT   zero=+0.062 real=+0.062 cons=+0.062 gap_real=+0.088 gap_cons=+0.094 pos_seg=2/2 -> COST_ROBUST
+    GOOGL  zero=+0.080 real=+0.080 cons=+0.080 gap_real=+0.119 gap_cons=+0.130 pos_seg=3/3 -> COST_ROBUST
+    AMZN   zero=+0.073 real=+0.073 cons=+0.073 gap_real=+0.071 gap_cons=+0.077 pos_seg=3/3 -> COST_ROBUST
+    META   zero=+0.061 real=+0.061 cons=+0.061 gap_real=+0.083 gap_cons=+0.085 pos_seg=3/3 -> COST_ROBUST
+    NVDA   zero=+0.025 real=+0.016 cons=+0.008 gap_real=-0.282 gap_cons=-0.139 pos_seg=2/3 -> COST_ROBUST
+    TSLA   zero=+0.085 real=+0.085 cons=+0.086 gap_real=+0.048 gap_cons=-0.016 pos_seg=3/3 -> COST_ROBUST
+    JPM    zero=+0.080 real=+0.080 cons=+0.080 gap_real=+0.097 gap_cons=+0.103 pos_seg=3/3 -> COST_ROBUST
+    JNJ    zero=+0.048 real=+0.048 cons=+0.048 gap_real=+0.057 gap_cons=+0.060 pos_seg=2/2 -> COST_ROBUST
+    XOM    zero=+0.027 real=+0.027 cons=+0.027 gap_real=+0.032 gap_cons=+0.035 pos_seg=2/2 -> COST_ROBUST
+
+determinism: r1 == r2: True
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Momentum cost-sensitivity across the collected universe: exploratory simulation.
+[0m
+[0m✗ [0mWrite /tmp/kilo/inspect_cost.py failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"external_directory","action":"deny","pattern":"*","source":"project"}
+The candidate medians barely move with cost while NVDA moves — I need to verify the cost model is actually applied and quantify the effect per segment. Let me inspect the artifact.
+[0m
+[0m← [0mWrite _inspect_cost.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 _inspect_cost.py
+=== AAPL lookback 5 ===
+  zero         medians=[0.071, 0.054, 0.092, 0.069] null=[-0.025, -0.011, 0.04, 0.032] verdict=REGIME_STABLE
+  realistic    medians=[0.071, 0.054, 0.092, 0.069] null=[-0.042, -0.02, 0.037, 0.031] verdict=REGIME_STABLE
+  conservative medians=[0.071, 0.054, 0.092, 0.069] null=[-0.061, -0.029, 0.034, 0.029] verdict=REGIME_STABLE
+  summary: {"beats_null_conservative": true, "beats_null_realistic": true, "conservative": {"mean_gap": 0.078, "mean_median": 0.072, "n_segments": 4, "pos_segments": 4}, "cost_class": "COST_ROBUST", "realistic": {"mean_gap": 0.07, "mean_median": 0.072, "n_segments": 4, "pos_segments": 4}, "zero": {"mean_gap": 0.062, "mean_median": 0.072, "n_segments": 4, "pos_segments": 4}, "zero_cost_edge": true}
+=== NVDA lookback 5 ===
+  zero         medians=[-0.038, 0.013, 0.1] null=[-0.108, 0.031, 0.001] verdict=REGIME_STABLE
+  realistic    medians=[-0.064, 0.012, 0.1] null=[0.396, 0.499, -0.0] verdict=REGIME_STABLE
+  conservative medians=[-0.088, 0.011, 0.1] null=[0.298, 0.193, -0.051] verdict=REGIME_STABLE
+  summary: {"beats_null_conservative": false, "beats_null_realistic": false, "conservative": {"mean_gap": -0.139, "mean_median": 0.008, "n_segments": 3, "pos_segments": 2}, "cost_class": "COST_ROBUST", "realistic": {"mean_gap": -0.282, "mean_median": 0.016, "n_segments": 3, "pos_segments": 2}, "zero": {"mean_gap": 0.05, "mean_median": 0.025, "n_segments": 3, "pos_segments": 2}, "zero_cost_edge": true}
+=== TSLA lookback 5 ===
+  zero         medians=[0.132, 0.016, 0.107] null=[0.063, 0.007, -0.019] verdict=REGIME_STABLE
+  realistic    medians=[0.133, 0.016, 0.107] null=[0.13, -0.0, -0.019] verdict=REGIME_STABLE
+  conservative medians=[0.134, 0.016, 0.108] null=[0.334, -0.008, -0.02] verdict=REGIME_STABLE
+  summary: {"beats_null_conservative": false, "beats_null_realistic": true, "conservative": {"mean_gap": -0.016, "mean_median": 0.086, "n_segments": 3, "pos_segments": 3}, "cost_class": "COST_ROBUST", "realistic": {"mean_gap": 0.048, "mean_median": 0.085, "n_segments": 3, "pos_segments": 3}, "zero": {"mean_gap": 0.068, "mean_median": 0.085, "n_segments": 3, "pos_segments": 3}, "zero_cost_edge": true}
+=== JNJ lookback 5 ===
+  zero         medians=[0.05, 0.046] null=[-0.024, 0.013] verdict=CONSISTENT_WITH_NOISE
+  realistic    medians=[0.05, 0.045] null=[-0.031, 0.012] verdict=CONSISTENT_WITH_NOISE
+  conservative medians=[0.05, 0.045] null=[-0.036, 0.011] verdict=CONSISTENT_WITH_NOISE
+  summary: {"beats_null_conservative": true, "beats_null_realistic": true, "conservative": {"mean_gap": 0.06, "mean_median": 0.048, "n_segments": 2, "pos_segments": 2}, "cost_class": "COST_ROBUST", "realistic": {"mean_gap": 0.057, "mean_median": 0.048, "n_segments": 2, "pos_segments": 2}, "zero": {"mean_gap": 0.054, "mean_median": 0.048, "n_segments": 2, "pos_segments": 2}, "zero_cost_edge": true}
+=== XOM lookback 5 ===
+  zero         medians=[0.018, 0.037] null=[0.004, -0.006] verdict=CONSISTENT_WITH_NOISE
+  realistic    medians=[0.018, 0.037] null=[-0.001, -0.007] verdict=CONSISTENT_WITH_NOISE
+  conservative medians=[0.018, 0.036] null=[-0.007, -0.009] verdict=CONSISTENT_WITH_NOISE
+  summary: {"beats_null_conservative": true, "beats_null_realistic": true, "conservative": {"mean_gap": 0.035, "mean_median": 0.027, "n_segments": 2, "pos_segments": 2}, "cost_class": "COST_ROBUST", "realistic": {"mean_gap": 0.032, "mean_median": 0.027, "n_segments": 2, "pos_segments": 2}, "zero": {"mean_gap": 0.028, "mean_median": 0.027, "n_segments": 2, "pos_segments": 2}, "zero_cost_edge": true}
+[0m
+The candidate medians barely move with cost while the null behaves erratically (NVDA null becomes large *positive* under costs). That is a red flag — I must verify the engine actually applies costs and that the null isn't producing an artifact before trusting any conclusion. Let me run a controlled diagnostic.
+[0m← [0mWrite _diag_cost.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 _diag_cost.py 2>&1 | tail -n 50
+=== AAPL lookback 5: per-segment mean/median log return by cost ===
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/_diag_cost.py", line 47, in <module>
+    rows = seg_medians(ticker, 5, cfg)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/X/X/_diag_cost.py", line 35, in seg_medians
+    res = bt.walk_forward(list(bars)[s:e], sig, train_window=train_window,
+                                                             ^^^^^^^^^^^^
+NameError: name 'train_window' is not defined
+[0m
+[0m← [0mEdit _diag_cost.py
+Index: /home/runner/work/X/X/_diag_cost.py
+===================================================================
+--- /home/runner/work/X/X/_diag_cost.py
++++ /home/runner/work/X/X/_diag_cost.py
+@@ -31,9 +31,9 @@
+     runs.append((cur, start, len(labels)))
+ out = []
+ for lab, s, e in runs:
+     sig = bt.momentum_signals(closes, lookback=lookback)[s:e]
+-    res = bt.walk_forward(list(bars)[s:e], sig, train_window=train_window,
++    res = bt.walk_forward(list(bars)[s:e], sig, train_window=TRAIN,
+                           test_window=TEST, warmup=WARM, overlap_window=OVERLAP, cfg=cfg)
+     lr = np.array([np.log1p(np.clip(f.metrics["total_return"], -1 + 1e-12, None))
+                    for f in res.folds])
+     out.append((lab, len(res.folds), float(np.mean(lr)), float(np.median(lr)),
+
+[0m
+[0m$ [0mpython3 _diag_cost.py 2>&1 | tail -n 50
+=== AAPL lookback 5: per-segment mean/median log return by cost ===
+  zero
+    turbulent  folds=28 mean=+0.0524 median=+0.0707 min=-0.2042 max=+0.3501
+    calm       folds=31 mean=+0.0518 median=+0.0538 min=-0.1342 max=+0.2757
+    turbulent  folds=31 mean=+0.1187 median=+0.0918 min=-0.0285 max=+0.3878
+    calm       folds=31 mean=+0.0690 median=+0.0690 min=-0.1340 max=+0.2510
+  real
+    turbulent  folds=28 mean=+0.0524 median=+0.0708 min=-0.2056 max=+0.3514
+    calm       folds=31 mean=+0.0517 median=+0.0537 min=-0.1350 max=+0.2766
+    turbulent  folds=31 mean=+0.1187 median=+0.0918 min=-0.0286 max=+0.3883
+    calm       folds=31 mean=+0.0689 median=+0.0690 min=-0.1344 max=+0.2513
+  cons
+    turbulent  folds=28 mean=+0.0524 median=+0.0709 min=-0.2070 max=+0.3527
+    calm       folds=31 mean=+0.0517 median=+0.0537 min=-0.1358 max=+0.2774
+    turbulent  folds=31 mean=+0.1188 median=+0.0918 min=-0.0288 max=+0.3888
+    calm       folds=31 mean=+0.0689 median=+0.0690 min=-0.1347 max=+0.2515
+=== NVDA lookback 5: per-segment mean/median log return by cost ===
+  zero
+    turbulent  folds=28 mean=-0.0836 median=-0.0382 min=-1.5980 max=+0.4367
+    calm       folds=31 mean=+0.0264 median=+0.0135 min=-1.0653 max=+1.1762
+    turbulent  folds=77 mean=+0.1373 median=+0.1003 min=-0.2774 max=+0.7198
+  real
+    turbulent  folds=28 mean=-0.1112 median=-0.0639 min=-1.8354 max=+0.4565
+    calm       folds=31 mean=+0.0198 median=+0.0125 min=-1.3170 max=+1.3730
+    turbulent  folds=77 mean=+0.1377 median=+0.1003 min=-0.2800 max=+0.7236
+  cons
+    turbulent  folds=28 mean=-0.1416 median=-0.0884 min=-2.1378 max=+0.4781
+    calm       folds=31 mean=+0.0162 median=+0.0114 min=-1.6470 max=+1.6609
+    turbulent  folds=77 mean=+0.1381 median=+0.1003 min=-0.2827 max=+0.7273
+
+=== Full-sample cost accounting (momentum lookback 5, whole series) ===
+  AAPL   zero  trades= 4452 commission=$0 gross_shares=3,269,055 eq=1e+06->6.53e+06
+  AAPL   real  trades= 4452 commission=$18,711 gross_shares=3,269,055 eq=1e+06->6.514e+06
+  AAPL   cons  trades= 4452 commission=$37,422 gross_shares=3,269,055 eq=1e+06->6.497e+06
+  NVDA   zero  trades= 4436 commission=$0 gross_shares=115,407,801 eq=1e+06->5.261e+06
+  NVDA   real  trades= 4436 commission=$355,095 gross_shares=115,407,801 eq=1e+06->4.907e+06
+  NVDA   cons  trades= 4436 commission=$710,191 gross_shares=115,407,801 eq=1e+06->4.554e+06
+
+=== Constant-long and random-signal cost accounting (AAPL) ===
+  const_long zero  trades= 4457 commission=$0 total_ret=+5.5298
+  const_long real  trades= 4457 commission=$18,851 total_ret=+5.5722
+  const_long cons  trades= 4457 commission=$37,702 total_ret=+5.6153
+  random     zero  trades= 3948 commission=$0 total_ret=-0.5146
+  random     real  trades= 3948 commission=$564,595 total_ret=-1.0795
+  random     cons  trades= 3948 commission=$1,129,190 total_ret=-1.6368
+[0m
+The engine applies costs, but the cost *convention* is suspect: a constant-long control's return *rises* with "realistic costs" (5.5298 → 5.5722 → 5.6153), which is impossible for a genuine cost. This is the symmetric-slippage convention (sells receive `close + slippage`). I must add a control diagnostic to the artifact so this confound is reproducible and not reported as genuine cost robustness. Let me update the check.
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -192,8 +192,44 @@
+         class_counts[key] = counts
+     return summary, class_counts
+ 
+ 
++def cost_model_control(tickers):
++    """Expose the engine's cost convention with non-signal controls.
++
++    A genuine cost cannot increase a strategy's total return. The engine prices
++    every fill at ``close + slippage`` for both buys and sells, so a net-selling
++    (long-biased) strategy is *credited* the slippage on its trims. This control
++    runs a constant-long position and a fixed coin-flip signal through each cost
++    level so that the convention is auditable alongside the candidate results.
++    """
++    out = {"constant_long": {}, "random_aapl": {}}
++    for level in COST_LEVELS:
++        cfg = cost_cfg(level)
++        per_t = {}
++        for t, bars in tickers.items():
++            n = bars.n_bars
++            const_long = [bt.Signal(date=i + 1, weight=1.0) for i in range(n)]
++            res = bt.run_bars(list(bars), const_long, cfg)
++            ret = float(res.equity_curve[-1] / res.equity_curve[0] - 1.0)
++            per_t[t] = dict(
++                const_long_total_return=round(ret, 6),
++                net_shares=round(float(sum(f.shares for f in res.trades)), 1),
++                gross_shares=round(float(sum(abs(f.shares) for f in res.trades)), 1),
++                commission=round(float(sum(f.commission for f in res.trades)), 2),
++            )
++        out["constant_long"][level] = per_t
++        bars = tickers["AAPL"]
++        rsig = bt.random_signals(bars.n_bars, seed=5042)
++        rres = bt.run_bars(list(bars), rsig, cfg)
++        out["random_aapl"][level] = dict(
++            random_total_return=round(
++                float(rres.equity_curve[-1] / rres.equity_curve[0] - 1.0), 6),
++            commission=round(float(sum(f.commission for f in rres.trades)), 2),
++        )
++    return out
++
++
+ def main() -> int:
+     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+ 
+     manifest = load_manifest()
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -280,8 +280,9 @@
+ print("  conservative = 2x realistic\n")
+ 
+ per_cost = run_all(all_tickers)
+ summary, class_counts = build_summary(per_cost)
++control = cost_model_control(all_tickers)
+ 
+ for lb in LOOKBACKS:
+     key = str(lb)
+     print("  lookback {}: {}".format(lb, class_counts[key]))
+@@ -297,8 +298,19 @@
+               s["conservative"]["mean_gap"], s["realistic"]["pos_segments"],
+               s["realistic"]["n_segments"], s["cost_class"]))
+ print("")
+ 
++n_ctrl_up = sum(
++    1 for t in ticker_order
++    if control["constant_long"]["realistic"][t]["const_long_total_return"]
++    > control["constant_long"]["zero"][t]["const_long_total_return"]
++)
++print("  cost-model control (constant-long): return rises from zero to "
++      "realistic cost for {}/{} tickers (a genuine cost cannot raise "
++      "return; >0 flags the symmetric-slippage convention)".format(
++          n_ctrl_up, len(ticker_order)))
++print("")
++
+ # Determinism: rerun the target subset under the realistic model.
+ res2 = {lb: {t: segment_result(t, tickers[t], lb, cost_cfg("realistic"))
+              for t in target}
+         for lb in LOOKBACKS}
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -329,8 +329,9 @@
+     cost_levels={k: dict(v) for k, v in COST_LEVELS.items()},
+     per_cost=per_cost,
+     summary=summary,
+     cost_class_counts=class_counts,
++    cost_model_control=control,
+ )
+ with open(ARTIFACT_PATH, "w") as f:
+     json.dump(artifact, f, indent=2, sort_keys=True)
+ print("artifact written to: {}".format(ARTIFACT_PATH))
+
+[0m
+Now let me re-run the check with the control diagnostic.
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py 2>&1 | tail -n 30
+AMZN: 4465 bars, momentum signals 4465, leakage [PASS], total_return +5.537
+  JPM: 4465 bars, momentum signals 4465, leakage [PASS], total_return +3.916
+  no-look-ahead: momentum sign at bar t uses closes[:t] only; costs are applied identically to candidate and matched null.
+
+=== 4. Cost x lookback x ticker grid ===
+  cost levels: zero, realistic, conservative
+  realistic = commission $2/trade + $0.003/share, 2c fixed + 5bps prop
+  conservative = 2x realistic
+
+  lookback 3: {'COST_ROBUST': 10, 'COST_DEGRADED': 0, 'COST_ERASED': 0, 'NO_ZERO_COST_EDGE': 0}
+  lookback 5: {'COST_ROBUST': 10, 'COST_DEGRADED': 0, 'COST_ERASED': 0, 'NO_ZERO_COST_EDGE': 0}
+  lookback 10: {'COST_ROBUST': 9, 'COST_DEGRADED': 1, 'COST_ERASED': 0, 'NO_ZERO_COST_EDGE': 0}
+
+  Per-asset lookback-5 cost profile (mean segment median; class):
+    AAPL   zero=+0.072 real=+0.072 cons=+0.072 gap_real=+0.070 gap_cons=+0.078 pos_seg=4/4 -> COST_ROBUST
+    MSFT   zero=+0.062 real=+0.062 cons=+0.062 gap_real=+0.088 gap_cons=+0.094 pos_seg=2/2 -> COST_ROBUST
+    GOOGL  zero=+0.080 real=+0.080 cons=+0.080 gap_real=+0.119 gap_cons=+0.130 pos_seg=3/3 -> COST_ROBUST
+    AMZN   zero=+0.073 real=+0.073 cons=+0.073 gap_real=+0.071 gap_cons=+0.077 pos_seg=3/3 -> COST_ROBUST
+    META   zero=+0.061 real=+0.061 cons=+0.061 gap_real=+0.083 gap_cons=+0.085 pos_seg=3/3 -> COST_ROBUST
+    NVDA   zero=+0.025 real=+0.016 cons=+0.008 gap_real=-0.282 gap_cons=-0.139 pos_seg=2/3 -> COST_ROBUST
+    TSLA   zero=+0.085 real=+0.085 cons=+0.086 gap_real=+0.048 gap_cons=-0.016 pos_seg=3/3 -> COST_ROBUST
+    JPM    zero=+0.080 real=+0.080 cons=+0.080 gap_real=+0.097 gap_cons=+0.103 pos_seg=3/3 -> COST_ROBUST
+    JNJ    zero=+0.048 real=+0.048 cons=+0.048 gap_real=+0.057 gap_cons=+0.060 pos_seg=2/2 -> COST_ROBUST
+    XOM    zero=+0.027 real=+0.027 cons=+0.027 gap_real=+0.032 gap_cons=+0.035 pos_seg=2/2 -> COST_ROBUST
+
+  cost-model control (constant-long): return rises from zero to realistic cost for 5/10 tickers (a genuine cost cannot raise return; >0 flags the symmetric-slippage convention)
+
+determinism: r1 == r2: True
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Momentum cost-sensitivity across the collected universe: exploratory simulation.
+[0m
+The control confirms the artifact (5/10 tickers' constant-long return rises under "costs"). Let me inspect the control details and the per-segment candidate changes.
+[0m← [0mWrite _inspect_cost.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 _inspect_cost.py
+=== constant-long control: total return by cost level ===
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/_inspect_cost.py", line 9, in <module>
+    z = art["cost_model_control"]["constant_long"]["zero"][t]
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^
+KeyError: 'conservative'
+[0m
+[0m✗ [0mpython3 -c "import json; a=json.load(open('state/check_artifacts/momentum_cost_sensitivity_results.json')); print(list(a['cost_model_control'])); print(list(a['cost_model_control']['constant_long'])); print(list(a['cost_model_control']['random_aapl']))" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python3 -c *","action":"deny","source":"project"}
+[0m
+[0m← [0mWrite _inspect_cost.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 _inspect_cost.py
+control top keys: ['constant_long', 'random_aapl']
+constant_long levels: ['conservative', 'realistic', 'zero']
+random_aapl levels: ['conservative', 'realistic', 'zero']
+cost_levels: {'conservative': {'commission_per_share': 0.006, 'commission_per_trade': 4.0, 'slippage_cents': 4.0, 'slippage_proportional': 0.001}, 'realistic': {'commission_per_share': 0.003, 'commission_per_trade': 2.0, 'slippage_cents': 2.0, 'slippage_proportional': 0.0005}, 'zero': {}}
+[0m
+[0m← [0mWrite _inspect_cost.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 _inspect_cost.py
+=== constant-long control: total return by cost level ===
+  AAPL   zero=+5.5298 real=+5.5722 cons=+5.6153 | net_sh=+2997 gross_sh=3,312,288 comm_z=0 comm_r=18851 comm_c=37702
+  AMZN   zero=+5.5608 real=+5.6009 cons=+5.6418 | net_sh=+3976 gross_sh=4,105,595 comm_z=0 comm_r=21229 comm_c=42458
+  GOOGL  zero=+4.4579 real=+4.4638 cons=+4.4697 | net_sh=+2911 gross_sh=1,796,565 comm_z=0 comm_r=14312 comm_c=28623
+  JNJ    zero=+2.2188 real=+2.2128 cons=+2.2068 | net_sh=+3906 gross_sh=444,091 comm_z=0 comm_r=10208 comm_c=20417
+  JPM    zero=+3.7335 real=+3.7293 cons=+3.7251 | net_sh=+3009 gross_sh=1,422,572 comm_z=0 comm_r=13156 comm_c=26311
+  META   zero=+4.1003 real=+4.0983 cons=+4.0963 | net_sh=+1374 gross_sh=652,382 comm_z=0 comm_r=9161 comm_c=18322
+  MSFT   zero=+4.1936 real=+4.1935 cons=+4.1934 | net_sh=+1932 gross_sh=1,158,554 comm_z=0 comm_r=12342 comm_c=24683
+  NVDA   zero=+8.9514 real=+9.8643 cons=+11.0529 | net_sh=+4274 gross_sh=114,031,247 comm_z=0 comm_r=350976 comm_c=701951
+  TSLA   zero=+8.1002 real=+8.1936 cons=+8.2900 | net_sh=+2698 gross_sh=13,094,723 comm_z=0 comm_r=47446 comm_c=94892
+  XOM    zero=+1.8996 real=+1.8912 cons=+1.8827 | net_sh=+6097 gross_sh=964,828 comm_z=0 comm_r=11790 comm_c=23581
+
+=== random AAPL control ===
+  zero {'commission': 0.0, 'random_total_return': -0.514579}
+  realistic {'commission': 564594.84, 'random_total_return': -1.079454}
+  conservative {'commission': 1129189.67, 'random_total_return': -1.636792}
+
+=== candidate mean segment median change (lookback 5) ===
+  AAPL   d_real=+0.0000 d_cons=+0.0000 class=COST_ROBUST
+  AMZN   d_real=+0.0000 d_cons=+0.0000 class=COST_ROBUST
+  GOOGL  d_real=+0.0000 d_cons=+0.0000 class=COST_ROBUST
+  JNJ    d_real=+0.0000 d_cons=+0.0000 class=COST_ROBUST
+  JPM    d_real=+0.0000 d_cons=+0.0000 class=COST_ROBUST
+  META   d_real=+0.0000 d_cons=+0.0000 class=COST_ROBUST
+  MSFT   d_real=+0.0000 d_cons=+0.0000 class=COST_ROBUST
+  NVDA   d_real=-0.0090 d_cons=-0.0170 class=COST_ROBUST
+  TSLA   d_real=+0.0000 d_cons=+0.0010 class=COST_ROBUST
+  XOM    d_real=+0.0000 d_cons=+0.0000 class=COST_ROBUST
+[0m
+The control is decisive: for 6/10 tickers a constant-long position earns *more* under "costs" (e.g., NVDA 8.95 → 11.05), which is impossible for a genuine cost. The candidate's apparent cost-insensitivity is confounded by the engine's symmetric-slippage convention. Let me record this confound flag in the artifact, then build the independent verifier.
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -308,10 +308,8 @@
+       "realistic cost for {}/{} tickers (a genuine cost cannot raise "
+       "return; >0 flags the symmetric-slippage convention)".format(
+           n_ctrl_up, len(ticker_order)))
+ print("")
+-
+-# Determinism: rerun the target subset under the realistic model.
+ res2 = {lb: {t: segment_result(t, tickers[t], lb, cost_cfg("realistic"))
+              for t in target}
+         for lb in LOOKBACKS}
+ out1 = json.dumps({lb: {t: per_cost["realistic"][str(lb)][t] for t in target}
+
+[0m
+[0m→ [0mRead research/checks/momentum_cost_sensitivity.py[90m [limit=55, offset=300][0m
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -328,8 +328,18 @@
+     per_cost=per_cost,
+     summary=summary,
+     cost_class_counts=class_counts,
+     cost_model_control=control,
++    cost_model_confound=bool(n_ctrl_up > 0),
++    cost_model_confound_detail={
++        "constant_long_return_rises_with_cost": int(n_ctrl_up),
++        "n_tickers": len(ticker_order),
++        "reason": (
++            "engine prices every fill at close + slippage for both buys and "
++            "sells, so a net-selling (long-biased) strategy is credited the "
++            "slippage on its trims; a genuine cost cannot raise return"
++        ),
++    },
+ )
+ with open(ARTIFACT_PATH, "w") as f:
+     json.dump(artifact, f, indent=2, sort_keys=True)
+ print("artifact written to: {}".format(ARTIFACT_PATH))
+
+[0m
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py 2>&1 | tail -n 12
+META   zero=+0.061 real=+0.061 cons=+0.061 gap_real=+0.083 gap_cons=+0.085 pos_seg=3/3 -> COST_ROBUST
+    NVDA   zero=+0.025 real=+0.016 cons=+0.008 gap_real=-0.282 gap_cons=-0.139 pos_seg=2/3 -> COST_ROBUST
+    TSLA   zero=+0.085 real=+0.085 cons=+0.086 gap_real=+0.048 gap_cons=-0.016 pos_seg=3/3 -> COST_ROBUST
+    JPM    zero=+0.080 real=+0.080 cons=+0.080 gap_real=+0.097 gap_cons=+0.103 pos_seg=3/3 -> COST_ROBUST
+    JNJ    zero=+0.048 real=+0.048 cons=+0.048 gap_real=+0.057 gap_cons=+0.060 pos_seg=2/2 -> COST_ROBUST
+    XOM    zero=+0.027 real=+0.027 cons=+0.027 gap_real=+0.032 gap_cons=+0.035 pos_seg=2/2 -> COST_ROBUST
+
+  cost-model control (constant-long): return rises from zero to realistic cost for 5/10 tickers (a genuine cost cannot raise return; >0 flags the symmetric-slippage convention)
+
+determinism: r1 == r2: True
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Momentum cost-sensitivity across the collected universe: exploratory simulation.
+[0m
+[0m← [0mWrite research/checks/verify_momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+Now I'll write the independent verifier. It recomputes the candidate and null through a fresh `walk_forward` path (not `stress_segments`), cross-checks the zero-cost columns against the existing sweep artifact, reproduces the classification and the cost-model control, and asserts determinism.
+Now let me run the independent verifier.
+[0m$ [0mpython3 research/checks/verify_momentum_cost_sensitivity.py 2>&1 | tail -n 40
+=== Gate 1: fresh walk_forward + fresh null (AMZN, JPM; all lookbacks/costs) ===
+  AMZN: lookbacks [3, 5, 10] all cost levels recomputed
+  AMZN: lookbacks [3, 5, 10] all cost levels recomputed
+  AMZN: lookbacks [3, 5, 10] all cost levels recomputed
+  JPM: lookbacks [3, 5, 10] all cost levels recomputed
+  JPM: lookbacks [3, 5, 10] all cost levels recomputed
+  JPM: lookbacks [3, 5, 10] all cost levels recomputed
+  Gate 1 -> MATCH
+
+=== Gate 2: full universe, lookback 5, realistic cost ===
+  Gate 2 -> MATCH
+
+=== Gate 3: zero-cost columns cross-check vs momentum_lookback_sweep_results.json ===
+  Gate 3 -> MATCH
+
+=== Gate 4: classification reproducibility ===
+  Gate 4 -> MATCH
+
+=== Gate 5: cost-model control (constant-long return rises with cost) ===
+  AAPL: zero=+5.5298 real=+5.5722 cons=+5.6153 rises=True (pub rises=True) -> MATCH
+  NVDA: zero=+8.9514 real=+9.8643 cons=+11.0529 rises=True (pub rises=True) -> MATCH
+  Gate 5 -> MATCH
+
+Determinism: recomputing AMZN lookback 5 realistic medians twice.
+  AMZN r1: [0.065, 0.076, 0.077]; r2: [0.065, 0.076, 0.077] -> identical
+
+All independent recomputations MATCH the check artifact: candidate and null medians (fresh walk_forward), zero-cost cross-consistency vs momentum_lookback_sweep_results.json, classification, and the cost-model control.
+NOTE: research/simulation only. No live trading or production execution. Momentum cost-sensitivity independent verification: exploratory simulation.
+[0m
+All verification gates pass. Now let me run the regression suite and check the working tree.
+[0m$ [0mgit status --short
+M state/campaign/global_agent_counter.json
+ M state/campaign/task_queue.json
+ M state/worker_progress.md
+?? _diag_cost.py
+?? _inspect_cost.py
+?? research/checks/momentum_cost_sensitivity.py
+?? research/checks/verify_momentum_cost_sensitivity.py
+?? state/campaign/current_task.json
+?? state/campaign/runs/43081592227/
+?? state/check_artifacts/momentum_cost_sensitivity_results.json
+[0m
+[0m$ [0mpython3 -m unittest discover -s tests 2>&1 | tail -n 6
+ret = um.true_divide(
+............................................
+----------------------------------------------------------------------
+Ran 168 tests in 12.206s
+
+OK
+[0m
+All 168 tests pass. Let me remove my scratch inspection scripts (the durable artifact and verifier already capture these findings).
+[0m✗ [0mrm _diag_cost.py _inspect_cost.py failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"rm *","action":"deny","source":"project"}
+`rm` is denied by project rules, so I'll leave the scratch diagnostics in place (the persistence policy permits scratch helpers). Let me capture an observed UTC timestamp for the activation record.
+[0m✗ [0mdate -u +%Y-%m-%dT%H:%M:%SZ failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+The `date` form is denied (consistent with the prior agent's note). I'll anchor the record to the before-capture timestamp and run/event identifiers. Let me update the progress milestone.
+[0m
+[0m← [0mWrite state/worker_progress.md
+Wrote file successfully.
+[0m
+Now let me update the durable research record. Let me check the tail of STATE.md to append a concise activation section.
+[0m✗ [0mwc -l state/STATE.md state/LEARNING_STATE.md failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m✱ [0mGrep "^## Current activation|^## Next activation|^## Notes"[90m in state · 28 matches[0m
+[0m→ [0mRead state/STATE.md[90m [offset=1441][0m
+[91m[1mError: [0mSign up for free to continue and explore 500 other models. Takes 2 minutes, no credit card required. Or come back later.
