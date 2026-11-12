@@ -1,0 +1,63 @@
+{
+  "agent_number": 1,
+  "campaign_slot": 1,
+  "global_agent_number": 1,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-001",
+  "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+  "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+  "question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+  "action": "Audited the durable record (LEARNING_STATE frontier table and recent learning history, STATE.md activation sections, state/activation_status.json, campaign controller state and task queue) and executed a read-only reproduction of the controller's qualitative ranking; counted distinct frontier cells and checked for equivalent re-tests.",
+  "changed": [
+    "scratch/verify_selection_rank.py (new read-only audit helper: reproduces the controller's LEARNING_PROCESS ranking and compares the contract compared_against list; mutates no state)"
+  ],
+  "verified": [
+    "python3 scratch/verify_selection_rank.py: LEARNING_PROCESS candidate order [P-001, P-002, P-004, P-003, P-006, P-005]; controller top-5 equals contract compared_against (TOP5_MATCH: True); P-001 is rank 1 (SELECTED_IS_RANK1: True).",
+    "Inspected .github/scripts/campaign_controller.py: task_rank is a deterministic ordinal tuple (benefit HIGH=0/MEDIUM=1/LOW=2; cost LOW=0/MEDIUM=1/HIGH=2) with task_id tiebreak; selection is candidates[0] among OPEN tasks for the role; no numeric reward score is used.",
+    "Inspected state/LEARNING_STATE.md and state/STATE.md: the frontier-first sequence closed distinct cells with decisive, independently verified verdicts — reversal 37263008074 (FALSIFIED), cross-sectional relative strength 37304873966 (FALSIFIED), volatility targeting 37314710995 (FALSIFIED), momentum 37318950814 (SUPPORTED), momentum lookback sweep 37361000967 (admitted/qualified), momentum longer horizon 37394344201 (TESTED), cross-sectional momentum (FALSIFIED), breakout 37414038601 (FALSIFIED); each maps to a distinct check and artifact with no exact duplicate cell.",
+    "Inspected state/LEARNING_STATE.md recent-history row 37260572520: that activation drew its objective from the queued receipt item rather than a frontier cell, and its process-level delta was recorded UNVERIFIED.",
+    "Inspected state/check_artifacts/*.json: each cited cell has a persisted artifact whose verdict fields agree with the recorded verdicts (e.g. breakout_20day_cont_results.json is CONSISTENT_WITH_NOISE-dominated; cross_sectional_momentum_results.json is NO_EDGE / CONSISTENT_WITH_NOISE).",
+    "Inspected state/campaign/runs/43263210357/campaign_status.json: completed_agents=[]; only agent 1 has been selected, so the controller-selector arm has no completed research outcome yet."
+  ],
+  "unverified": [
+    "The efficiency magnitude (information gained per unit worker effort) is not measured; the frontier-first vs opportunistic comparison is confounded by concurrent tooling additions, a single agent, and no counterfactual.",
+    "The controller's task_rank selector has no completed research outcome in this run, so its selector advantage over opportunistic choice is not yet demonstrated by campaign outcomes.",
+    "One intermediate record (37318950814) marks the momentum process delta UNVERIFIED; the later LEARNING_STATE summary records the frontier-first delta as RETAIN (verified). The tension is preserved, not erased.",
+    "The momentum family received repeated engagement across three activations (base 37318950814, lookback sweep 37361000967, longer horizon 37394344201) for distinct robustness objectives; these are not exact duplicate cells, but they show the selector can spend multiple activations on one signal family."
+  ],
+  "observed_effect": "The explicit highest-value selector is deterministic and value-ordered: it selected the rank-1 OPEN LEARNING_PROCESS task (P-001) and its top-5 candidate list exactly matches the contract. The historical frontier-first sequence closed eight distinct cells decisively with independent verification and no exact duplicate cell, while the documented opportunistic case (37260572520) left the process delta UNVERIFIED. This is a concrete ordering/non-duplication advantage; a measured efficiency gain is not demonstrated.",
+  "uncertainty_targeted": "Whether explicit highest-value focused-task selection improves information flow relative to the repository's prior opportunistic task choice.",
+  "uncertainty_reduced": "Partially: the deterministic value-ordering and non-duplication advantage is verified; the efficiency magnitude and the controller-selector arm's research outcomes remain unverified.",
+  "process_decision": "RETAIN",
+  "research_result": "RETAIN — the explicit highest-value selector produces a concrete, reproducible ordering/non-duplication advantage (rank-1 selection verified; eight distinct frontier cells closed decisively with no exact re-test; the opportunistic baseline 37260572520 left the process delta UNVERIFIED). The efficiency magnitude is not demonstrated and the controller-selector arm has no completed outcome yet; both are recorded as unresolved rather than claimed.",
+  "decision": "RETAIN",
+  "next": "In the next campaign slot, inspect the first completed HIGHER_ORDER_OBJECTIVE outcome (agent 02's R-001 cost-sensitivity verdict) and record whether the retained selector converted its ordering advantage into a decisive, independently verified research result.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-007",
+      "role": "LEARNING_PROCESS",
+      "status": "OPEN",
+      "primary_question": "Does the retained highest-value selector convert its ordering advantage into measured information gain across completed campaign research outcomes?",
+      "bottleneck": "The selector's ordering and non-duplication advantage is verified, but its effect on measured information gain per unit worker effort is not.",
+      "objective": "Compare completed HIGHER_ORDER_OBJECTIVE outcomes produced under the retained selector against their predeclared success criteria to test whether the ordering advantage yields information gain.",
+      "scope": "Use completed campaign agent records and their predeclared success criteria only.",
+      "out_of_scope": "Do not rerun research experiments, redesign the controller, or add a numeric reward score.",
+      "deliverable": "A bounded process decision on whether the ordering advantage translates into measured information gain.",
+      "success_criterion": "The comparison classifies the selector's information-flow effect as improved, unchanged, or unverified using durable records.",
+      "stop_condition": "Stop once the completed campaign outcomes are classified.",
+      "verification_requirement": "Controller-side validation plus inspection of the cited agent records.",
+      "evidence_basis": "Agent 01 audit found a verified ordering/non-duplication advantage but no measured efficiency gain, and the controller-selector arm had no completed outcome at audit time.",
+      "expected_information_gain": "MEDIUM",
+      "downstream_leverage": "HIGH",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "effort": "LOW",
+      "complexity": "LOW",
+      "execution_risk": "LOW",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "LOW",
+  "failure_class": "NONE",
+  "task_selection_observation": "IMPROVED"
+}
