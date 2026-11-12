@@ -1,0 +1,68 @@
+{
+  "agent_number": 2,
+  "campaign_slot": 2,
+  "global_agent_number": 2,
+  "role": "HIGHER_ORDER_OBJECTIVE",
+  "task_id": "R-001",
+  "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+  "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+  "question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+  "action": "Added research/checks/momentum_cost_sensitivity.py: a predeclared 3-level cost grid (zero, realistic = the repository's existing realistic cost model from examples/ma_crossover_real_data.py, conservative = exactly 2x the realistic variable costs) evaluated for lookback 3/5/10 across all 10 collected tickers through the existing stress_segments walk-forward regime gate (train=252d/test=84d/warmup=60d/overlap=60d, 4 volatility blocks, min 400 bars/segment) with the framework's coin-flip null run on the same segments under the same cost model; recorded per-segment candidate/null medians, per-asset full-sample total return and realized cost, and a predeclared survival classification. Added research/checks/verify_momentum_cost_sensitivity.py with four independent gates. Wrote the artifact state/check_artifacts/momentum_cost_sensitivity_results.json.",
+  "changed": [
+    "research/checks/momentum_cost_sensitivity.py (new: predeclared cost grid, per-segment matched-null regime gate, full-sample cost drag, survival classification, determinism assertion, artifact)",
+    "research/checks/verify_momentum_cost_sensitivity.py (new: independent recomputation via fresh vol blocks + walk_forward + noise_benchmark, zero-cost lookback-5 cross-consistency vs momentum_lookback_sweep_results.json, classification reproducibility, determinism)",
+    "state/check_artifacts/momentum_cost_sensitivity_results.json (new artifact)",
+    "state/worker_progress.md (phase/status/milestone updated)",
+    "logs/ACTIVATION-2026-11-12.md (activation record with observed UTC timestamps)",
+    "scratch/probe_cost.py, scratch/probe_cost2.py, scratch/probe_cost3.py, scratch/analyze_cost.py, scratch/now.py, scratch/validate_record.py (retained diagnostics for cost attribution, runtime estimation, and record-schema validation)"
+  ],
+  "verified": [
+    "python3 research/checks/momentum_cost_sensitivity.py: exit 0; manifest 10/10 OK; PREFLIGHT PASSED; leakage PASS on AMZN/JPM (signal integrity + equity-fill audit); full 3x3x10 grid executed; determinism r1==r2; artifact written",
+    "python3 research/checks/verify_momentum_cost_sensitivity.py: Gate 1 MATCH on AMZN/JPM for all 3 cost levels x 3 lookbacks (fresh walk_forward + noise_benchmark vs artifact); Gate 2 MATCH all 10 tickers on the zero-cost lookback-5 column vs momentum_lookback_sweep_results.json (medians and nulls); Gate 3 all survival flags and universe classifications reproduce; Gate 4 determinism identical",
+    "python3 -m unittest discover -s tests -v: 168 tests, all passing, no failures",
+    "Predeclared classification rule (fixed before execution): an asset SURVIVES a cost level iff every segment net-of-cost candidate median > 0; COST_ROBUST if >= 6/10 survive, COST_FRAGILE if 0/10, PARTIAL otherwise. Result: COST_ROBUST at every cost level and lookback (9/10 survive; NVDA is the sole non-survivor and was already non-positive at zero cost).",
+    "Realized full-sample cost drag (mean across 10 assets): lookback 3 zero 4.4739 -> realistic 4.4243 (drag 0.0497, ~1.1%) -> conservative 4.3746 (drag 0.0993, ~2.2%); lookback 5 zero 4.4902 -> realistic 4.4406 (drag 0.0496) -> conservative 4.3910 (drag 0.0993); lookback 10 zero 4.5091 -> realistic 4.4600 (drag 0.0491) -> conservative 4.4109 (drag 0.0982)",
+    "Retained net-of-cost median-segment fraction (mean/min over assets): realistic 0.964/0.645 (lb3), 0.964/0.647 (lb5), 0.965/0.650 (lb10); conservative 0.930/0.305 (lb3), 0.930/0.309 (lb5), 0.879/-0.206 (lb10). The min is NVDA, the cost-fragile outlier."
+  ],
+  "unverified": [
+    "The framework coin-flip null is price-independent and is NOT turnover-matched to the candidate; its net-of-cost medians are therefore not a clean cost benchmark. The candidate-vs-null 'beats' count fell at conservative cost (7-8/10) relative to zero/realistic (8-9/10) while absolute survival stayed 9/10, confirming the differential-turnover confound. The absolute net-of-cost candidate medians and the full-sample drag are the operative evidence.",
+    "The conservative level is a bounded 2x multiple of the realistic variable costs, not an exhaustive cost frontier; the break-even multiple beyond which the edge would be erased was not mapped.",
+    "The per-fold log-return metric divides by an equity base that already contains prior-segment cost (a mild fold-base sensitivity); this was checked against the unambiguous full-sample drag and the two agree (realized drag ~1-2% of cumulative return), so it does not change the classification.",
+    "No live or production execution was performed; this is research/simulation only."
+  ],
+  "observed_effect": "The cost qualification is closed as COST_ROBUST rather than a threat: the admitted short-horizon momentum evidence survives the repository's realistic cost model and a 2x conservative stress on 9/10 assets at every lookback (3/5/10), with a realized full-sample cost drag of only ~1.1% (realistic) and ~2.2% (conservative). The mechanism is low turnover: constant-dollar sizing rebalances only the change in notional, so the per-bar traded notional is a small fraction of the position. NVDA is the sole cost-fragile outlier (already non-positive at zero cost; retained fraction 0.31 at lookback 5 conservative and -0.21 at lookback 10 conservative).",
+  "uncertainty_targeted": "Whether the short-horizon momentum edge survives conservative transaction-cost stress on the collected real-data universe.",
+  "uncertainty_reduced": "Substantially: the cost qualification is resolved as COST_ROBUST (9/10 assets survive realistic and 2x conservative costs at lookbacks 3/5/10; full-sample cost drag ~1.1%/~2.2%). Residual uncertainty is narrowed to NVDA's cost fragility and the framework null's turnover mismatch; neither changes the universe-level classification.",
+  "process_decision": "RETAIN",
+  "research_result": "SUPPORTED (cost-robust). The predeclared cost grid shows the short-horizon momentum edge survives conservative transaction-cost stress on the collected universe: 9/10 assets retain a strictly positive net-of-cost per-segment median at every cost level and lookback, the zero-cost column reproduces momentum_lookback_sweep_results.json exactly, and the full-sample realized cost drag is ~1.1% (realistic) / ~2.2% (2x conservative). The sole non-survivor (NVDA) was already non-positive at zero cost and is cost-fragile. The candidate momentum admission therefore remains qualified as cost-robust; the cost qualification that motivated this task is closed.",
+  "decision": "RETAIN",
+  "next": "Run task R-002 (predeclared holding-period sensitivity for the lookback-5 momentum signal) through the existing walk-forward/matched-null gate stack and independent verification.",
+  "candidate_tasks": [
+    {
+      "task_id": "R-006",
+      "role": "HIGHER_ORDER_OBJECTIVE",
+      "status": "OPEN",
+      "primary_question": "Does a turnover-matched cost null change the universe-level cost-robustness classification of the qualified momentum edge?",
+      "bottleneck": "The framework coin-flip null is not turnover-matched, so candidate-vs-null cost comparisons are confounded by differential trading.",
+      "objective": "Build a turnover-matched null (same per-bar traded-notional profile as the candidate) and re-evaluate the momentum cost-robustness classification against it.",
+      "scope": "Existing 10-asset universe, existing cost model, existing walk-forward/regime framework; one predeclared null construction.",
+      "out_of_scope": "Do not tune the signal, expand the universe, add leverage, or change the cost model.",
+      "deliverable": "A reproducible artifact and independent verification classifying whether the turnover-matched null changes the momentum cost verdict.",
+      "success_criterion": "The turnover-matched null either confirms or changes the COST_ROBUST classification, with independent verification.",
+      "stop_condition": "Stop after the turnover-matched null is evaluated at the realistic and conservative cost levels and independently checked.",
+      "verification_requirement": "Leakage gate, matched null, independent recomputation, determinism, regression suite.",
+      "evidence_basis": "This activation found the framework coin-flip null is not turnover-matched; the candidate-vs-null beats count fell at conservative cost while absolute survival stayed 9/10.",
+      "expected_information_gain": "MEDIUM",
+      "downstream_leverage": "MEDIUM",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "effort": "MEDIUM",
+      "complexity": "MEDIUM",
+      "execution_risk": "LOW",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "NONE",
+  "failure_class": "NONE",
+  "task_selection_observation": "IMPROVED"
+}
