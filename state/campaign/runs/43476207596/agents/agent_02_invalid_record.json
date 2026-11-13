@@ -1,0 +1,65 @@
+{
+  "action": "Wrote and executed research/checks/momentum_cost_sensitivity.py over the 10-asset collected universe: cost grid {zero, realistic, 2x, 4x} x the existing realistic cost model (commission_per_trade=2.0, commission_per_share=0.003, slippage_cents=2.0, slippage_proportional=0.0005), lookbacks 3/5/10, each level vs a matched coin-flip null, for (A) the admitted candidate exactly as implemented and (B) a defect-repair diagnostic implementing the documented previous-lookback-day-return hypothesis. Wrote and executed an independent verifier (fresh walk_forward + noise_benchmark, cross-consistency vs momentum_lookback_sweep_results.json, classification reproducibility, determinism).",
+  "agent_number": 2,
+  "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; execution-cost robustness is decision-relevant, and the admitted candidate's actual signal semantics were unverified.",
+  "campaign_slot": 2,
+  "candidate_tasks": [
+    {
+      "agent_number": 2,
+      "bottleneck": "The per-asset momentum and mean-reversion evidence base is invalid: both signals are constant long/short due to a mean-log-price vs return defect, so the SUPPORTED momentum and FALSIFIED reversal verdicts do not test the documented hypotheses.",
+      "campaign_slot": 2,
+      "deliverable": "Repaired signal functions + unit tests + re-run momentum (lookback 3/5/10) and reversal cells with cost grid and independent verifier.",
+      "evidence_basis": "This activation's verified defect finding and cost-sensitivity artifact.",
+      "global_agent_number": 2,
+      "objective": "Repair momentum_signals/mean_reversion_signals to compute the previous lookback-day return, add unit tests, and re-run the momentum and mean-reversion cells through the full gate stack with the cost grid.",
+      "out_of_scope": "Do not change the universe, walk-forward parameters, cost model, or verdict thresholds; do not tune to obtain a positive result.",
+      "primary_question": "Does a correctly implemented short-horizon momentum (and reversal) signal show a robust edge on the collected universe, and does it survive realistic costs?",
+      "role": "HIGHER_ORDER_OBJECTIVE",
+      "scope": "research/backtest/regime_stability.py, tests/, research/checks/momentum*.py, research/checks/mean_reversion.py and their verifiers.",
+      "stop_condition": "Stop after the repaired cells are re-run and independently verified, regardless of outcome.",
+      "success_criterion": "Repaired signals demonstrably track the previous lookback-day return; cells re-run and independently verified; prior invalid verdicts corrected in durable state.",
+      "task_id": "R-002",
+      "tests_preceding_process": true,
+      "verification_requirement": "Unit tests for the repaired signals, real-data preflight, leakage gate, independent recomputation, determinism, and the existing regression suite."
+    }
+  ],
+  "changed": [
+    "research/checks/momentum_cost_sensitivity.py (new: cost-sensitivity check + artifact)",
+    "research/checks/verify_momentum_cost_sensitivity.py (new: independent verifier)",
+    "state/check_artifacts/momentum_cost_sensitivity_results.json (new: artifact)",
+    "state/STATE.md (appended a durable correction section for the momentum/reversal signal defect)",
+    "state/LEARNING_STATE.md (corrected the momentum/reversal frontier rows and next action)",
+    "logs/ACTIVATION-2026-11-13.md (appended this activation record)",
+    "state/worker_progress.md (semantic checkpoint)",
+    "state/campaign/runs/43476207596/agents/agent_02.json (this record)"
+  ],
+  "complexity_added": "MODERATE - two new deterministic check files (cost-sensitivity check + independent verifier) and one artifact; no framework, test, or existing-check modification. The durable correction to STATE.md/LEARNING_STATE.md records a verified defect in existing signal functions.",
+  "decision": "VERIFIED_NEGATIVE_RESULT",
+  "failure_class": "NONE",
+  "global_agent_number": 2,
+  "next": "Repair research/backtest/regime_stability.py::momentum_signals and ::mean_reversion_signals to use the actual previous lookback-day return (log(close[i]) - log(close[i-lookback])), add unit tests asserting the sign tracks the return and is lookback-dependent, then re-run the momentum and mean-reversion frontier cells (including the cost grid) through the gate stack with a fresh independent verifier.",
+  "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null; classify cost robustness.",
+  "observed_effect": "The cost-sensitivity check is reproducible and independently verified, but its dominant finding is a research-integrity correction rather than a cost number: the admitted 'momentum edge' is not a momentum signal. research/backtest/regime_stability.py::momentum_signals computes mean(log(price)) over the lookback window (always positive for adjusted close > 1) and takes its sign, so it is a constant LONG on every bar independent of lookback; mean_reversion_signals is the same defect with the opposite sign (constant SHORT). Consequences: (1) the prior 'momentum SUPPORTED 7/10 REGIME_STABLE' result is a constant-long equity-beta/drift bet, not a momentum anomaly; (2) the prior 'reversal FALSIFIED' result is a constant-short, and the reported -0.99 momentum/reversal correlation is trivially -1; (3) lookback 3/5/10 'robustness' is vacuous (identical signal at every lookback, hence identical medians). Cost classification: the constant-long candidate is COST_ROBUST 7/10 at all lookbacks (low 3.81x turnover, medians essentially unchanged from zero to 4x cost) because it is beta, not because momentum survives costs; a correctly implemented short-horizon momentum signal (previous lookback-day return, ~105x turnover) shows NO robust positive edge at zero cost (NO_EDGE 10/10 at every lookback) and is cost-fragile where marginally positive.",
+  "process_decision": "RETAIN",
+  "question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+  "research_result": "VERIFIED NEGATIVE / REFRAMING RESULT. Cost-sensitivity artifact + independent verifier classify cost robustness for lookback 3/5/10. Finding: research/backtest/regime_stability.py::momentum_signals (and ::mean_reversion_signals) do not implement the documented 'previous N-day return' hypothesis; they compute the mean log PRICE, which is always positive for these adjusted-close series, so the signal is a constant long (all 4460 non-neutral bars +1) and the reversal signal a constant short. The previously admitted momentum SUPPORTED (7/10 REGIME_STABLE) and reversal FALSIFIED verdicts therefore describe constant long/short (equity beta / drift), not momentum/reversal; the lookback 3/5/10 robustness is vacuous. On cost: the constant-long candidate is COST_ROBUST 7/10 (AAPL, MSFT, GOOGL, AMZN, META, TSLA, JPM) at every lookback (medians ~+0.05..+0.13, essentially unchanged from zero to 4x cost; 3.81x annualized turnover) and NO_EDGE for NVDA/JNJ/XOM; a corrected return-based momentum diagnostic (105x turnover) is NO_EDGE 10/10 at every lookback at zero cost and cost-fragile. Independent verifier: all four gates MATCH (fresh walk_forward+noise_benchmark; cross-consistency vs momentum_lookback_sweep_results.json on all 10 tickers; classification reproducibility; determinism). Primary question answered: the short-horizon momentum edge does not survive cost stress because, as implemented and as corrected, there is no robust short-horizon momentum edge on this universe; the prior positive evidence is an artifact of the signal defect.",
+  "role": "HIGHER_ORDER_OBJECTIVE",
+  "task_id": "R-001",
+  "task_selection_observation": "IMPROVED",
+  "uncertainty_reduced": "Resolved the primary question decisively: there is no short-horizon momentum edge to survive cost stress. The admitted positive candidate is a constant-long beta bet (verified implementation defect), which is cost-robust only because it is low turnover; the corrected momentum signal has no robust positive edge and is cost-fragile. This also resolves why the prior lookback-robustness result was degenerate and invalidates the per-asset momentum/reversal evidence base pending re-test.",
+  "uncertainty_targeted": "Whether the short-horizon momentum edge survives conservative transaction-cost stress on the collected real-data universe.",
+  "unverified": [
+    "No wall-clock timestamps beyond the runner message time (the date shell form is denied); start anchored to 2026-11-13T18:00:12Z, no backfilled timestamps.",
+    "The corrected return-based momentum signal is a diagnostic defined and run only inside this check; it has not been added to research/backtest/regime_stability.py nor unit-tested, and the momentum/reversal cells have not been re-run end-to-end with it (that is the next task).",
+    "A correctly implemented momentum/reversal signal may still show an edge at some horizon/cost; this activation only establishes that the shipped implementation is degenerate and that the corrected daily-rebalance signal has no robust positive edge on this universe."
+  ],
+  "verified": [
+    "research/data/preflight.py: PREFLIGHT PASSED (all 10 tickers, 57+ checks incl. known-gaps audit).",
+    "research/checks/momentum_cost_sensitivity.py executed end-to-end; determinism r1 == r2 on the AMZN existing/lb5/realistic cell; artifact written.",
+    "research/checks/verify_momentum_cost_sensitivity.py: Gate 1 (fresh walk_forward + noise_benchmark, AMZN/JPM x both variants x lookbacks 3/5/10 x all cost levels) MATCH; Gate 2 (existing zero-cost lookback-5 column vs momentum_lookback_sweep_results.json, all 10 tickers) MATCH; Gate 3 (all variant x lookback x asset cost-robustness classifications reproduce) MATCH; Gate 4 (determinism) identical.",
+    "python3 -m unittest discover -s tests -q: 168 tests OK after adding the two check files.",
+    "Empirical confirmation of the implementation defect: bt.momentum_signals emits weight +1 on 4460/4460 non-neutral bars (0 short) for AAPL/AMZN/JPM/XOM regardless of lookback; bt.mean_reversion_signals emits weight -1 on all non-neutral bars; a corrected return-based momentum signal flips ~800-900 times over ~4.5k bars.",
+    "Cost-robustness classification (existing candidate, all lookbacks identical): COST_ROBUST=7 (AAPL, MSFT, GOOGL, AMZN, META, TSLA, JPM), NO_EDGE_AT_ZERO_COST=3 (NVDA, JNJ, XOM). Corrected momentum: NO_EDGE_AT_ZERO_COST=10/10 at every lookback.",
+    "Turnover diagnostic (AMZN, lb5, full sample): existing 3.81x annualized turnover / $21,055 realistic commission / +5.518 total return; corrected 105.28x / $284,746 / -1.178."
+  ]
+}
