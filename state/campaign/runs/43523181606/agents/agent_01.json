@@ -1,0 +1,63 @@
+{
+  "agent_number": 1,
+  "campaign_slot": 1,
+  "global_agent_number": 1,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-001",
+  "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+  "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+  "question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+  "action": "Audited the durable selector evidence without changing any process or controller code. Read LEARNING_STATE (frontier table + recent learning history), STATE activation records, state/campaign/task_queue.json, campaign_controller.py (task_rank + select_task), campaign_status.json, activation_status.json, and the runs directory. Distinguished two selector generations: (A) the worker-era frontier-first discipline recorded in LEARNING_STATE and (B) the new controller ordinal task_rank that assigned this campaign's tasks. Traced the 'no equivalent re-test' evidence to generation A, and established that generation B has zero completed-agent outcomes (this is agent 1 of the first campaign).",
+  "changed": [
+    "state/campaign/runs/43523181606/agents/agent_01.json (this durable handoff record; no process/code/tooling change)",
+    "state/worker_progress.md (phase/milestone advanced to reflect the recorded process judgment)"
+  ],
+  "verified": [
+    "Inspected state/LEARNING_STATE.md lines 5-13 and 42-59: the frontier-first selection delta is recorded RETAIN(verified) with a clean ordering and six consecutive frontier cells (mean reversion 37263008074, cross-sectional relative strength 37304873966, volatility targeting 37314710995, momentum 37318950814, momentum lookback sweep 37361000967, longer-horizon momentum 37394344201, breakout 37414038601) each closed with a decisive, independently-verified verdict and no equivalent re-test.",
+    "Inspected state/LEARNING_STATE.md line 51: the opportunistic-queue baseline is documented (activation 37260572520 - 'the objective came from the queued receipt item rather than a frontier cell'; process-level delta UNVERIFIED), confirming the pre-delta comparison point.",
+    "Inspected .github/scripts/campaign_controller.py: the only selector is task_rank (lines 206-218) + candidate_tasks_for_role/select_task (lines 221-311); it is an ordinal qualitative ordering over (expected_information_gain, downstream_leverage, falsification_power, verifiability, effort, complexity, execution_risk, task_id), not a numeric reward score.",
+    "Verified the controller selected P-001 for agent 1 by that ranking: among the six OPEN LEARNING_PROCESS tasks (P-001..P-006), P-001 uniquely combines HIGH expected_information_gain, HIGH falsification_power and all-LOW cost, so it sorts first; this is consistent with the recorded selection_history in campaign_status.json (compared_against [P-001,P-002,P-004,P-003,P-006]).",
+    "Inspected state/campaign/runs/43523181606/campaign_status.json: completed_agents=[] and phase=AGENT_01_SELECTED; glob of state/campaign/runs/**/agents/agent_*.json returns only agent_01_contract.json and agent_01_before.json, i.e. this is the first campaign and the controller selector has zero completed-agent outcomes.",
+    "Inspected .github/scripts/validate_campaign_agent.py and evaluate_research_process.py to confirm this record conforms to controller schema (required fields, canonical decision/process_decision/task_selection_observation/failure_class values, list fields, single-line next, candidate_tasks passing validate_task)."
+  ],
+  "unverified": [
+    "The controller ordinal task_rank selector's own incremental effect on information flow: no campaign agent has completed under it yet (run 43523181606 is at agent 1 of 10), so no completed-agent outcome evidence exists; the durable support attaches to the worker-era frontier-first discipline, a different mechanism.",
+    "No quantitative counterfactual exists for the opportunistic-queue period; 'no equivalent re-tests' is attributed to the worker frontier-first discipline rather than directly to the controller's ordinal implementation, and the comparison is qualitative.",
+    "Borderline REGIME_STABLE verdicts in prior momentum/breakout cells sit near the framework's 0.05 noise band and remain threshold-sensitive (carried forward from prior activations; not re-tested in this audit)."
+  ],
+  "observed_effect": "Concrete evidence-backed finding: the frontier-first selection PRINCIPLE has durable support - six consecutive frontier cells were each closed with a decisive, independently-verified verdict and no equivalent re-test, versus the documented opportunistic-queue baseline where the process delta was UNVERIFIED. The controller ordinal task_rank faithfully formalizes that principle and selected a defensible highest-value task (P-001) for agent 1, but because this is the first campaign with zero completed agents, the controller selector's own incremental learning-efficiency benefit is NOT yet observed and must not be claimed as demonstrated. No equivalent re-test was found in the frontier table (the momentum lookback/horizon extensions carry new diagnostic purpose, permitted by learning rule 2). Campaign-liveness note (recorded, not acted on): only four OPEN HIGHER_ORDER_OBJECTIVE tasks exist (R-001,R-002,R-003,R-005; R-004 RESOLVED) for five even-agent slots, so a later even agent may find no OPEN task unless candidate_tasks supply one.",
+  "uncertainty_targeted": "Whether the current controller focused-task selector improves learning efficiency relative to the repository's prior opportunistic task choice.",
+  "uncertainty_reduced": "Partially. The audit establishes that the durable 'cells closed without re-tests' evidence attaches to the frontier-first selection principle (worker-era), not yet to the controller's ordinal implementation; and that the controller selector has zero completed-agent evidence, so its incremental benefit cannot be asserted. This prevents the next agents from over-claiming the controller selector 'works' before campaign evidence exists and correctly attributes the durable support to the principle.",
+  "process_decision": "RETAIN",
+  "research_result": "Process judgment (no market/research claim): retain the frontier-first selection discipline; classify the controller ordinal selector's incremental information-flow benefit as UNVERIFIED pending completed campaign-agent outcomes. No process, code, or tooling change was made.",
+  "decision": "RETAIN",
+  "next": "After at least three campaign agents have completed, re-run this selector audit by comparing each controller-selected task against the frontier-first baseline (did it close a distinct unresolved cell without an equivalent re-test?) to convert the controller selector's effect from UNVERIFIED to a classified judgment.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-007",
+      "role": "LEARNING_PROCESS",
+      "status": "OPEN",
+      "primary_question": "Do controller-selected tasks close distinct frontier cells without equivalent re-tests once at least three campaign agents have completed?",
+      "bottleneck": "The controller ordinal selector's information-flow benefit is UNVERIFIED until completed campaign-agent outcomes exist.",
+      "objective": "Compare completed controller-selected tasks against the frontier-first baseline to classify the controller selector's effect.",
+      "scope": "Use completed agent_*.json records and the frontier/queue state only; no new experiments.",
+      "out_of_scope": "Do not modify controller code, add a numeric reward score, or start new research experiments.",
+      "deliverable": "A classified judgment (IMPROVED / UNCHANGED / WORSENED / UNVERIFIED) for the controller selector with per-agent evidence.",
+      "success_criterion": "Each completed agent is classified as closing a distinct cell without an equivalent re-test, or the shortfall is documented as UNVERIFIED.",
+      "stop_condition": "Stop once at least three completed agent records are classified or the evidence is clearly insufficient.",
+      "verification_requirement": "Controller-side schema validation plus direct inspection of the cited agent_*.json and frontier records.",
+      "evidence_basis": "P-001 established that the controller selector has zero completed-agent evidence at agent 1; this task supplies that evidence later in the campaign.",
+      "expected_information_gain": "HIGH",
+      "downstream_leverage": "HIGH",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "effort": "LOW",
+      "complexity": "LOW",
+      "execution_risk": "LOW",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "none (no process, code, or tooling change; only the durable handoff record and worker progress were written)",
+  "failure_class": "NONE",
+  "task_selection_observation": "UNCHANGED"
+}
