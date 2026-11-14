@@ -1,0 +1,1335 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+[0m→ [0mRead state/campaign/runs/43548892244
+[0m
+[0m$ [0mls
+AGENTS.md
+ENTERPRISE.md
+LEARNING_EFFICIENCY.md
+MANUAL_SETUP.md
+PERSISTENCE_POLICY.md
+README.md
+REPOSITORY_PLAYBOOK.md
+append_activation_log.py
+check_adjacent.py
+check_compile.py
+check_compile2.py
+check_determinism.py
+check_determinism_nvda.py
+check_determinism_real_data.py
+check_determinism_universe.py
+check_exports.py
+check_gaps.py
+check_json1.py
+check_network.py
+debug_diff.py
+debug_holidays.py
+debug_stress.py
+debug_sweep.py
+debug_ts.py
+debug_ts2.py
+debug_ts3.py
+debug_yahoo.py
+debug_yahoo2.py
+diag_fold_detail.py
+diag_mom_vs_rev.py
+diag_null.py
+diag_null2.py
+diag_null3.py
+diag_null4.py
+diag_null5.py
+diag_null6.py
+dump_artifact.py
+examples
+log_append.py
+logs
+probe_env.py
+probe_hosts.py
+probe_manifest.py
+probe_mean_reversion_artifact.py
+probe_stooq.py
+probe_yahoo.py
+probe_yahoo3.py
+read_env.py
+repro_engine.py
+repro_engine2.py
+research
+scratch
+smoke_csrs.py
+state
+test_loader_tmp.py
+test_segment_merge.py
+test_timer.py
+test_write.py
+tests
+tmp_art.py
+tmp_artifact_check.py
+tmp_cleanup.py
+tmp_edit_ls.py
+tmp_json_check.py
+tmp_read.py
+tmp_read2.py
+tmp_read3.py
+update_manifest_gaps.py
+validate_receipt.py
+verify_json.py
+verify_perfold.py
+[0m
+[0m✗ [0mls research; echo ---; ls research/checks | head -50; echo ---; ls state; echo ---; ls state/campaign failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m→ [0mRead state/worker_progress.md
+[0m→ [0mRead state
+[0m→ [0mRead research
+[0m→ [0mRead state/campaign
+[0m→ [0mRead research/checks
+[0m→ [0mRead research/backtest
+[0m→ [0mRead research/data
+[0m→ [0mRead research/checks/momentum.py
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py
+[0m✱ [0mGrep "cost|slippage|fee|commission"[90m in research · 39 matches[0m
+[0m→ [0mRead research/backtest/engine.py
+[0m✱ [0mGrep "slippage_cents|commission_per_trade|slippage_proportional|BacktestConfig\("[90m in . · 100 matches[0m
+[0m✱ [0mGrep "cost_sens|cost_sensitivity|cost stress|cost-stress|realistic cost"[90m in . · 25 matches[0m
+[0m✱ [0mGrep "slippage|commission|10 bps|bps"[90m in . · 10 matches[0m
+[0m✗ [0mwc -l state/LEARNING_STATE.md failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m
+[0m$ [0mpython3 --version
+Python 3.12.3
+[0m
+[0m→ [0mRead state/LEARNING_STATE.md
+[0m→ [0mRead research/backtest/regime_stability.py
+[0m✱ [0mGrep "def noise_benchmark"[90m in research/backtest/perturbation.py · 1 match[0m
+[0m→ [0mRead research/checks/verify_momentum_lookback_sweep.py
+[0m→ [0mRead state/check_artifacts/momentum_lookback_sweep_results.json[90m [limit=80][0m
+[0m✗ [0mpython3 -c "import sys; sys.path.insert(0,'.'); import research.backtest as bt; bars,_=bt.load_ticker('AAPL'); c=bars.closes_array(); import numpy as np; s={lb: np.array([x.weight for x in bt.momentum_signals(c, lb)]) for lb in (3,5,10,20,60)}; print({lb: float(np.mean(v!=0)) for lb,v in s.items()}); print('agree 3-5', float(np.mean(s[3]==s[5])), 'agree 3-10', float(np.mean(s[3]==s[10])), 'agree 5-20', float(np.mean(s[5]==s[20])), 'agree 20-60', float(np.mean(s[20]==s[60])))" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python3 -c *","action":"deny","source":"project"}
+[0m
+[0m← [0mWrite scratch/probe_signal_agreement.py
+Wrote file successfully.
+[0m
+[0m← [0mEdit scratch/probe_signal_agreement.py
+Index: /home/runner/work/X/X/scratch/probe_signal_agreement.py
+===================================================================
+--- /home/runner/work/X/X/scratch/probe_signal_agreement.py
++++ /home/runner/work/X/X/scratch/probe_signal_agreement.py
+@@ -33,10 +33,10 @@
+             print("  lookback {:2d}: long_share={:.3f} short_share={:.3f} neutral={}".format(
+                 lb, float(np.mean(w > 0)), float(np.mean(w < 0)),
+                 int(np.sum(w == 0))))
+         for a, b in ((3, 5), (3, 10), (5, 10), (5, 20), (20, 60)):
+-            print("  agree {}({}) vs {}({}): {:.4f}".format(
+-                a, LOOKBACKS[a - 1] if False else "", b, "", float(np.mean(sig[a] == sig[b]))))
++            print("  agree lookback {} vs {}: {:.4f}".format(
++                a, b, float(np.mean(sig[a] == sig[b]))))
+     return 0
+ 
+ 
+ if __name__ == "__main__":
+
+[0m
+[0m$ [0mpython3 scratch/probe_signal_agreement.py
+AAPL n_bars 4465
+  lookback  3: long_share=0.999 short_share=0.000 neutral=3
+  lookback  5: long_share=0.999 short_share=0.000 neutral=5
+  lookback 10: long_share=0.998 short_share=0.000 neutral=10
+  lookback 20: long_share=0.996 short_share=0.000 neutral=20
+  lookback 60: long_share=0.987 short_share=0.000 neutral=60
+  agree lookback 3 vs 5: 0.9996
+  agree lookback 3 vs 10: 0.9984
+  agree lookback 5 vs 10: 0.9989
+  agree lookback 5 vs 20: 0.9966
+  agree lookback 20 vs 60: 0.9910
+AMZN n_bars 4465
+  lookback  3: long_share=0.999 short_share=0.000 neutral=3
+  lookback  5: long_share=0.999 short_share=0.000 neutral=5
+  lookback 10: long_share=0.998 short_share=0.000 neutral=10
+  lookback 20: long_share=0.996 short_share=0.000 neutral=20
+  lookback 60: long_share=0.987 short_share=0.000 neutral=60
+  agree lookback 3 vs 5: 0.9996
+  agree lookback 3 vs 10: 0.9984
+  agree lookback 5 vs 10: 0.9989
+  agree lookback 5 vs 20: 0.9966
+  agree lookback 20 vs 60: 0.9910
+JPM n_bars 4465
+  lookback  3: long_share=0.999 short_share=0.000 neutral=3
+  lookback  5: long_share=0.999 short_share=0.000 neutral=5
+  lookback 10: long_share=0.998 short_share=0.000 neutral=10
+  lookback 20: long_share=0.996 short_share=0.000 neutral=20
+  lookback 60: long_share=0.987 short_share=0.000 neutral=60
+  agree lookback 3 vs 5: 0.9996
+  agree lookback 3 vs 10: 0.9984
+  agree lookback 5 vs 10: 0.9989
+  agree lookback 5 vs 20: 0.9966
+  agree lookback 20 vs 60: 0.9910
+JNJ n_bars 4465
+  lookback  3: long_share=0.999 short_share=0.000 neutral=3
+  lookback  5: long_share=0.999 short_share=0.000 neutral=5
+  lookback 10: long_share=0.998 short_share=0.000 neutral=10
+  lookback 20: long_share=0.996 short_share=0.000 neutral=20
+  lookback 60: long_share=0.987 short_share=0.000 neutral=60
+  agree lookback 3 vs 5: 0.9996
+  agree lookback 3 vs 10: 0.9984
+  agree lookback 5 vs 10: 0.9989
+  agree lookback 5 vs 20: 0.9966
+  agree lookback 20 vs 60: 0.9910
+[0m
+[0m✱ [0mGrep "def load_ticker"[90m in research/backtest · 1 match[0m
+[0m→ [0mRead research/backtest/real_data.py[90m [limit=31][0m
+[0m
+[0m← [0mWrite scratch/probe_closes.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 scratch/probe_closes.py
+AAPL n 4465 first [2.714299 2.828853 2.782194] last [333.019989 330.320007 333.690002]
+  dates ['2009-01-02', '2009-01-05'] ['2026-10-01', '2026-10-02']
+  weights first 10 [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0] counts {0.0: 3, 1.0: 4462}
+  close diffs sign counts {-1: 2080, 0: 8, 1: 2376}
+JPM n 4465 first [20.480757 19.108831 19.520403] last [330.829987 333.179993 332.380005]
+  dates ['2009-01-02', '2009-01-05'] ['2026-10-01', '2026-10-02']
+  weights first 10 [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0] counts {0.0: 3, 1.0: 4462}
+  close diffs sign counts {-1: 2122, 0: 21, 1: 2321}
+JNJ n 4465 first [36.088642 35.731609 35.517406] last [264.73999  258.660004 256.029999]
+  dates ['2009-01-02', '2009-01-05'] ['2026-10-01', '2026-10-02']
+  weights first 10 [0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0] counts {0.0: 3, 1.0: 4462}
+  close diffs sign counts {-1: 2114, 0: 27, 1: 2323}
+[0m
+[0m← [0mWrite scratch/time_cost_probe.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 scratch/time_cost_probe.py
+AAPL: 0.14s folds=28 segments=['turbulent', 'calm', 'turbulent', 'calm'] medians=[0.071, 0.054, 0.092, 0.069]
+AMZN: 0.14s folds=28 segments=['turbulent', 'calm', 'turbulent'] medians=[0.065, 0.076, 0.077]
+[0m
+[0m← [0mWrite scratch/probe_cost_effect.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 scratch/probe_cost_effect.py
+=== signal composition over the collected universe (lookback 5) ===
+  AAPL   n=4465 min_close=2.3389 long=0.9989 short=0.0000 neutral=5
+  MSFT   n=4465 min_close=11.0683 long=0.9989 short=0.0000 neutral=5
+  GOOGL  n=4465 min_close=7.0091 long=0.9989 short=0.0000 neutral=5
+  AMZN   n=4465 min_close=2.4220 long=0.9989 short=0.0000 neutral=5
+  META   n=3614 min_close=17.5618 long=0.9986 short=0.0000 neutral=5
+  NVDA   n=4465 min_close=0.1649 long=0.5841 short=0.4148 neutral=5
+  TSLA   n=4091 min_close=1.0533 long=0.9988 short=0.0000 neutral=5
+  JPM    n=4465 min_close=10.3874 long=0.9989 short=0.0000 neutral=5
+  JNJ    n=4465 min_close=27.9584 long=0.9989 short=0.0000 neutral=5
+  XOM    n=4465 min_close=23.6703 long=0.9989 short=0.0000 neutral=5
+
+=== cost effect on segment medians (AMZN, lookback 5) ===
+  zero: [0.065397, 0.076361, 0.076947]
+  1x  : [0.065386, 0.076372, 0.076917]
+  5x  : [0.065341, 0.076417, 0.076796]
+
+=== full-sample total return / turnover (AMZN, lookback 5) ===
+  zero: total_return=+5.5373 mean_turnover_per_bar=1.5107% total_cost=0 (0.0000% of capital over 4465 bars)
+  1x  : total_return=+5.5184 mean_turnover_per_bar=1.5133% total_cost=21055 (2.1055% of capital over 4465 bars)
+  5x  : total_return=+5.4429 mean_turnover_per_bar=1.5235% total_cost=105276 (10.5276% of capital over 4465 bars)
+[0m
+Now I'll write the contracted cost-sensitivity check. The signal-composition probe already exposed a material implementation defect, which the check will document as a diagnostic rather than silently repair.
+[0m← [0mWrite research/checks/momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review under the realistic cost model (AMZN, JPM) ===
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 316, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 208, in main
+    bt.check_signal_integrity(signals, dates, warmup=0)
+  File "/home/runner/work/X/X/research/backtest/leakage.py", line 33, in check_signal_integrity
+    bar_dates = [int(d) for d in bar_dates]
+                 ^^^^^^
+ValueError: invalid literal for int() with base 10: '2009-01-02'
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -201,12 +201,12 @@
+     return 1
+ 
+ print("\n=== 3. Leakage review under the realistic cost model (AMZN, JPM) ===")
+ for ticker in ("AMZN", "JPM"):
+-    bars, dates = bt.load_ticker(ticker)
++    bars, _dates = bt.load_ticker(ticker)
+     closes = bars.closes_array()
+     signals = bt.momentum_signals(closes, lookback=5)
+-    bt.check_signal_integrity(signals, dates, warmup=0)
++    bt.check_signal_integrity(signals, [b.date for b in bars], warmup=0)
+     res = bt.run_bars(list(bars), signals, cfg_for("1x"))
+     bt.check_equity_matches_fills(res.equity_curve, res.trades, closes, 1e6)
+     total_return = (res.equity_curve[-1] - 1e6) / 1e6
+     print(f"  {ticker}: {bars.n_bars} bars, signals {len(signals)}, leakage [PASS], "
+
+[0m
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review under the realistic cost model (AMZN, JPM) ===
+  AMZN: 4465 bars, signals 4465, leakage [PASS], costed total_return +5.518
+  JPM: 4465 bars, signals 4465, leakage [PASS], costed total_return +3.904
+
+=== 4. Signal composition and definition diagnostic ===
+  (documents what the cost grid measures; no result is tuned from this)
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 316, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 227, in main
+    composition_by_lookback[str(lb)][ticker] = composition(closes, lb)
+                                               ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 140, in composition
+    both_defined = (implemented != 0) & (textbook != 0)
+                   ~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+ValueError: operands could not be broadcast together with shapes (4463,) (4462,)
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -130,9 +130,9 @@
+ w = np.array([s.weight for s in bt.momentum_signals(closes, lookback)], dtype=np.float64)
+ n = len(closes)
+ implemented = np.sign(
+     np.array([float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+-              for i in range(lookback - 1, n)])
++              for i in range(lookback, n)])
+ )
+ textbook = np.sign(
+     np.array([float(np.log(closes[i]) - np.log(closes[i - lookback]))
+               for i in range(lookback, n)])
+
+[0m
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review under the realistic cost model (AMZN, JPM) ===
+  AMZN: 4465 bars, signals 4465, leakage [PASS], costed total_return +5.518
+  JPM: 4465 bars, signals 4465, leakage [PASS], costed total_return +3.904
+
+=== 4. Signal composition and definition diagnostic ===
+  (documents what the cost grid measures; no result is tuned from this)
+  AAPL   lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4202 degenerate=True
+  MSFT   lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4208 degenerate=True
+  GOOGL  lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4316 degenerate=True
+  AMZN   lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4431 degenerate=True
+  META   lb5 long=0.9986 short=0.0000 neutral= 5 textbook_disagreement=0.4418 degenerate=True
+  NVDA   lb5 long=0.5841 short=0.4148 neutral= 5 textbook_disagreement=0.4566 degenerate=False
+  TSLA   lb5 long=0.9988 short=0.0000 neutral= 5 textbook_disagreement=0.4618 degenerate=True
+  JPM    lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4300 degenerate=True
+  JNJ    lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4472 degenerate=True
+  XOM    lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4578 degenerate=True
+
+=== 5. Cost grid: lookback x cost level x collected universe ===
+  cost levels: zero=zero, 1x={'commission_per_trade': 2.0, 'commission_per_share': 0.003, 'slippage_cents': 2.0, 'slippage_proportional': 0.0005}, 2x={'commission_per_trade': 4.0, 'commission_per_share': 0.006, 'slippage_cents': 4.0, 'slippage_proportional': 0.001}, 5x={'commission_per_trade': 10.0, 'commission_per_share': 0.015, 'slippage_cents': 10.0, 'slippage_proportional': 0.0025}
+  AAPL   lb3=COST_ROBUST lb5=COST_ROBUST lb10=NO_BASELINE_EDGE
+  MSFT   lb3=COST_ROBUST lb5=COST_ROBUST lb10=COST_ROBUST
+  GOOGL  lb3=COST_ROBUST lb5=COST_ROBUST lb10=COST_ROBUST
+  AMZN   lb3=COST_ROBUST lb5=COST_ROBUST lb10=COST_ROBUST
+  META   lb3=COST_ROBUST lb5=COST_ROBUST lb10=COST_ROBUST
+  NVDA   lb3=NO_BASELINE_EDGE lb5=NO_BASELINE_EDGE lb10=NO_BASELINE_EDGE
+  TSLA   lb3=COST_ROBUST lb5=COST_ROBUST lb10=COST_ROBUST
+  JPM    lb3=NO_BASELINE_EDGE lb5=NO_BASELINE_EDGE lb10=NO_BASELINE_EDGE
+  JNJ    lb3=NO_BASELINE_EDGE lb5=NO_BASELINE_EDGE lb10=NO_BASELINE_EDGE
+  XOM    lb3=NO_BASELINE_EDGE lb5=NO_BASELINE_EDGE lb10=NO_BASELINE_EDGE
+
+=== 6. Cost-robustness classification (predeclared rule) ===
+  lookback 3: {'COST_ROBUST': 6, 'COST_FRAGILE': 0, 'COST_ERASED': 0, 'NO_BASELINE_EDGE': 4}
+  lookback 5: {'COST_ROBUST': 6, 'COST_FRAGILE': 0, 'COST_ERASED': 0, 'NO_BASELINE_EDGE': 4}
+  lookback 10: {'COST_ROBUST': 5, 'COST_FRAGILE': 0, 'COST_ERASED': 0, 'NO_BASELINE_EDGE': 5}
+  per-asset lookback-5 class:
+    AAPL   COST_ROBUST      med 0/1x/2x/5x = 0.0699/0.0699/0.0699/0.0700 retention 1x/2x = 1.0003/1.0006 survives_5x=True
+    MSFT   COST_ROBUST      med 0/1x/2x/5x = 0.0618/0.0617/0.0617/0.0616 retention 1x/2x = 0.9994/0.9988 survives_5x=True
+    GOOGL  COST_ROBUST      med 0/1x/2x/5x = 0.0707/0.0707/0.0707/0.0707 retention 1x/2x = 1.0002/1.0003 survives_5x=True
+    AMZN   COST_ROBUST      med 0/1x/2x/5x = 0.0764/0.0764/0.0764/0.0764 retention 1x/2x = 1.0001/1.0003 survives_5x=True
+    META   COST_ROBUST      med 0/1x/2x/5x = 0.0673/0.0672/0.0672/0.0671 retention 1x/2x = 0.9994/0.9989 survives_5x=True
+    NVDA   NO_BASELINE_EDGE
+    TSLA   COST_ROBUST      med 0/1x/2x/5x = 0.1075/0.1075/0.1075/0.1076 retention 1x/2x = 1.0002/1.0003 survives_5x=True
+    JPM    NO_BASELINE_EDGE
+    JNJ    NO_BASELINE_EDGE
+    XOM    NO_BASELINE_EDGE
+
+=== 7. Determinism (AMZN lookback 5 at 1x, recomputed) ===
+  r1 == r2: True
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Cost sensitivity of the implemented momentum candidate: exploratory simulation.
+[0m
+[0m← [0mWrite research/checks/verify_momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 research/checks/verify_momentum_cost_sensitivity.py
+=== Gate 0: signal composition recomputed from a fresh path ===
+  AAPL   lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  AAPL   lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  AAPL   lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  MSFT   lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  MSFT   lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  MSFT   lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  GOOGL  lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  GOOGL  lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  GOOGL  lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  AMZN   lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  AMZN   lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  AMZN   lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  META   lb 3 long=0.9992 short=0.0000 neutral= 3 -> MATCH
+  META   lb 5 long=0.9986 short=0.0000 neutral= 5 -> MATCH
+  META   lb10 long=0.9972 short=0.0000 neutral=10 -> MATCH
+  NVDA   lb 3 long=0.5845 short=0.4148 neutral= 3 -> MATCH
+  NVDA   lb 5 long=0.5841 short=0.4148 neutral= 5 -> MATCH
+  NVDA   lb10 long=0.5834 short=0.4143 neutral=10 -> MATCH
+  TSLA   lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  TSLA   lb 5 long=0.9988 short=0.0000 neutral= 5 -> MATCH
+  TSLA   lb10 long=0.9976 short=0.0000 neutral=10 -> MATCH
+  JPM    lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  JPM    lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  JPM    lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  JNJ    lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  JNJ    lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  JNJ    lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  XOM    lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  XOM    lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  XOM    lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  degenerate_static_long at lookback 5: {'AAPL': True, 'MSFT': True, 'GOOGL': True, 'AMZN': True, 'META': True, 'NVDA': False, 'TSLA': True, 'JPM': True, 'JNJ': True, 'XOM': True} (count=9)
+
+=== Gate 1: fresh walk_forward + noise_benchmark (AMZN, NVDA) ===
+  AMZN   lb 3 zero -> MISMATCH
+    recomputed medians=[0.065397, 0.076361, 0.076947] nulls=[0.0601, 0.009463, -0.029929] verdict=REGIME_STABLE
+    published   medians=[0.065397, 0.076361, 0.076947] nulls=[0.0601, 0.009463, -0.029929] verdict=REGIME_STABLE
+  AMZN   lb 3 1x   -> MISMATCH
+    recomputed medians=[0.065386, 0.076372, 0.076917] nulls=[0.051893, 0.002673, -0.030914] verdict=REGIME_STABLE
+    published   medians=[0.065386, 0.076372, 0.076917] nulls=[0.051893, 0.002673, -0.030914] verdict=REGIME_STABLE
+  AMZN   lb 3 2x   -> MISMATCH
+    recomputed medians=[0.065375, 0.076383, 0.076887] nulls=[0.042968, -0.004451, -0.031915] verdict=REGIME_STABLE
+    published   medians=[0.065375, 0.076383, 0.076887] nulls=[0.042968, -0.004451, -0.031915] verdict=REGIME_STABLE
+  AMZN   lb 3 5x   -> MISMATCH
+    recomputed medians=[0.065341, 0.076417, 0.076796] nulls=[-0.007476, -0.015532, -0.035023] verdict=REGIME_STABLE
+    published   medians=[0.065341, 0.076417, 0.076796] nulls=[-0.007476, -0.015532, -0.035023] verdict=REGIME_STABLE
+  AMZN   lb 5 zero -> MISMATCH
+    recomputed medians=[0.065397, 0.076361, 0.076947] nulls=[-0.006863, -0.002178, 0.035658] verdict=REGIME_STABLE
+    published   medians=[0.065397, 0.076361, 0.076947] nulls=[-0.006863, -0.002178, 0.035658] verdict=REGIME_STABLE
+  AMZN   lb 5 1x   -> MISMATCH
+    recomputed medians=[0.065386, 0.076372, 0.076917] nulls=[-0.022341, -0.007225, 0.035279] verdict=REGIME_STABLE
+    published   medians=[0.065386, 0.076372, 0.076917] nulls=[-0.022341, -0.007225, 0.035279] verdict=REGIME_STABLE
+  AMZN   lb 5 2x   -> MISMATCH
+    recomputed medians=[0.065375, 0.076383, 0.076887] nulls=[-0.036517, -0.012455, 0.034893] verdict=REGIME_STABLE
+    published   medians=[0.065375, 0.076383, 0.076887] nulls=[-0.036517, -0.012455, 0.034893] verdict=REGIME_STABLE
+  AMZN   lb 5 5x   -> MISMATCH
+    recomputed medians=[0.065341, 0.076417, 0.076796] nulls=[-0.108858, -0.029348, 0.033701] verdict=REGIME_STABLE
+    published   medians=[0.065341, 0.076417, 0.076796] nulls=[-0.108858, -0.029348, 0.033701] verdict=REGIME_STABLE
+  AMZN   lb10 zero -> MISMATCH
+    recomputed medians=[0.065397, 0.076361, 0.076947] nulls=[-0.088547, -0.039925, 0.010572] verdict=REGIME_STABLE
+    published   medians=[0.065397, 0.076361, 0.076947] nulls=[-0.088547, -0.039925, 0.010572] verdict=REGIME_STABLE
+  AMZN   lb10 1x   -> MISMATCH
+    recomputed medians=[0.065386, 0.076372, 0.076917] nulls=[-0.107701, -0.041406, 0.009079] verdict=REGIME_STABLE
+    published   medians=[0.065386, 0.076372, 0.076917] nulls=[-0.107701, -0.041406, 0.009079] verdict=REGIME_STABLE
+  AMZN   lb10 2x   -> MISMATCH
+    recomputed medians=[0.065375, 0.076383, 0.076887] nulls=[-0.129608, -0.042905, 0.007568] verdict=REGIME_STABLE
+    published   medians=[0.065375, 0.076383, 0.076887] nulls=[-0.129608, -0.042905, 0.007568] verdict=REGIME_STABLE
+  AMZN   lb10 5x   -> MISMATCH
+    recomputed medians=[0.065341, 0.076417, 0.076796] nulls=[0.025235, -0.075778, 0.002927] verdict=REGIME_STABLE
+    published   medians=[0.065341, 0.076417, 0.076796] nulls=[0.025235, -0.075778, 0.002927] verdict=REGIME_STABLE
+  NVDA   lb 3 zero -> MISMATCH
+    recomputed medians=[-0.038236, 0.012979, 0.10027] nulls=[-0.027799, 0.01277, 0.028854] verdict=REGIME_DEPENDENT
+    published   medians=[-0.038236, 0.012979, 0.10027] nulls=[-0.027799, 0.01277, 0.028854] verdict=REGIME_DEPENDENT
+  NVDA   lb 3 1x   -> MISMATCH
+    recomputed medians=[-0.063879, 0.012, 0.100282] nulls=[0.44173, 0.389181, 0.023201] verdict=REGIME_STABLE
+    published   medians=[-0.063879, 0.012, 0.100282] nulls=[0.44173, 0.389181, 0.023201] verdict=REGIME_STABLE
+  NVDA   lb 3 2x   -> MISMATCH
+    recomputed medians=[-0.088378, 0.010984, 0.100294] nulls=[0.339518, 0.29532, 0.016941] verdict=REGIME_STABLE
+    published   medians=[-0.088378, 0.010984, 0.100294] nulls=[0.339518, 0.29532, 0.016941] verdict=REGIME_STABLE
+  NVDA   lb 3 5x   -> MISMATCH
+    recomputed medians=[-0.143307, -0.022827, 0.10033] nulls=[0.31325, 0.245657, -0.000257] verdict=REGIME_STABLE
+    published   medians=[-0.143307, -0.022827, 0.10033] nulls=[0.31325, 0.245657, -0.000257] verdict=REGIME_STABLE
+  NVDA   lb 5 zero -> MISMATCH
+    recomputed medians=[-0.038236, 0.013467, 0.10027] nulls=[-0.108013, 0.031275, 0.000826] verdict=REGIME_STABLE
+    published   medians=[-0.038236, 0.013467, 0.10027] nulls=[-0.108013, 0.031275, 0.000826] verdict=REGIME_STABLE
+  NVDA   lb 5 1x   -> MISMATCH
+    recomputed medians=[-0.063879, 0.012459, 0.100282] nulls=[0.395566, 0.499298, -0.000123] verdict=REGIME_STABLE
+    published   medians=[-0.063879, 0.012459, 0.100282] nulls=[0.395566, 0.499298, -0.000123] verdict=REGIME_STABLE
+  NVDA   lb 5 2x   -> MISMATCH
+    recomputed medians=[-0.088378, 0.011411, 0.100294] nulls=[0.297971, 0.192844, -0.050954] verdict=REGIME_STABLE
+    published   medians=[-0.088378, 0.011411, 0.100294] nulls=[0.297971, 0.192844, -0.050954] verdict=REGIME_STABLE
+  NVDA   lb 5 5x   -> MISMATCH
+    recomputed medians=[-0.143307, -0.093406, 0.10033] nulls=[0.264464, 0.252284, -0.094356] verdict=REGIME_STABLE
+    published   medians=[-0.143307, -0.093406, 0.10033] nulls=[0.264464, 0.252284, -0.094356] verdict=REGIME_STABLE
+  NVDA   lb10 zero -> MISMATCH
+    recomputed medians=[-0.038236, 0.01425, 0.10027] nulls=[-0.032812, -0.07422, 0.010529] verdict=REGIME_STABLE
+    published   medians=[-0.038236, 0.01425, 0.10027] nulls=[-0.032812, -0.07422, 0.010529] verdict=REGIME_STABLE
+  NVDA   lb10 1x   -> MISMATCH
+    recomputed medians=[-0.063879, 0.013196, 0.100282] nulls=[0.508346, 0.487659, 0.009851] verdict=REGIME_STABLE
+    published   medians=[-0.063879, 0.013196, 0.100282] nulls=[0.508346, 0.487659, 0.009851] verdict=REGIME_STABLE
+  NVDA   lb10 2x   -> MISMATCH
+    recomputed medians=[-0.088378, -0.027655, 0.100294] nulls=[0.388052, 0.317764, 0.009164] verdict=REGIME_STABLE
+    published   medians=[-0.088378, -0.027655, 0.100294] nulls=[0.388052, 0.317764, 0.009164] verdict=REGIME_STABLE
+  NVDA   lb10 5x   -> MISMATCH
+    recomputed medians=[-0.143307, -0.093406, 0.10033] nulls=[0.32727, 0.264518, -0.10782] verdict=REGIME_STABLE
+    published   medians=[-0.143307, -0.093406, 0.10033] nulls=[0.32727, 0.264518, -0.10782] verdict=REGIME_STABLE
+
+=== Gate 2: zero-cost column vs momentum_lookback_sweep_results.json ===
+  AAPL   lb 3 -> MISMATCH
+  AAPL   lb 5 -> MISMATCH
+  AAPL   lb10 -> MISMATCH
+  MSFT   lb 3 -> MISMATCH
+  MSFT   lb 5 -> MISMATCH
+  MSFT   lb10 -> MISMATCH
+  GOOGL  lb 3 -> MISMATCH
+  GOOGL  lb 5 -> MISMATCH
+  GOOGL  lb10 -> MISMATCH
+  AMZN   lb 3 -> MISMATCH
+  AMZN   lb 5 -> MISMATCH
+  AMZN   lb10 -> MISMATCH
+  META   lb 3 -> MISMATCH
+  META   lb 5 -> MISMATCH
+  META   lb10 -> MISMATCH
+  NVDA   lb 3 -> MISMATCH
+  NVDA   lb 5 -> MISMATCH
+  NVDA   lb10 -> MISMATCH
+  TSLA   lb 3 -> MISMATCH
+  TSLA   lb 5 -> MISMATCH
+  TSLA   lb10 -> MISMATCH
+  JPM    lb 3 -> MISMATCH
+  JPM    lb 5 -> MISMATCH
+  JPM    lb10 -> MISMATCH
+  JNJ    lb 3 -> MISMATCH
+  JNJ    lb 5 -> MISMATCH
+  JNJ    lb10 -> MISMATCH
+  XOM    lb 3 -> MISMATCH
+  XOM    lb 5 -> MISMATCH
+  XOM    lb10 -> MISMATCH
+
+=== Gate 3: classification reproducibility from stored cells ===
+  AAPL   lb 3 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  AAPL   lb 5 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  AAPL   lb10 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  MSFT   lb 3 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  MSFT   lb 5 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  MSFT   lb10 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  GOOGL  lb 3 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  GOOGL  lb 5 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  GOOGL  lb10 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  AMZN   lb 3 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  AMZN   lb 5 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  AMZN   lb10 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  META   lb 3 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  META   lb 5 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  META   lb10 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  NVDA   lb 3 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  NVDA   lb 5 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  NVDA   lb10 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  TSLA   lb 3 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  TSLA   lb 5 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  TSLA   lb10 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  JPM    lb 3 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  JPM    lb 5 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  JPM    lb10 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  JNJ    lb 3 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  JNJ    lb 5 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  JNJ    lb10 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  XOM    lb 3 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  XOM    lb 5 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  XOM    lb10 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+
+=== Gate 4: determinism (AMZN lookback 5 at 1x, twice) ===
+  identical: True -> MATCH
+
+MISMATCH FOUND: the artifact does not reproduce via the independent path. Investigate before recording results.
+[0m
+[0m→ [0mRead research/backtest/perturbation.py[90m [limit=120, offset=284][0m
+[0m
+[0m← [0mWrite scratch/probe_null_monotonic.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 scratch/probe_null_monotonic.py
+NVDA lb3 segment turbulent bars=1056 seed=3042 weights={-1.0: 331, 0.0: 359, 1.0: 366}
+  zero folds=28 first5=[ 0.24372  0.02156 -0.03829 -0.26031 -0.22859]
+  1x   folds=28 first5=[0.72556 1.35622 1.39853 2.00933 1.10466] max_delta=+2.269637 n_higher=27 n_equal=0
+  5x   folds=28 first5=[0.44999 0.43207 0.34688 0.35373 0.28165] max_delta=+0.680928 n_higher=27 n_equal=0
+AMZN lb10 segment turbulent bars=1056 seed=10042 weights={-1.0: 341, 0.0: 334, 1.0: 381}
+  zero folds=28 first5=[-0.34776 -0.30524 -0.43961 -0.39506 -0.32164]
+  1x   folds=28 first5=[-0.48199 -0.45595 -0.72747 -0.59344 -0.50351] max_delta=+0.059856 n_higher=1 n_equal=0
+  5x   folds=28 first5=[-8.65996  4.23043  1.77202  4.22829  2.97338] max_delta=+4.623350 n_higher=6 n_equal=0
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -133,9 +133,10 @@
+                            train_window=TRAIN, test_window=TEST,
+                            warmup=0, overlap_window=0, periods_per_year=252,
+                            cfg=cfg(level))
+     nulls.append(round(float(null.baseline_median_log_return), 6))
+-    n_folds = len(res.folds)
++    if n_folds is None:
++        n_folds = len(res.folds)
+ cand_disp = round(float(np.std(np.array(medians))), 6)
+ null_disp = round(float(np.std(np.array(nulls))), 6)
+ return dict(medians=medians, null_medians=nulls,
+             candidate_dispersion=cand_disp, null_dispersion=null_disp,
+
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -227,9 +227,10 @@
+ pub = art["cells"][ticker][str(lb)]["zero"]
+ old = sweep["universe"]["per_asset"][ticker]["lookback_medians"][str(lb)]
+ old_null = sweep["universe"]["per_asset"][ticker]["lookback_null_medians"][str(lb)]
+ old_verdict = sweep["universe"]["per_asset"][ticker]["verdicts_5"] if lb == 5 else None
+-same = (pub["medians"] == old and pub["null_medians"] == old_null)
++same = ([round(v, 3) for v in pub["medians"]] == old
++        and [round(v, 3) for v in pub["null_medians"]] == old_null)
+ if lb == 5:
+     same = same and pub["verdict"] == old_verdict
+ if not same:
+     all_ok = False
+
+[0m
+[0m$ [0mpython3 research/checks/verify_momentum_cost_sensitivity.py
+=== Gate 0: signal composition recomputed from a fresh path ===
+  AAPL   lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  AAPL   lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  AAPL   lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  MSFT   lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  MSFT   lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  MSFT   lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  GOOGL  lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  GOOGL  lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  GOOGL  lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  AMZN   lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  AMZN   lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  AMZN   lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  META   lb 3 long=0.9992 short=0.0000 neutral= 3 -> MATCH
+  META   lb 5 long=0.9986 short=0.0000 neutral= 5 -> MATCH
+  META   lb10 long=0.9972 short=0.0000 neutral=10 -> MATCH
+  NVDA   lb 3 long=0.5845 short=0.4148 neutral= 3 -> MATCH
+  NVDA   lb 5 long=0.5841 short=0.4148 neutral= 5 -> MATCH
+  NVDA   lb10 long=0.5834 short=0.4143 neutral=10 -> MATCH
+  TSLA   lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  TSLA   lb 5 long=0.9988 short=0.0000 neutral= 5 -> MATCH
+  TSLA   lb10 long=0.9976 short=0.0000 neutral=10 -> MATCH
+  JPM    lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  JPM    lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  JPM    lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  JNJ    lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  JNJ    lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  JNJ    lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  XOM    lb 3 long=0.9993 short=0.0000 neutral= 3 -> MATCH
+  XOM    lb 5 long=0.9989 short=0.0000 neutral= 5 -> MATCH
+  XOM    lb10 long=0.9978 short=0.0000 neutral=10 -> MATCH
+  degenerate_static_long at lookback 5: {'AAPL': True, 'MSFT': True, 'GOOGL': True, 'AMZN': True, 'META': True, 'NVDA': False, 'TSLA': True, 'JPM': True, 'JNJ': True, 'XOM': True} (count=9)
+
+=== Gate 1: fresh walk_forward + noise_benchmark (AMZN, NVDA) ===
+  AMZN   lb 3 zero -> MATCH
+  AMZN   lb 3 1x   -> MATCH
+  AMZN   lb 3 2x   -> MATCH
+  AMZN   lb 3 5x   -> MATCH
+  AMZN   lb 5 zero -> MATCH
+  AMZN   lb 5 1x   -> MATCH
+  AMZN   lb 5 2x   -> MATCH
+  AMZN   lb 5 5x   -> MATCH
+  AMZN   lb10 zero -> MATCH
+  AMZN   lb10 1x   -> MATCH
+  AMZN   lb10 2x   -> MATCH
+  AMZN   lb10 5x   -> MATCH
+  NVDA   lb 3 zero -> MATCH
+  NVDA   lb 3 1x   -> MATCH
+  NVDA   lb 3 2x   -> MATCH
+  NVDA   lb 3 5x   -> MATCH
+  NVDA   lb 5 zero -> MATCH
+  NVDA   lb 5 1x   -> MATCH
+  NVDA   lb 5 2x   -> MATCH
+  NVDA   lb 5 5x   -> MATCH
+  NVDA   lb10 zero -> MATCH
+  NVDA   lb10 1x   -> MATCH
+  NVDA   lb10 2x   -> MATCH
+  NVDA   lb10 5x   -> MATCH
+
+=== Gate 2: zero-cost column vs momentum_lookback_sweep_results.json ===
+  AAPL   lb 3 -> MATCH
+  AAPL   lb 5 -> MATCH
+  AAPL   lb10 -> MATCH
+  MSFT   lb 3 -> MATCH
+  MSFT   lb 5 -> MATCH
+  MSFT   lb10 -> MATCH
+  GOOGL  lb 3 -> MATCH
+  GOOGL  lb 5 -> MATCH
+  GOOGL  lb10 -> MATCH
+  AMZN   lb 3 -> MATCH
+  AMZN   lb 5 -> MATCH
+  AMZN   lb10 -> MATCH
+  META   lb 3 -> MATCH
+  META   lb 5 -> MATCH
+  META   lb10 -> MATCH
+  NVDA   lb 3 -> MATCH
+  NVDA   lb 5 -> MATCH
+  NVDA   lb10 -> MATCH
+  TSLA   lb 3 -> MATCH
+  TSLA   lb 5 -> MATCH
+  TSLA   lb10 -> MATCH
+  JPM    lb 3 -> MATCH
+  JPM    lb 5 -> MATCH
+  JPM    lb10 -> MATCH
+  JNJ    lb 3 -> MATCH
+  JNJ    lb 5 -> MATCH
+  JNJ    lb10 -> MATCH
+  XOM    lb 3 -> MATCH
+  XOM    lb 5 -> MATCH
+  XOM    lb10 -> MATCH
+
+=== Gate 3: classification reproducibility from stored cells ===
+  AAPL   lb 3 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  AAPL   lb 5 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  AAPL   lb10 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  MSFT   lb 3 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  MSFT   lb 5 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  MSFT   lb10 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  GOOGL  lb 3 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  GOOGL  lb 5 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  GOOGL  lb10 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  AMZN   lb 3 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  AMZN   lb 5 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  AMZN   lb10 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  META   lb 3 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  META   lb 5 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  META   lb10 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  NVDA   lb 3 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  NVDA   lb 5 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  NVDA   lb10 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  TSLA   lb 3 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  TSLA   lb 5 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  TSLA   lb10 recomputed=COST_ROBUST      published=COST_ROBUST      -> MATCH
+  JPM    lb 3 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  JPM    lb 5 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  JPM    lb10 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  JNJ    lb 3 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  JNJ    lb 5 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  JNJ    lb10 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  XOM    lb 3 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  XOM    lb 5 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+  XOM    lb10 recomputed=NO_BASELINE_EDGE published=NO_BASELINE_EDGE -> MATCH
+
+=== Gate 4: determinism (AMZN lookback 5 at 1x, twice) ===
+  identical: True -> MATCH
+
+All verification gates MATCH the artifact.
+NOTE: research/simulation only. No live trading or production execution. Independent verification of the momentum cost-sensitivity artifact: exploratory simulation.
+[0m
+[0m← [0mWrite scratch/audit_cost_model.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 scratch/audit_cost_model.py
+=== Round-trip slippage test (engine.py `_run_bars` fill pricing) ===
+  no costs                 round-trip PnL=+10000.000000 fills=[(1000.0, 100.0, 0.0), (-1000.0, 110.0, 0.0)]
+  fixed slippage 2c        round-trip PnL=+10000.000000 fills=[(1000.0, 100.02, 0.0), (-1000.0, 110.02, 0.0)]
+  proportional 5bps        round-trip PnL=+10005.000000 fills=[(1000.0, 100.05, 0.0), (-1000.0, 110.055, 0.0)]
+  full realistic vector    round-trip PnL=+9995.000000 fills=[(1000.0, 100.07, 5.0), (-1000.0, 110.075, 5.0)]
+
+=== Full-sample cost decomposition, lookback 5 ===
+  AMZN: fills=4451 traded_notional=4051072 (4.1x capital)
+    commission=21055 (2.1055% of capital) | engine slippage cash impact=2189 (0.2189%) | gross intended slippage charge=33726 (3.3726%)
+  JPM: fills=4439 traded_notional=1420366 (1.4x capital)
+    commission=13139 (1.3139% of capital) | engine slippage cash impact=1398 (0.1398%) | gross intended slippage charge=29409 (2.9409%)
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -149,9 +149,8 @@
+     )
+ 
+ 
+ def classify(cells: dict) -> tuple[str, dict]:
+-    """Apply the predeclared classification rule to one (asset, lookback)."""
+     zero = cells["zero"]
+     if not (zero["verdict"] == "REGIME_STABLE"
+             and all(m > 0 for m in zero["medians"])):
+         return "NO_BASELINE_EDGE", {}
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -148,9 +148,68 @@
+                                     and float(np.mean(w > 0)) >= 0.95),
+     )
+ 
+ 
++def round_trip_slippage_probe() -> dict:
++    """Two-bar round trip: does the cost vector charge slippage?
++
++    A completed round trip must pay the spread on both legs. In the existing
++    engine every fill is priced at ``close + slippage``; this probe records the
++    round-trip PnL under each cost component so the artifact states what the
++    cost grid actually charges.
++    """
++    bars = [
++        bt.Bar(date=1, open=100.0, high=100.0, low=100.0, close=100.0, volume=1e6),
++        bt.Bar(date=2, open=110.0, high=110.0, low=110.0, close=110.0, volume=1e6),
++    ]
++    sig = [bt.Signal(date=1, weight=1.0), bt.Signal(date=2, weight=0.0)]
++    out = {}
++    for label, costs in (
++        ("no_costs", {}),
++        ("fixed_2c", dict(slippage_cents=2.0)),
++        ("proportional_5bps", dict(slippage_proportional=0.0005)),
++        ("realistic_1x", dict(BASE_COST)),
++    ):
++        res = bt.run_bars(bars, sig, bt.BacktestConfig(initial_capital=100_000.0, **costs))
++        out[label] = round(float(res.equity_curve[-1] - 100_000.0), 6)
++    return dict(
++        round_trip_pnl=out,
++        fixed_slippage_cancels=bool(out["fixed_2c"] == out["no_costs"]),
++        proportional_slippage_adds=bool(out["proportional_5bps"] > out["no_costs"]),
++        realistic_vector_pnl=out["realistic_1x"],
++    )
++
++
++def cost_accounting(ticker: str, bars, lookback: int, level: str = "1x") -> dict:
++    """Decompose the cash impact of the cost vector on one full sample."""
++    closes = bars.closes_array()
++    signals = bt.momentum_signals(closes, lookback=lookback)
++    cfg = cfg_for(level)
++    res = bt.run_bars(list(bars), signals, cfg)
++    trade_closes = np.array([closes[b.date - 1] for b in res.trades], dtype=np.float64)
++    shares = np.array([f.shares for f in res.trades], dtype=np.float64)
++    commission = float(sum(f.commission for f in res.trades))
++    engine_slippage_cash = float(np.sum(-shares * (np.array([f.price for f in res.trades])
++                                                   - trade_closes)))
++    costs = dict(BASE_COST)
++    gross_intended = float(np.sum(
++        (costs["slippage_cents"] / 100.0 + trade_closes * costs["slippage_proportional"])
++        * np.abs(shares)))
++    return dict(
++        fills=len(res.trades),
++        traded_notional=round(float(np.sum(np.abs(shares) * trade_closes)), 2),
++        commission=round(commission, 2),
++        engine_slippage_cash_impact=round(engine_slippage_cash, 2),
++        gross_intended_slippage_charge=round(gross_intended, 2),
++        total_return=round(float((res.equity_curve[-1] - 1e6) / 1e6), 6),
++        commission_pct_capital=round(commission / 1e6, 6),
++        engine_slippage_pct_capital=round(engine_slippage_cash / 1e6, 6),
++        gross_intended_slippage_pct_capital=round(gross_intended / 1e6, 6),
++    )
++
++
+ def classify(cells: dict) -> tuple[str, dict]:
++    """Apply the predeclared classification rule to one (asset, lookback)."""
+     zero = cells["zero"]
+     if not (zero["verdict"] == "REGIME_STABLE"
+             and all(m > 0 for m in zero["medians"])):
+         return "NO_BASELINE_EDGE", {}
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -331,9 +331,23 @@
+                   d["survives_5x"]))
+     else:
+         print("    {:6s} {}".format(ticker, c["cls"]))
+ 
+-print("\n=== 7. Determinism (AMZN lookback 5 at 1x, recomputed) ===")
++print("\n=== 7. Cost-accounting audit (what the grid actually charges) ===")
++round_trip = round_trip_slippage_probe()
++print("  round-trip PnL: " + ", ".join(
++    "{}={:+.2f}".format(k, v) for k, v in round_trip["round_trip_pnl"].items()))
++print("  fixed slippage cancels: {} | proportional slippage adds: {}".format(
++    round_trip["fixed_slippage_cancels"], round_trip["proportional_slippage_adds"]))
++accounting = {t: cost_accounting(t, tickers[t], 5) for t in ticker_order}
++for ticker in ticker_order:
++    a = accounting[ticker]
++    print("  {:6s} commission={:.2%} | engine slippage cash={:+.2%} | "
++          "gross intended slippage={:.2%} | total_return={:+.3f}".format(
++              ticker, a["commission_pct_capital"], a["engine_slippage_pct_capital"],
++              a["gross_intended_slippage_pct_capital"], a["total_return"]))
++
++print("\n=== 8. Determinism (AMZN lookback 5 at 1x, recomputed) ===")
+ bars = tickers["AMZN"]
+ again = run_cell(bars, 5, "1x")
+ deterministic = again == cells["AMZN"]["5"]["1x"]
+ print("  r1 == r2: {}".format(deterministic))
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -368,8 +368,16 @@
+     "null; else COST_FRAGILE if 2x median-of-medians <= 0 or <= 2x matched null "
+     "or 2x retention < 0.5; else COST_ROBUST. 5x is a reported diagnostic."
+ ),
+ signal_composition=composition_by_lookback,
++cost_model_audit=dict(
++    round_trip=round_trip,
++    per_asset=accounting,
++    note=("the existing engine prices every fill at close + slippage, so a "
++          "completed round trip cancels fixed and proportional slippage; only "
++          "commissions are a genuine cost. The gross intended slippage column "
++          "is the conservative charge the cost vector nominally describes."),
++),
+ cells=cells,
+ classification=classification,
+ counts_by_lookback=counts_by_lookback,
+ ticker_order=ticker_order,
+
+[0m
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review under the realistic cost model (AMZN, JPM) ===
+  AMZN: 4465 bars, signals 4465, leakage [PASS], costed total_return +5.518
+  JPM: 4465 bars, signals 4465, leakage [PASS], costed total_return +3.904
+
+=== 4. Signal composition and definition diagnostic ===
+  (documents what the cost grid measures; no result is tuned from this)
+  AAPL   lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4202 degenerate=True
+  MSFT   lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4208 degenerate=True
+  GOOGL  lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4316 degenerate=True
+  AMZN   lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4431 degenerate=True
+  META   lb5 long=0.9986 short=0.0000 neutral= 5 textbook_disagreement=0.4418 degenerate=True
+  NVDA   lb5 long=0.5841 short=0.4148 neutral= 5 textbook_disagreement=0.4566 degenerate=False
+  TSLA   lb5 long=0.9988 short=0.0000 neutral= 5 textbook_disagreement=0.4618 degenerate=True
+  JPM    lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4300 degenerate=True
+  JNJ    lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4472 degenerate=True
+  XOM    lb5 long=0.9989 short=0.0000 neutral= 5 textbook_disagreement=0.4578 degenerate=True
+
+=== 5. Cost grid: lookback x cost level x collected universe ===
+  cost levels: zero=zero, 1x={'commission_per_trade': 2.0, 'commission_per_share': 0.003, 'slippage_cents': 2.0, 'slippage_proportional': 0.0005}, 2x={'commission_per_trade': 4.0, 'commission_per_share': 0.006, 'slippage_cents': 4.0, 'slippage_proportional': 0.001}, 5x={'commission_per_trade': 10.0, 'commission_per_share': 0.015, 'slippage_cents': 10.0, 'slippage_proportional': 0.0025}
+  AAPL   lb3=COST_ROBUST lb5=COST_ROBUST lb10=NO_BASELINE_EDGE
+  MSFT   lb3=COST_ROBUST lb5=COST_ROBUST lb10=COST_ROBUST
+  GOOGL  lb3=COST_ROBUST lb5=COST_ROBUST lb10=COST_ROBUST
+  AMZN   lb3=COST_ROBUST lb5=COST_ROBUST lb10=COST_ROBUST
+  META   lb3=COST_ROBUST lb5=COST_ROBUST lb10=COST_ROBUST
+  NVDA   lb3=NO_BASELINE_EDGE lb5=NO_BASELINE_EDGE lb10=NO_BASELINE_EDGE
+  TSLA   lb3=COST_ROBUST lb5=COST_ROBUST lb10=COST_ROBUST
+  JPM    lb3=NO_BASELINE_EDGE lb5=NO_BASELINE_EDGE lb10=NO_BASELINE_EDGE
+  JNJ    lb3=NO_BASELINE_EDGE lb5=NO_BASELINE_EDGE lb10=NO_BASELINE_EDGE
+  XOM    lb3=NO_BASELINE_EDGE lb5=NO_BASELINE_EDGE lb10=NO_BASELINE_EDGE
+
+=== 6. Cost-robustness classification (predeclared rule) ===
+  lookback 3: {'COST_ROBUST': 6, 'COST_FRAGILE': 0, 'COST_ERASED': 0, 'NO_BASELINE_EDGE': 4}
+  lookback 5: {'COST_ROBUST': 6, 'COST_FRAGILE': 0, 'COST_ERASED': 0, 'NO_BASELINE_EDGE': 4}
+  lookback 10: {'COST_ROBUST': 5, 'COST_FRAGILE': 0, 'COST_ERASED': 0, 'NO_BASELINE_EDGE': 5}
+  per-asset lookback-5 class:
+    AAPL   COST_ROBUST      med 0/1x/2x/5x = 0.0699/0.0699/0.0699/0.0700 retention 1x/2x = 1.0003/1.0006 survives_5x=True
+    MSFT   COST_ROBUST      med 0/1x/2x/5x = 0.0618/0.0617/0.0617/0.0616 retention 1x/2x = 0.9994/0.9988 survives_5x=True
+    GOOGL  COST_ROBUST      med 0/1x/2x/5x = 0.0707/0.0707/0.0707/0.0707 retention 1x/2x = 1.0002/1.0003 survives_5x=True
+    AMZN   COST_ROBUST      med 0/1x/2x/5x = 0.0764/0.0764/0.0764/0.0764 retention 1x/2x = 1.0001/1.0003 survives_5x=True
+    META   COST_ROBUST      med 0/1x/2x/5x = 0.0673/0.0672/0.0672/0.0671 retention 1x/2x = 0.9994/0.9989 survives_5x=True
+    NVDA   NO_BASELINE_EDGE
+    TSLA   COST_ROBUST      med 0/1x/2x/5x = 0.1075/0.1075/0.1075/0.1076 retention 1x/2x = 1.0002/1.0003 survives_5x=True
+    JPM    NO_BASELINE_EDGE
+    JNJ    NO_BASELINE_EDGE
+    XOM    NO_BASELINE_EDGE
+
+=== 7. Cost-accounting audit (what the grid actually charges) ===
+  round-trip PnL: no_costs=+10000.00, fixed_2c=+10000.00, proportional_5bps=+10005.00, realistic_1x=+9995.00
+  fixed slippage cancels: True | proportional slippage adds: True
+  AAPL   commission=1.87% | engine slippage cash=+0.22% | gross intended slippage=9.41% | total_return=+5.514
+  MSFT   commission=1.23% | engine slippage cash=+0.16% | gross intended slippage=4.94% | total_return=+4.221
+  GOOGL  commission=1.43% | engine slippage cash=+0.17% | gross intended slippage=6.34% | total_return=+4.463
+  AMZN   commission=2.11% | engine slippage cash=+0.22% | gross intended slippage=11.47% | total_return=+5.518
+  META   commission=0.91% | engine slippage cash=+0.16% | gross intended slippage=4.30% | total_return=+4.261
+  NVDA   commission=35.51% | engine slippage cash=+0.15% | gross intended slippage=235.53% | total_return=+3.907
+  TSLA   commission=4.74% | engine slippage cash=+0.37% | gross intended slippage=31.37% | total_return=+8.443
+  JPM    commission=1.31% | engine slippage cash=+0.14% | gross intended slippage=5.78% | total_return=+3.904
+  JNJ    commission=1.02% | engine slippage cash=+0.05% | gross intended slippage=2.60% | total_return=+2.236
+  XOM    commission=1.18% | engine slippage cash=+0.04% | gross intended slippage=4.45% | total_return=+1.939
+
+=== 8. Determinism (AMZN lookback 5 at 1x, recomputed) ===
+  r1 == r2: True
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Cost sensitivity of the implemented momentum candidate: exploratory simulation.
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -255,8 +255,43 @@
+ if not same:
+     all_ok = False
+ print("  identical: {} -> {}".format(same, "MATCH" if same else "MISMATCH"))
+ 
++print("\n=== Gate 5: cost-accounting audit recomputed independently ===")
++rt = art["cost_model_audit"]["round_trip"]
++analytic = {
++    "no_costs": 10000.0,
++    "fixed_2c": 10000.0,
++    "proportional_5bps": 10005.0,
++    "realistic_1x": 9995.0,
++}
++analytic_ok = all(abs(rt["round_trip_pnl"][k] - v) < 1e-9 for k, v in analytic.items())
++if not analytic_ok:
++    all_ok = False
++print("  round-trip PnL analytic {} vs stored {} -> {}".format(
++    analytic, rt["round_trip_pnl"], "MATCH" if analytic_ok else "MISMATCH"))
++for ticker in ("AMZN", "JPM"):
++    bars_t, _ = bt.load_ticker(ticker)
++    closes = bars_t.closes_array()
++    sig = momentum_signals(closes, 5)
++    res = bt.run_bars(list(bars_t), sig, cfg("1x"))
++    trade_closes = np.array([closes[bd.date - 1] for bd in res.trades], dtype=np.float64)
++    shares = np.array([f.shares for f in res.trades], dtype=np.float64)
++    commission = float(sum(f.commission for f in res.trades))
++    slip_cash = float(np.sum(-shares * (np.array([f.price for f in res.trades]) - trade_closes)))
++    gross = float(np.sum((0.02 + 0.0005 * trade_closes) * np.abs(shares)))
++    pub = art["cost_model_audit"]["per_asset"][ticker]
++    same = (pub["fills"] == len(res.trades)
++            and abs(pub["commission"] - round(commission, 2)) < 0.01
++            and abs(pub["engine_slippage_cash_impact"] - round(slip_cash, 2)) < 0.01
++            and abs(pub["gross_intended_slippage_charge"] - round(gross, 2)) < 0.01)
++    if not same:
++        all_ok = False
++    print("  {:6s} fills={} commission={:.0f} engine_slippage={:+.0f} "
++          "gross={:.0f} -> {}".format(
++              ticker, len(res.trades), commission, slip_cash, gross,
++              "MATCH" if same else "MISMATCH"))
++
+ print()
+ if all_ok:
+     print("All verification gates MATCH the artifact.")
+ else:
+
+[0m
+[91m[1mError: [0mSign up for free to continue and explore 500 other models. Takes 2 minutes, no credit card required. Or come back later.
