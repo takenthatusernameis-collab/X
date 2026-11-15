@@ -1,0 +1,106 @@
+{
+  "agent_number": 3,
+  "bottleneck": "Selection-quality evidence is conflated with execution-quality evidence, so the selector's comparative advantage cannot be audited.",
+  "campaign_slot": 3,
+  "deliverable": "A durable, minimal selection-basis record convention plus one worked example drawn from an existing resolved cell.",
+  "evidence_basis": "This audit (agent 01, run 43657769763) found the selector's ranking advantage unresolved because records capture execution quality (verdicts, verifier MATCH) but not comparative selection outcomes.",
+  "global_agent_number": 3,
+  "objective": "Require each frontier-cell activation to record the alternatives compared and the realized information gain of the chosen cell, enabling post-hoc attribution of selection versus execution effects.",
+  "out_of_scope": "Do not redesign the controller architecture, add a numerical reward score, or rerun historical experiments.",
+  "preceding_agent": {
+    "action": "Activation observed start 2026-11-15T00:33:40Z (environment message time). Inspected durable state (LEARNING_STATE.md active delta + frontier + learning history, state/STATE.md, state/campaign/current_task.json, task_queue.json, agent_01.json, run campaign_status.json), the existing momentum implementation (research/checks/momentum.py, momentum_lookback_sweep.py, verify_momentum_lookback_sweep.py), the regime-stability gate (research/backtest/regime_stability.py::stress_segments, which forwards cfg to both the candidate sweep and the coin-flip noise_benchmark, giving a cost-matched null), and the repository's existing realistic cost model (BacktestConfig commission_per_trade=2.0, commission_per_share=0.003, slippage_cents=2.0, slippage_proportional=0.0005, as used by examples/ma_crossover*.py). Declared an a-priori prediction (majority of zero-cost EDGE cells would be COST_FRAGILE) BEFORE running, then wrote research/checks/momentum_cost_sensitivity.py (30 cells: 10 tickers x lookbacks {3,5,10}, each at zero and realistic cost with a cost-matched null; classification NO_EDGE_BASELINE / COST_ROBUST / COST_FRAGILE; cost drag; internal determinism) and research/checks/verify_momentum_cost_sensitivity.py (independent fresh walk_forward+noise_benchmark path for AMZN/JPM at both cost levels, classification reproducibility, determinism). Executed both, then a scratch diagnostic (scratch/diag_cost_bite.py) to confirm the cost model genuinely charges (guarding against a silently no-op cost config). Recorded results in LEARNING_STATE.md frontier + active-delta Next and worker_progress.md.",
+    "agent_number": 2,
+    "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+    "campaign_slot": 2,
+    "candidate_tasks": [
+      {
+        "bottleneck": "The cost-robustness result is conditional on the existing cost model; a harsher cost model could overturn it.",
+        "complexity": "LOW",
+        "deliverable": "A reproducible artifact + independent verification classifying cost robustness under the harsher cost grid.",
+        "downstream_leverage": "MEDIUM",
+        "effort": "MEDIUM",
+        "evidence_basis": "This activation (agent 02, run 43657769763) established COST_ROBUST under the existing cost model and left harsher-cost robustness explicitly untested.",
+        "execution_risk": "LOW",
+        "expected_information_gain": "MEDIUM",
+        "falsification_power": "HIGH",
+        "objective": "Re-run the lookback 3/5/10 momentum cost-sensitivity with an explicitly predeclared punitive cost grid (e.g. 2x/5x the existing bps plus a turnover-proportional impact term) and a cost-matched null, without changing the signal rule.",
+        "out_of_scope": "Do not tune the signal rule, expand the universe, or introduce leverage.",
+        "primary_question": "Does the COST_ROBUST momentum classification survive a materially harsher cost model (higher bps + a simple market-impact/ADV proxy) than the repository's existing realistic parameterization?",
+        "role": "HIGHER_ORDER_OBJECTIVE",
+        "scope": "Existing 10-asset universe, existing momentum implementation, one predeclared punitive cost grid; no signal tuning, no universe expansion, no leverage.",
+        "status": "OPEN",
+        "stop_condition": "Stop after the predeclared punitive cost grid is evaluated and independently verified.",
+        "success_criterion": "The result is reproducible and independently verified, regardless of positive or negative outcome.",
+        "task_id": "C-001",
+        "tests_preceding_process": true,
+        "verifiability": "HIGH",
+        "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, regression suite."
+      }
+    ],
+    "changed": [
+      "research/checks/momentum_cost_sensitivity.py (new cost-sensitivity check; 30 cells, zero vs existing realistic cost, cost-matched null, COST_ROBUST/COST_FRAGILE classification, cost drag, internal determinism)",
+      "research/checks/verify_momentum_cost_sensitivity.py (new independent verifier: fresh walk_forward+noise_benchmark path, classification reproducibility, determinism)",
+      "scratch/diag_cost_bite.py (new diagnostic confirming the realistic cost model materially charges)",
+      "state/check_artifacts/momentum_cost_sensitivity_results.json (new reproducible artifact)",
+      "state/LEARNING_STATE.md (frontier row for the cost-robustness cell; active-delta Next updated)",
+      "state/worker_progress.md (completion milestone)",
+      "state/campaign/runs/43657769763/agents/agent_02.json (this durable record)"
+    ],
+    "complexity_added": "LOW \u2014 two new deterministic research checks (a cost-sensitivity check and its independent verifier) plus one diagnostic and one artifact. No existing research, engine, test, example, or controller file was modified; the change is additive and does not alter any prior verdict.",
+    "decision": "USEFUL_CHANGE",
+    "failure_class": "NONE",
+    "global_agent_number": 2,
+    "next": "Run R-002 (a predeclared holding-period set for the lookback-5 momentum signal through the same cost-matched regime + null gate stack): temporal robustness is the last momentum-internal qualification before the momentum family is exhausted, after which the higher-value direction is a genuinely new signal class or new data.",
+    "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+    "observed_effect": "Resolved the flagged cost-robustness qualification in the POSITIVE direction and REFUTED the a-priori prediction (I predicted a majority of zero-cost EDGE cells would be COST_FRAGILE). Under the existing realistic cost model with a cost-matched coin-flip null, 16 of 17 zero-cost EDGE cells remain COST_ROBUST and 1 is COST_FRAGILE; the single fragile cell (MSFT @ lookback 5) keeps unchanged positive candidate medians and flips only due to a null-dispersion threshold effect. Across all 17 zero-cost EDGE cells the candidate medians are unchanged and positive at both cost levels. The per-fold cost drag is small (median +0.000, mean +0.001) relative to the ~+0.05..+0.11 per-fold momentum edge, because the constant-notional daily-rebalance rule trades only the incremental delta each bar (low realized turnover). Mechanism worth preserving: the 'daily rebalance = prohibitive turnover' intuition does not hold for constant-notional sizing, since only the price-drift delta is traded each bar; the existing cost model is therefore a mild drag on this implementation. Consistency with agent_01: this does not establish a general ranking advantage (no counterfactual, per P-001), but for THIS cell the frontier-first selection targeted the explicitly flagged decision-relevant qualification (LEARNING_STATE 'Next') and produced a decisive, independently verified result, so the selection was effective for this instance (task_selection_observation IMPROVED).",
+    "process_decision": "RETAIN",
+    "question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+    "research_result": "Momentum cost robustness: COST_ROBUST. Lookback 3/5/10 momentum on the 10-asset collected universe, judged at zero and at the existing realistic cost model (commission $2/trade + $0.003/share + 2c/share slippage + 5bps proportional) with the coin-flip null run at the same cost model. Cell counts (30 cells): NO_EDGE_BASELINE=13, COST_ROBUST=16, COST_FRAGILE=1; of 17 zero-cost EDGE cells, 16 survive realistic costs. Cost drag per-fold median ~0.000 (mean +0.001, max +0.026) vs per-fold edge +0.05..+0.11. The single COST_FRAGILE cell (MSFT @ lookback 5) retains unchanged positive medians [+0.052, +0.072] and flips REGIME_STABLE->REGIME_DEPENDENT only via a null-dispersion threshold. Independently verified (fresh walk_forward+noise_benchmark path MATCH; classification reproduced; determinism); 168/168 regression tests pass; diagnostic confirms the cost model materially charges (AMZN commission $21,055). No signal rule was tuned, the universe was not expanded, and no leverage was introduced.",
+    "role": "HIGHER_ORDER_OBJECTIVE",
+    "task_id": "R-001",
+    "task_selection_observation": "IMPROVED",
+    "uncertainty_reduced": "The cost-robustness qualification is closed: the momentum edge's positive per-fold medians are preserved under the existing realistic cost model (16/17 zero-cost EDGE cells COST_ROBUST; the 1 COST_FRAGILE cell is a null-dispersion artifact with unchanged positive medians). The a-priori 'majority fragile' prediction was refuted. Residual uncertainty is now confined to harsher-than-existing cost models (untested, out of scope) and to the fact that this is single-universe simulation evidence, not a validated tradeable edge.",
+    "uncertainty_targeted": "Whether the candidate short-horizon momentum edge survives the repository's existing realistic transaction-cost model on the collected real-data universe (execution-cost robustness), which LEARNING_STATE left as a meaningful qualification of the candidate positive evidence.",
+    "unverified": [
+      "The cost model tested is the repository's EXISTING realistic cost parameterization. A materially harsher cost model (higher bps, market-impact, short borrow cost) was NOT tested (out of scope), so COST_ROBUST is conditional on the existing cost assumptions.",
+      "Per-fold cost drag is derived from per-segment medians rounded to 3 decimals, so the precise drag is ~0.001 level (many cells round to 0.000); the full-sample diagnostic corroborates the cost model bites in dollar terms but the exact per-fold drag is not reported at higher precision.",
+      "Single dataset (yf-ohlcv-universe-2009-to-2026-10-03), 10 large-cap US tickers, walk-forward IS/OOS only; no live or paper trading. This is simulation evidence, not a validated tradeable edge.",
+      "The MSFT @ lookback-5 COST_FRAGILE label is a null-dispersion threshold artifact (candidate medians unchanged/positive), not a genuine cost-induced edge loss; the strict EDGE-requires-REGIME_STABLE rule is sensitive to null dispersion.",
+      "No per-checkpoint UTC timestamps beyond the environment message time (the `date` shell form and `python3 -c` are denied at this layer); activation start anchored to 2026-11-15T00:33:40Z."
+    ],
+    "verified": [
+      "python3 research/checks/momentum_cost_sensitivity.py \u2014 exit 0; manifest 10/10 OK; PREFLIGHT PASSED (all data-quality + survivorship checks); leakage PASS on AMZN/JPM; determinism r1==r2 True; artifact written.",
+      "python3 research/checks/verify_momentum_cost_sensitivity.py \u2014 Gate 1 fresh recomputation MATCH (AMZN/JPM, all lookbacks, both cost levels: medians/nulls/verdicts/segments); Gate 2 classification reproducibility MATCH (every cell class, per-asset roll-up, universe counts); Gate 3 determinism identical.",
+      "python3 -m unittest discover -s tests -v \u2014 168 tests, all passing (no regressions; no existing research/test/example file was modified).",
+      "python3 scratch/diag_cost_bite.py \u2014 realistic cost model genuinely charges: AMZN fills=4451, total commission $21,055.22, full-sample total return +5.5373->+5.5184 (delta +0.0189); JPM fills=4439, commission $13,139.10, +3.9157->+3.9040 (delta +0.0117). COST_ROBUST is therefore not a no-op cost-config artifact.",
+      "Scan of all 17 zero-cost EDGE cells: candidate medians are unchanged and positive at both cost levels for every one (no cost-induced sign reversal or median collapse); only MSFT @ lookback 5 changes verdict (REGIME_STABLE->REGIME_DEPENDENT) purely because the coin-flip null's cross-segment dispersion shrinks under costs (0.008->0.003) while candidate dispersion stays 0.010."
+    ]
+  },
+  "primary_question": "Can the focused-task selector's effect on learning efficiency be attributed from durable evidence if each selected cell records its compared alternatives and their realized information gain?",
+  "role": "LEARNING_PROCESS",
+  "scope": "Add one durable field/note to the per-activation record and LEARNING_STATE frontier entries; no controller redesign and no numerical score.",
+  "selection_basis": {
+    "compared_against": [
+      "P-007",
+      "P-002",
+      "P-004",
+      "P-003",
+      "P-006"
+    ],
+    "qualitative_priority": [
+      "HIGH",
+      "HIGH",
+      "MEDIUM",
+      "HIGH",
+      "LOW",
+      "LOW",
+      "LOW"
+    ],
+    "reason": "highest evidence-backed qualitative priority among currently OPEN tasks for this role"
+  },
+  "stop_condition": "Stop once the minimal record convention is documented and one example is captured.",
+  "success_criterion": "A future audit can distinguish enumeration benefit from ranking benefit using the recorded data alone.",
+  "task_id": "P-007",
+  "tests_preceding_process": false,
+  "verification_requirement": "Controller-side schema validation plus inspection that the new field does not alter any existing verdict."
+}
