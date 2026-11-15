@@ -1,0 +1,439 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+[0m✗ [0mdate -u +"%Y-%m-%dT%H:%M:%SZ" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m→ [0mRead state/LEARNING_STATE.md
+I'll start by inspecting the durable state to understand the current research process and history.
+[0m→ [0mRead state/STATE.md
+[0m✱ [0mGlob "state/campaign/**/*"[90m 21 matches[0m
+[0m✱ [0mGlob "research/checks/*.py"[90m 32 matches[0m
+[0m→ [0mRead state/STATE.md[90m [offset=852][0m
+[0m→ [0mRead state/campaign/task_queue.json
+Now let me examine the campaign queue semantics and the current task structure.
+[0m→ [0mRead state/campaign/current_task.json
+[0m→ [0mRead state/campaign/runs/43687380362/campaign_status.json
+[0m→ [0mRead state/campaign/runs/43687380362/agents/agent_03_contract.json
+[0m→ [0mRead research/checks/momentum_sweep.py[90m [limit=60][0m
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py[90m [limit=60][0m
+Let me examine potentially duplicate momentum check scripts and the prior process-agent record.
+[0m→ [0mRead research/checks/momentum.py[90m [limit=50][0m
+[0m→ [0mRead state/campaign/runs/43687380362/agents/agent_01.json
+Let me check git history and the artifact directory to map which checks are actually used versus orphaned/near-duplicate.
+[0m✱ [0mGlob "state/check_artifacts/*.json"[90m 12 matches[0m
+[0m
+[0m$ [0mgit log --oneline -30
+618539a4 Test bounded transient gateway recovery
+7b3fa6cc Bound transient Kilo recovery retries
+9fdd4360 Retry checkpoint persistence until workflow cutoff
+da10b967 Fix campaign outcome preflight test persistence fixture
+370d418e Assert Kilo sessions rely only on workflow-level cutoff
+1ea666f0 Remove one-shot smoke-session timeout
+b5487b8c Remove smoke-session timeout; rely on workflow cutoff
+d0ad93dd Clarify that only the workflow imposes the execution deadline
+52a1e044 Remove one-shot session deadlines; keep workflow cutoff
+4f7279f1 Remove duplicate setup and all agent-specific runtime deadlines
+74a52dc0 Test workflow-only execution cutoff without agent deadlines
+ef6934fe Remove per-agent limits; retain 355-minute workflow cutoff
+532f158e Remove per-agent Kilo execution and stall deadlines
+de1b1182 fix(kilo): preserve worker progress across transient retries
+8b739ca5 fix(kilo): retry transient upstream errors in smoke test
+42beedc5 fix(kilo): retry transient upstream errors in smoke test
+1048fda4 test(kilo): clarify upstream retry deadline reporting
+c83b5d90 fix(kilo): retry transient gateway failures until safety deadline
+1d6bceb4 test(kilo): enforce deadline-bound transient upstream retries
+caf6f48d docs(kilo): distinguish transient retries from research task retries
+b2d62def fix(kilo): retry transient gateway failures until agent deadline
+2f795baf Verify campaign checkpoints and expose persistence failures
+f8070758 Resolve completed falsified breakout task
+9a5a0de1 Tighten campaign outcome regression test
+5b8ce3b3 Harden campaign outcome regression test
+55cd6801 Add quarantine outcome regression test
+d837a1f1 Fix momentum hold-period determinism check
+6217aefb Fix quarantined campaign reporting semantics
+0fde0057 Fix controller identity handoff placeholders
+0440fd1e Harden campaign agent handoff against observed Kilo failures
+[0m
+[0m$ [0mgit log --oneline --all -- research/checks/momentum_sweep.py
+1354bd7c Kilo activation: update research state
+2dfc2df5 Kilo activation: update research state
+[0m
+[0m✱ [0mGrep "momentum_sweep"[90m in . · 5 matches[0m
+[0m
+[0m$ [0mgit log --oneline --all -- research/checks/momentum_lookback_sweep.py
+5ce6d789 Kilo activation: update research state
+[0m
+[0m→ [0mRead research/checks/momentum_hold_period_sensitivity.py[90m [limit=45][0m
+Let me examine the campaign controller's selection logic to see whether it guards against resolved/duplicate tasks.
+[0m✱ [0mGlob "**/campaign_controller.py"[90m 0 matches[0m
+[0m
+[0m$ [0mgit show --stat --oneline 5ce6d789
+5ce6d789 Kilo activation: update research state
+ logs/ACTIVATION-2026-10-05.md                      |  112 ++
+ research/checks/momentum_lookback_sweep.py         |  262 ++++
+ research/checks/verify_momentum_lookback_sweep.py  |  261 ++++
+ state/LEARNING_STATE.md                            |    8 +-
+ state/STATE.md                                     |   50 +
+ state/activation_status.json                       |   38 +-
+ .../momentum_lookback_sweep_results.json           | 1493 ++++++++++++++++++++
+ state/worker_progress.md                           |   10 +-
+ 8 files changed, 2205 insertions(+), 29 deletions(-)
+[0m
+[0m$ [0mgit show --stat --oneline 1354bd7c
+1354bd7c Kilo activation: update research state
+ logs/ACTIVATION-2026-10-05.md                     |  176 +++
+ research/checks/momentum_concentration.py         |  289 ++++
+ research/checks/momentum_sweep.py                 |   32 +-
+ research/checks/verify_momentum_concentration.py  |  270 ++++
+ research/checks/verify_momentum_sweep.py          |  375 +++++
+ research/scratch/diag_labels.py                   |   78 ++
+ research/scratch/inspect_artifact.py              |   16 +
+ research/scratch/inspect_conc.py                  |    8 +
+ research/scratch/validate_jsons.py                |   23 +
+ state/LEARNING_STATE.md                           |   10 +-
+ state/STATE.md                                    |  131 ++
+ state/activation_status.json                      |   38 +-
+ state/check_artifacts/momentum_concentration.json |  399 ++++++
+ state/check_artifacts/momentum_sweep_results.json | 1533 +++++++++++++++++++++
+ state/worker_progress.md                          |   23 +-
+ 15 files changed, 3352 insertions(+), 49 deletions(-)
+[0m
+[0m✱ [0mGlob "**/*controller*.py"[90m 0 matches[0m
+[0m→ [0mRead state/worker_progress.md
+[0m
+[0m$ [0mfind . -name "campaign_controller.py" -not -path "*/node_modules/*" 2>/dev/null
+./.github/scripts/campaign_controller.py
+[0m
+[0m→ [0mRead state/activation_status.json
+Let me read the controller's task selection logic to understand the current novelty-guard state.
+[0m→ [0mRead .github/scripts/campaign_controller.py[90m [limit=220, offset=180][0m
+Let me verify the momentum_sweep vs lookback_sweep relationship and check for genuine repeated experiments in the history.
+[0m
+[0m$ [0mgit show 1354bd7c -- state/LEARNING_STATE.md
+commit 1354bd7cfcb8a134daeb82422d5b260cf1f50383
+Author: kilo-research-enterprise <kilo-research-enterprise@users.noreply.github.com>
+Date:   Mon Oct 5 15:21:12 2026 +0000
+
+    Kilo activation: update research state
+
+diff --git a/state/LEARNING_STATE.md b/state/LEARNING_STATE.md
+index b042ca91..de1a63c4 100644
+--- a/state/LEARNING_STATE.md
++++ b/state/LEARNING_STATE.md
+@@ -8,9 +8,9 @@ This is the compact durable learning layer for the autonomous quantitative-resea
+ - **Strategy Delta:** Make frontier-first research selection explicit: choose the highest-value unresolved hypothesis/frontier cell before starting substantial work, and record one process-level search change per substantive activation.
+ - **Expected Effect:** Fewer equivalent experiments and more information gained per unit of worker time.
+ - **Anti-gaming Constraint:** Do not tune to OOS results or treat experiment count, positive results, runtime, or commits as learning. Prefer reliable negative conclusions.
+-- **Observed Effect:** The frontier-first contract is now operative and demonstrated across four new-signal-class cells: activation 37263008074 selected the DEFERRED short-horizon return-reversal cell, executed it with a complete test + independent-verifier pair, and closed it FALSIFIED; this activation (37304873966) selected the next deferred cell (cross-sectional relative strength), executed it end-to-end (manifest, preflight, leakage, regime gate, concentration gate, perturbation sweep), repaired four implementation defects found during execution (off-by-one in synthetic spread loops, missing export, engine-path warmup/compounding mismatch fixed via per-fold constant-share signals, and three sweep/determinism bugs), and closed it FALSIFIED; the following activation (37314710995) selected the next deferred cell (volatility targeting), executed it end-to-end through the same regime + concentration + perturbation-sweep gates with an engine-path cross-check and an independent verifier, wrote check + verifier cleanly with no execution-time defects, and closed it FALSIFIED with uniformly negative figures; and this activation (37318950814) selected the next deferred cell (momentum: go LONG the previous N-day return), executed it end-to-end (manifest, preflight, leakage, regime gate + 10-asset sweep, synthetic sweep, determinism) and independently verified it (fresh `walk_forward` recomputation MATCH on all per-asset/universe medians and verdicts), closing it SUPPORTED with a REGIME_STABLE positive edge in 7/10 of the universe; independent verification passed in all four cases (verifier MATCH on all primary path values; determinism r1==r2 across two full runs).
+-- **Decision: RETAIN (with an important caveat)** — frontier-first selection produced a clean ordering (MA crossover -> reversal -> CSRS -> volatility targeting -> momentum), each cell closed with a decisive verdict and no equivalent re-tests; three cells closed FALSIFIED (negative evidence, as expected) but the momentum cell closed SUPPORTED with a genuine positive edge that survived the regime gate, the independent-verification gate, and a post-hoc engine-asymmetry investigation (the apparent reversal/momentum magnitude asymmetry was shown to be an engine warmup+train compounding artifact that understates rather than fakes the momentum edge). The frontier-first delta is therefore VERIFIED as a working selection mechanism — it selected momentum, the correct competing hypothesis, and produced a decisive non-falsified verdict. The caveat: because momentum survived, the frontier is NO LONGER exhausted for this search direction; the next action is to decide whether to admit momentum to the evidence base (it passes leakage, regime-stability, and independent-verification gates) or to extend the momentum test (cross-sectional momentum, longer horizons, different data regime) before admission, and to record that decision in `state/STATE.md` / `state/LEARNING_STATE.md`.
+-- **Next:** decide whether to admit momentum to the evidence base as candidate positive evidence or to extend momentum testing (cross-sectional momentum / longer lookback horizons / a different asset/data regime) before admission; record that frontier decision in `state/STATE.md` and `state/LEARNING_STATE.md`, and set the next frontier cell accordingly.
++- **Observed Effect:** The frontier-first contract is now operative and demonstrated across five new-signal-class cells: activation 37263008074 selected the DEFERRED short-horizon return-reversal cell, executed it with a complete test + independent-verifier pair, and closed it FALSIFIED; this activation (37304873966) selected the next deferred cell (cross-sectional relative strength), executed it end-to-end (manifest, preflight, leakage, regime gate, concentration gate, perturbation sweep), repaired four implementation defects found during execution (off-by-one in synthetic spread loops, missing export, engine-path warmup/compounding mismatch fixed via per-fold constant-share signals, and three sweep/determinism bugs), and closed it FALSIFIED; the following activation (37314710995) selected the next deferred cell (volatility targeting), executed it end-to-end through the same regime + concentration + perturbation-sweep gates with an engine-path cross-check and an independent verifier, wrote check + verifier cleanly with no execution-time defects, and closed it FALSIFIED with uniformly negative figures; this activation (37318950814) selected the next deferred cell (momentum: go LONG the previous N-day return), executed it end-to-end (manifest, preflight, leakage, regime gate + 10-asset sweep, synthetic sweep, determinism) and independently verified it (fresh `walk_forward` recomputation MATCH on all per-asset/universe medians and verdicts), closing it SUPPORTED with a REGIME_STABLE positive edge in 7/10 of the universe; and this activation (37324143509) executed the pre-admission extension of momentum — a real-data lookback sweep across 3 / 5 / 10 / 20 days with fold-level t-statistics and an independent verifier — finding the REGIME_STABLE positive edge persists at every lookback in 4 assets (GOOGL, AMZN, META, TSLA), 9/10 nominally significant at all lookbacks, 2/10 CONSISTENT_WITH_NOISE (JNJ, XOM, small positive medians at the noise threshold), 3/10 flipping between REGIME_DEPENDENT and REGIME_STABLE (idiosyncratic instability, not horizon-concentration), with the independent verifier reporting MATCH at full precision across all medians, verdicts, dispersions, fold statistics, and cross-summary; independent verification passed in all five cases (verifier MATCH on all primary path values; determinism r1==r2 across two full runs).
++- **Decision: RETAIN** — frontier-first selection produced a clean ordering (MA crossover -> reversal -> CSRS -> volatility targeting -> momentum), each cell closed with a decisive verdict and no equivalent re-tests; three cells closed FALSIFIED (negative evidence, as expected) but the momentum cell closed SUPPORTED with a genuine positive edge that survived the regime gate, the independent-verification gate, a post-hoc engine-asymmetry investigation (the apparent reversal/momentum magnitude asymmetry was shown to be an engine warmup+train compounding artifact that understates rather than fakes the momentum edge), and a real-data parameter-robustness sweep (edge persists across lookbacks 3/5/10/20 with 9/10 nominally significant at every lookback; independent verifier MATCH at full precision). The frontier-first delta is therefore VERIFIED as a working selection mechanism — it selected momentum, the correct competing hypothesis, and produced a decisive non-falsified verdict that the pre-admission extension test corroborated rather than refuted. The momentum class is admitted to the evidence base as candidate positive evidence with the documented caveats below; the frontier remains open for the follow-on effect-size / concentration and cross-sectional-momentum tests.
++- **Next:** follow-on activation to further stress the admitted momentum candidate: (a) per-asset effect-size ranking by candidate vs null dispersion and edge-strength summary to check for concentration, and (b) a cross-sectional momentum variant (rank-based winners-only construction) to contrast with the falsified top-3/short-bottom-3 relative-strength class; record the outcome in `state/STATE.md` and `state/LEARNING_STATE.md`.
+ 
+ ## Research frontier
+ 
+@@ -27,7 +27,7 @@ This is the compact durable learning layer for the autonomous quantitative-resea
+ | Short-horizon return reversal (mean-reversion signal) on collected data | FALSIFIED (executed, 37263008074) | Mechanical 1-day reversal bet (short the previous 5-day return): negative median walk-forward log returns in every segment of all 10 collected assets; perturbation sweep (lookback 3/5/10) flat on the coin-flip null ([0.003, 0.003, 0.003] vs -0.001); universe verdict counts CONSISTENT_WITH_NOISE=0/REGIME_STABLE=6/REGIME_DEPENDENT=4 with no positive edge anywhere; independently recomputed and deterministic. Verdict recorded in state/STATE.md. | None — cell closed FALSIFIED |
+ | Cross-sectional relative strength (long top-3 / short bottom-3 by 20-day lookback return, rank-based) on collected data | FALSIFIED (executed, 37304873966) | Full universe: segment medians calm -0.027, turbulent -0.013 vs null -0.067 / +0.017; CONSISTENT_WITH_NOISE (dispersion +0.010 vs null +0.059, < 2x); per-asset drop-one: CWN=9, REGIME_STABLE=1 (NVDA, negative medians, not an edge), REGIME_DEPENDENT=0; concentration NO_EDGE (median -0.013 within null tol +0.030); synthetic sweep baseline -0.001 vs null +0.009 within fixed 0.05, sweep-level CONSISTENT_WITH_NOISE; engine-path cross-check MATCH on every fold, determinism r1==r2 across two full runs. | None — cell closed FALSIFIED |
+ | Volatility targeting (vol-normalized sizing / long low-vol short high-vol) on collected data | FALSIFIED (executed, 37314710995) | Full-universe spread median -0.084: every segment of every asset shows a negative median walk-forward log return; regime gate medians calm -0.081, turbulent -0.056 vs null calm +0.017, turbulent +0.074; REGIME_STABLE describes stability of *losses* (dispersion +0.018 < 2x null +0.040), not an edge; per-sub-universe verdicts CONSISTENT_WITH_NOISE=1 (TSLA, both segments negative), REGIME_STABLE=9 (uniformly negative), REGIME_DEPENDENT=0 — no positive edge anywhere; synthetic sweep CONSISTENT_WITH_NOISE (baseline +0.001 vs null -0.002, within sample-calibrated tol +0.007); engine-path cross-check MATCH on every segment, determinism r1==r2 across two full runs; independently recomputed and MATCH | None — cell closed FALSIFIED |
+-| Momentum (long the previous 5-day return, hold 1 day, daily rebalance) on collected data | SUPPORTED (executed, 37318950814) | Mechanical 1-day-ahead bet LONG the previous 5-day return: uniformly POSITIVE segment medians in 7/10 assets and REGIME_STABLE (regime-stable across blocks): AAPL [+0.071, +0.054, +0.092, +0.069], MSFT [+0.052, +0.072], GOOGL [+0.069, +0.071, +0.101], AMZN [+0.065, +0.076, +0.077], META [+0.073, +0.067, +0.042], NVDA [-0.038, +0.013, +0.100], TSLA [+0.132, +0.016, +0.107]; 2/10 CONSISTENT_WITH_NOISE (JNJ [+0.050, +0.046], XOM [+0.018, +0.037] — small positive, at the noise threshold); 1/10 REGIME_DEPENDENT (JPM [+0.113, +0.044, +0.083], dispersion +0.028 > 2x null +0.012). The result is the exact opposite of the falsified reversal class (reversal lost everywhere; momentum wins 7/10), internally consistent with a genuine short-horizon positive return autocorrelation (documented momentum anomaly). Independent verifier MATCH on all per-asset/universe medians and verdicts; determinism asserted; 134/134 regression tests pass. Caveat: the synthetic perturbation sweep baseline matches the null (CONSISTENT_WITH_NOISE) because the synthetic generator has no momentum structure, so the sweep is a tooling-validity check, not an edge-robustness test for momentum. | Next: decide whether to admit momentum to the evidence base as candidate positive evidence (passes leakage, regime-stability, independent-verification gates) or extend the momentum test (cross-sectional momentum, longer horizons, different data) before admission. |
++| Momentum (long the previous N-day return, hold 1 day, daily rebalance) on collected data | SUPPORTED - admitted (executed, 37318950814; lookback sweep + concentration analysis 37324143509) | Lookback sweep on real data (37324143509) across lookbacks 3 / 5 / 10 / 20: REGIME_STABLE uniformly-positive edge persists at every lookback in 4 assets (GOOGL, AMZN, META, TSLA); 9/10 assets nominally significant at all lookbacks; 2/10 CONSISTENT_WITH_NOISE (JNJ [+0.050, +0.046], XOM [+0.018, +0.037] — small positive medians at the +/-0.05 noise threshold); 3/10 flip between REGIME_DEPENDENT and REGIME_STABLE across lookbacks (JPM: REGIME_DEPENDENT at 3/5/10, REGIME_STABLE at 20; NVDA: REGIME_DEPENDENT at 3/10/20, REGIME_STABLE at 5; MSFT: REGIME_STABLE at 3/5/10, REGIME_DEPENDENT at 20) — idiosyncratic instability, not horizon-concentration. Concentration analysis (effect size = candidate_median - null_median): base lookback-5 verdict DISTRIBUTED — HHI 0.1137 (uniform ~0.10), top-1 share of positive edge 16.3% (< 40% threshold), top-3 43.0%, max/median ratio 1.62 (< 2.0 threshold); all 10 assets EFFECTIVE_STRONG (mean abs effect > 0.05) except XOM (EFFECTIVE_MODERATE); null-baseline concentration identical (noise has no concentration structure). Lookback-20 verdict CONCENTRATED (HHI 0.3336, top-1 56.6%, max/median 10.67); lookback-3 AMBIGUOUS (top-1 36.6%, max/median 4.51), lookback-10 DISTRIBUTED. REGIME_STABLE consistency: GOOGL/AMZN/META/TSLA REGIME_STABLE at all 4 lookbacks; AAPL/MSFT 3/4; NVDA 2/4; JPM 1/4; JNJ/XOM 0/4. Independent verifier (fresh walk_forward recomputation of all 28 lookback-5 segment medians across 10 assets): MATCH on per-asset medians/segments; derived concentration metrics MATCH artifact (HHI/top-1/top-3 exact; max_median_ratio within 1e-3); verdict MATCH (DISTRIBUTED); determinism identical. Admitted with caveats: 0/10 survive family-wise Bonferroni at alpha 0.005 (mirrors the MA-crossover universe finding, which had no REGIME_STABLE positive edge anywhere; momentum differs structurally by showing REGIME_STABLE positive edges in 6-7/10); concentration only appears at lookback 20; single-asset (not cross-sectional) construction. Exact opposite of the falsified reversal class (reversal lost everywhere; momentum wins 7/10), consistent with the documented short-horizon momentum anomaly; reversal vs momentum per-bar P&L corr = -0.99 confirms the sign flip is genuine and warmup+train compounding understates (never fakes) the edge. The lookback sweep is a tooling-validity check on synthetic data (GBM generator has no return autocorrelation); real-data regime-stability is the operative robustness evidence. | Next: deferred frontier item (b) — cross-sectional momentum variant (rank-based winners-only construction) to contrast with the falsified top-3/short-bottom-3 relative-strength class; record the concentration verdict (edge DISTRIBUTED at short horizons, CONCENTRATED only at lookback 20) in state/LEARNING_STATE.md and state/STATE.md. |
+ 
+ Use statuses such as UNEXPLORED, TESTED, FALSIFIED, SUPPORTED, BLOCKED, or DEFERRED.
+ Prefer the highest-value unresolved frontier cell over repeating an equivalent experiment.
+@@ -51,6 +51,8 @@ Prefer the highest-value unresolved frontier cell over repeating an equivalent e
+ 
+ | 37318950814 (2026-10-05) | Execute the momentum frontier cell (the competing hypothesis to the uniformly-negative reversal class: go LONG instead of SHORT the previous 5-day return) | VERIFIED: framework function `momentum_signals` added + exported; check ran end-to-end (manifest 10/10 OK, preflight passed, leakage PASS on AMZN/JPM, regime gate + 10-asset universe sweep + synthetic perturbation sweep + determinism); independent verifier MATCH on all per-asset/universe medians and verdicts + determinism r1==r2; 134/134 regression tests pass post-edit. Verdict: SUPPORTED — REGIME_STABLE uniformly-positive edge in 7/10 assets (AAPL, MSFT, GOOGL, AMZN, META, NVDA, TSLA); 2/10 CONSISTENT_WITH_NOISE (JNJ, XOM); 1/10 REGIME_DEPENDENT (JPM). The a-priori falsification prediction was REJECTED: momentum mirrors the falsified reversal class with opposite sign (reversal lost everywhere; momentum wins 7/10), internally consistent with a genuine short-horizon positive return autocorrelation; internal check confirmed reversal and momentum daily P&Ls are strongly negatively correlated (-0.99) on identical folds, and the warmup+train equity compounding understates (never fakes) the edge, so the reported medians are a conservative lower bound. Caveat: the synthetic perturbation sweep baseline matches the null (CONSISTENT_WITH_NOISE) because the synthetic generator (regime-switching GBM, no return autocorrelation) contains no momentum structure — the sweep is a tooling-validity check, not an edge-robustness test for momentum; real-data regime-stability is the operative robustness evidence. | One signal class closed SUPPORTED instead of FALSIFIED — the first positive candidate of this series, independently verified and deterministic; the framework labels it correctly as REGIME_STABLE (uniformly positive) rather than REGIME_STABLE_LOSS; momentum is the first class to survive the regime-stability gate with a positive edge on this universe | UNVERIFIED (process delta) — the frontier-first selection operated (momentum was the recorded next hypothesis family) and produced a decisive non-falsified verdict, but the strategy-delta decision must be reconsidered in the next activation because the search direction's four original signal classes were all falsified and momentum now survives — the frontier is no longer exhausted, and the next frontier decision (admit momentum vs extend momentum testing) has not yet been recorded |
+ 
++| 37324143509 (2026-10-05) | Execute the momentum lookback-sweep extension (3/5/10/20 on collected data) and independently verify it, then admit momentum as candidate positive evidence; execute the pending per-asset effect-size/concentration diagnostic on the admitted candidate | VERIFIED: `research/checks/momentum_sweep.py` ran end-to-end: manifest 10/10 OK, preflight PASSED, lookback sweep 3/5/10/20 with per-asset verdicts and fold-level t-statistics, cross-lookback summary, determinism r1==r2, artifact written; `research/checks/verify_momentum_sweep.py` ran end-to-end: INDEPENDENT VERIFICATION — MATCH at full precision on all per-asset medians, null medians, segment labels, verdicts, dispersions, fold-level t-statistics, and cross-lookback summary; determinism identical; 134/134 regression tests pass post-edit. Findings: REGIME_STABLE positive edge persists at every lookback in 4 assets (GOOGL, AMZN, META, TSLA); 9/10 nominally significant at all lookbacks; 0/10 survive family-wise Bonferroni (mirrors MA-crossover, which had no REGIME_STABLE positive edge anywhere, so momentum differs structurally); 3/10 assets flip between REGIME_DEPENDENT and REGIME_STABLE idiosyncratically, not horizon-concentrated; 2/10 CONSISTENT_WITH_NOISE at the noise threshold. `research/checks/momentum_concentration.py` ran end-to-end: base lookback-5 verdict DISTRIBUTED (HHI 0.1137, top-1 16.3%, max/median 1.62; all 10 assets EFFECTIVE_STRONG except XOM EFFECTIVE_MODERATE; null-baseline concentration identical); lookback-20 CONCENTRATED (HHI 0.3336, top-1 56.6%, max/median 10.67); determinism r1==r2, artifact written. `research/checks/verify_momentum_concentration.py` ran end-to-end: fresh walk_forward recomputation of all 28 lookback-5 segment medians across 10 assets MATCHes the concentration artifact (per-asset medians/segments exact; derived concentration metrics MATCH — HHI/top-1/top-3 exact; max_median_ratio within 1e-3); verdict MATCH (DISTRIBUTED); determinism identical; one verifier defect found and repaired (vol_blocks window slicing off-by-one). | Parameter-robustness gate PASSED with real data (edge persists across lookbacks 3/5/10/20); concentration gate PASSED at short horizons — the REGIME_STABLE positive edge is DISTRIBUTED across the universe (HHI ~0.11, top-1 16%, all 10 assets EFFECTIVE_STRONG), i.e. not concentrated in one or two names, the opposite of the MA-crossover finding where the edge lived in a single historical regime; concentration appears only at lookback 20 (noisier longer horizon). Momentum admitted as candidate positive evidence with documented caveats; frontier-first selection operated correctly a fifth (sweep) + sixth (concentration) time (right cell selected, clean verdict, independent verification MATCH). | RETAIN (frontier-first delta demonstrated: right cell selected, concentration gate passed, admission with caveats recorded; verification defect caught and repaired) |
++
+ ## Learning rules
+ 
+ 1. One substantive activation should normally choose one primary strategy delta.
+[0m
+[0m$ [0mgit show 5ce6d789 -- state/LEARNING_STATE.md
+commit 5ce6d789235cd9c804ec1167cbaccbeff899eff7
+Author: kilo-research-enterprise <kilo-research-enterprise@users.noreply.github.com>
+Date:   Mon Oct 5 19:23:25 2026 +0000
+
+    Kilo activation: update research state
+
+diff --git a/state/LEARNING_STATE.md b/state/LEARNING_STATE.md
+index b042ca91..8fc66c87 100644
+--- a/state/LEARNING_STATE.md
++++ b/state/LEARNING_STATE.md
+@@ -8,9 +8,9 @@ This is the compact durable learning layer for the autonomous quantitative-resea
+ - **Strategy Delta:** Make frontier-first research selection explicit: choose the highest-value unresolved hypothesis/frontier cell before starting substantial work, and record one process-level search change per substantive activation.
+ - **Expected Effect:** Fewer equivalent experiments and more information gained per unit of worker time.
+ - **Anti-gaming Constraint:** Do not tune to OOS results or treat experiment count, positive results, runtime, or commits as learning. Prefer reliable negative conclusions.
+-- **Observed Effect:** The frontier-first contract is now operative and demonstrated across four new-signal-class cells: activation 37263008074 selected the DEFERRED short-horizon return-reversal cell, executed it with a complete test + independent-verifier pair, and closed it FALSIFIED; this activation (37304873966) selected the next deferred cell (cross-sectional relative strength), executed it end-to-end (manifest, preflight, leakage, regime gate, concentration gate, perturbation sweep), repaired four implementation defects found during execution (off-by-one in synthetic spread loops, missing export, engine-path warmup/compounding mismatch fixed via per-fold constant-share signals, and three sweep/determinism bugs), and closed it FALSIFIED; the following activation (37314710995) selected the next deferred cell (volatility targeting), executed it end-to-end through the same regime + concentration + perturbation-sweep gates with an engine-path cross-check and an independent verifier, wrote check + verifier cleanly with no execution-time defects, and closed it FALSIFIED with uniformly negative figures; and this activation (37318950814) selected the next deferred cell (momentum: go LONG the previous N-day return), executed it end-to-end (manifest, preflight, leakage, regime gate + 10-asset sweep, synthetic sweep, determinism) and independently verified it (fresh `walk_forward` recomputation MATCH on all per-asset/universe medians and verdicts), closing it SUPPORTED with a REGIME_STABLE positive edge in 7/10 of the universe; independent verification passed in all four cases (verifier MATCH on all primary path values; determinism r1==r2 across two full runs).
+-- **Decision: RETAIN (with an important caveat)** — frontier-first selection produced a clean ordering (MA crossover -> reversal -> CSRS -> volatility targeting -> momentum), each cell closed with a decisive verdict and no equivalent re-tests; three cells closed FALSIFIED (negative evidence, as expected) but the momentum cell closed SUPPORTED with a genuine positive edge that survived the regime gate, the independent-verification gate, and a post-hoc engine-asymmetry investigation (the apparent reversal/momentum magnitude asymmetry was shown to be an engine warmup+train compounding artifact that understates rather than fakes the momentum edge). The frontier-first delta is therefore VERIFIED as a working selection mechanism — it selected momentum, the correct competing hypothesis, and produced a decisive non-falsified verdict. The caveat: because momentum survived, the frontier is NO LONGER exhausted for this search direction; the next action is to decide whether to admit momentum to the evidence base (it passes leakage, regime-stability, and independent-verification gates) or to extend the momentum test (cross-sectional momentum, longer horizons, different data regime) before admission, and to record that decision in `state/STATE.md` / `state/LEARNING_STATE.md`.
+-- **Next:** decide whether to admit momentum to the evidence base as candidate positive evidence or to extend momentum testing (cross-sectional momentum / longer lookback horizons / a different asset/data regime) before admission; record that frontier decision in `state/STATE.md` and `state/LEARNING_STATE.md`, and set the next frontier cell accordingly.
++- **Observed Effect:** The frontier-first contract is now operative and demonstrated across four new-signal-class cells: activation 37263008074 selected the DEFERRED short-horizon return-reversal cell, executed it with a complete test + independent-verifier pair, and closed it FALSIFIED; this activation (37304873966) selected the next deferred cell (cross-sectional relative strength), executed it end-to-end (manifest, preflight, leakage, regime gate, concentration gate, perturbation sweep), repaired four implementation defects found during execution (off-by-one in synthetic spread loops, missing export, engine-path warmup/compounding mismatch fixed via per-fold constant-share signals, and three sweep/determinism bugs), and closed it FALSIFIED; the following activation (37314710995) selected the next deferred cell (volatility targeting), executed it end-to-end through the same regime + concentration + perturbation-sweep gates with an engine-path cross-check and an independent verifier, wrote check + verifier cleanly with no execution-time defects, and closed it FALSIFIED with uniformly negative figures; activation 37318950814 selected the next deferred cell (momentum: go LONG the previous N-day return), executed it end-to-end (manifest, preflight, leakage, regime gate + 10-asset sweep, synthetic sweep, determinism) and independently verified it (fresh `walk_forward` recomputation MATCH on all per-asset/universe medians and verdicts), closing it SUPPORTED with a REGIME_STABLE positive edge in 7/10 of the universe; and the current activation (37361000967) extended the momentum cell with a real-data lookback sweep (lookback 3 / 5 / 10) across all 10 collected tickers through the walk-forward regime-stability gate with a matched coin-flip null, verified the artifact through three independent gates (fresh `walk_forward` + `noise_benchmark` recomputation MATCH on AMZN/JPM; lookback-5 column cross-consistency vs the prior `momentum_results.json` MATCH on all 10 tickers; robustness verdicts re-derived from the artifact reproduce for all assets), found the lookback=5 edge is lookback-robust for 6/10 assets and 0/10 lookback-sensitive, and admitted momentum to the evidence base as candidate positive evidence.
++- **Decision: RETAIN (verified)** — the frontier-first selection produced a clean ordering (MA crossover -> reversal -> CSRS -> volatility targeting -> momentum), each cell closed with a decisive verdict and no equivalent re-tests; three cells closed FALSIFIED (negative evidence, as expected) but the momentum cell closed SUPPORTED with a genuine positive edge that survived the regime gate, the independent-verification gate, and a post-hoc engine-asymmetry investigation (the apparent reversal/momentum magnitude asymmetry was shown to be an engine warmup+train compounding artifact that understates rather than fakes the momentum edge); the current activation (37361000967) then tested the remaining lookback-robustness question on REAL data and found the edge persists across lookback 3/5/10 for 6/10 assets with 0 lookback-sensitive cases, confirming the momentum signal is the correct competing hypothesis and the frontier-first + lookback-robustness-extension delta is VERIFIED as a working mechanism. The momentum cell is now admitted to the evidence base as candidate positive evidence (leakage, regime-stability, independent-verification, and real-data lookback-robustness gates all pass).
++- **Next:** momentum is admitted as candidate positive evidence; the next frontier action is to test generalization beyond the short-horizon window that was swept — run longer-horizon momentum (lookback 20/60) through the same regime + independent-verification gates to determine whether the edge survives at the classic momentum horizon, before any broader generalization.
+ 
+ ## Research frontier
+ 
+@@ -27,7 +27,7 @@ This is the compact durable learning layer for the autonomous quantitative-resea
+ | Short-horizon return reversal (mean-reversion signal) on collected data | FALSIFIED (executed, 37263008074) | Mechanical 1-day reversal bet (short the previous 5-day return): negative median walk-forward log returns in every segment of all 10 collected assets; perturbation sweep (lookback 3/5/10) flat on the coin-flip null ([0.003, 0.003, 0.003] vs -0.001); universe verdict counts CONSISTENT_WITH_NOISE=0/REGIME_STABLE=6/REGIME_DEPENDENT=4 with no positive edge anywhere; independently recomputed and deterministic. Verdict recorded in state/STATE.md. | None — cell closed FALSIFIED |
+ | Cross-sectional relative strength (long top-3 / short bottom-3 by 20-day lookback return, rank-based) on collected data | FALSIFIED (executed, 37304873966) | Full universe: segment medians calm -0.027, turbulent -0.013 vs null -0.067 / +0.017; CONSISTENT_WITH_NOISE (dispersion +0.010 vs null +0.059, < 2x); per-asset drop-one: CWN=9, REGIME_STABLE=1 (NVDA, negative medians, not an edge), REGIME_DEPENDENT=0; concentration NO_EDGE (median -0.013 within null tol +0.030); synthetic sweep baseline -0.001 vs null +0.009 within fixed 0.05, sweep-level CONSISTENT_WITH_NOISE; engine-path cross-check MATCH on every fold, determinism r1==r2 across two full runs. | None — cell closed FALSIFIED |
+ | Volatility targeting (vol-normalized sizing / long low-vol short high-vol) on collected data | FALSIFIED (executed, 37314710995) | Full-universe spread median -0.084: every segment of every asset shows a negative median walk-forward log return; regime gate medians calm -0.081, turbulent -0.056 vs null calm +0.017, turbulent +0.074; REGIME_STABLE describes stability of *losses* (dispersion +0.018 < 2x null +0.040), not an edge; per-sub-universe verdicts CONSISTENT_WITH_NOISE=1 (TSLA, both segments negative), REGIME_STABLE=9 (uniformly negative), REGIME_DEPENDENT=0 — no positive edge anywhere; synthetic sweep CONSISTENT_WITH_NOISE (baseline +0.001 vs null -0.002, within sample-calibrated tol +0.007); engine-path cross-check MATCH on every segment, determinism r1==r2 across two full runs; independently recomputed and MATCH | None — cell closed FALSIFIED |
+-| Momentum (long the previous 5-day return, hold 1 day, daily rebalance) on collected data | SUPPORTED (executed, 37318950814) | Mechanical 1-day-ahead bet LONG the previous 5-day return: uniformly POSITIVE segment medians in 7/10 assets and REGIME_STABLE (regime-stable across blocks): AAPL [+0.071, +0.054, +0.092, +0.069], MSFT [+0.052, +0.072], GOOGL [+0.069, +0.071, +0.101], AMZN [+0.065, +0.076, +0.077], META [+0.073, +0.067, +0.042], NVDA [-0.038, +0.013, +0.100], TSLA [+0.132, +0.016, +0.107]; 2/10 CONSISTENT_WITH_NOISE (JNJ [+0.050, +0.046], XOM [+0.018, +0.037] — small positive, at the noise threshold); 1/10 REGIME_DEPENDENT (JPM [+0.113, +0.044, +0.083], dispersion +0.028 > 2x null +0.012). The result is the exact opposite of the falsified reversal class (reversal lost everywhere; momentum wins 7/10), internally consistent with a genuine short-horizon positive return autocorrelation (documented momentum anomaly). Independent verifier MATCH on all per-asset/universe medians and verdicts; determinism asserted; 134/134 regression tests pass. Caveat: the synthetic perturbation sweep baseline matches the null (CONSISTENT_WITH_NOISE) because the synthetic generator has no momentum structure, so the sweep is a tooling-validity check, not an edge-robustness test for momentum. | Next: decide whether to admit momentum to the evidence base as candidate positive evidence (passes leakage, regime-stability, independent-verification gates) or extend the momentum test (cross-sectional momentum, longer horizons, different data) before admission. |
++| Momentum (long the previous 5-day return, hold 1 day, daily rebalance) on collected data | ADMITTED AS CANDIDATE POSITIVE EVIDENCE (executed 37318950814; lookback-sweep verification 37361000967) | Mechanical 1-day-ahead bet LONG the previous 5-day return: uniformly POSITIVE segment medians in 7/10 assets and REGIME_STABLE (regime-stable across blocks): AAPL [+0.071, +0.054, +0.092, +0.069], MSFT [+0.052, +0.072], GOOGL [+0.069, +0.071, +0.101], AMZN [+0.065, +0.076, +0.077], META [+0.073, +0.067, +0.042], NVDA [-0.038, +0.013, +0.100], TSLA [+0.132, +0.016, +0.107]; 2/10 CONSISTENT_WITH_NOISE (JNJ [+0.050, +0.046], XOM [+0.018, +0.037] — small positive, at the noise threshold); 1/10 REGIME_DEPENDENT (JPM [+0.113, +0.044, +0.083], dispersion +0.028 > 2x null +0.012). The result is the exact opposite of the falsified reversal class (reversal lost everywhere; momentum wins 7/10), internally consistent with a genuine short-horizon positive return autocorrelation (documented momentum anomaly). Independent verifier MATCH on all per-asset/universe medians and verdicts; determinism asserted; 134/134 regression tests pass. Lookback-sweep verification (37361000967): real-data lookback sweep 3/5/10 across all 10 collected tickers through the walk-forward regime-stability gate with a matched coin-flip null; the lookback=5 medians/nulls/verdicts reproduce the 37318950814 artifact exactly (cross-consistency gate); fresh walk_forward + noise_benchmark recomputation MATCH on AMZN/JPM; robustness verdicts re-derived from the artifact reproduce for all assets; determinism identical. Outcome: 6/10 assets lookback-ROBUST (positive REGIME_STABLE edge at >=2 lookbacks; MSFT/GOOGL/AMZN/META/TSLA at all three lookbacks), 0/10 lookback-SENSITIVE, 4/10 NO_EDGE. The NO_EDGE group = NVDA (uniformly negative medians across lookbacks, stable losses), JPM (REGIME_DEPENDENT but no robust positive edge), JNJ/XOM (small positives within the noise band). The remaining UNVERIFIED gap — real-data lookback parameter sensitivity — is closed: the momentum edge is not a single-point lookback optimum. Gates passed: leakage, regime-stability, independent-verification, determinism, real-data lookback-robustness. Caveats stand: the edge is short-horizon and mechanical; 3/10 assets show no robust edge; the synthetic generator has no momentum structure so it cannot test momentum robustness. | Next: test generalization beyond the short-horizon window: run longer-horizon momentum (lookback 20/60) through the same regime + independent-verification gates before declaring momentum robust across horizons. |
+ 
+ Use statuses such as UNEXPLORED, TESTED, FALSIFIED, SUPPORTED, BLOCKED, or DEFERRED.
+ Prefer the highest-value unresolved frontier cell over repeating an equivalent experiment.
+[0m
+I've found strong duplicate-work evidence. Let me confirm the deletion timeline of the earlier sweep's artifacts and verifiers.
+[0m$ [0mgit log --oneline --diff-filter=D -- research/checks/momentum_concentration.py research/checks/verify_momentum_sweep.py state/check_artifacts/momentum_sweep_results.json state/check_artifacts/momentum_concentration.json
+(no output)
+[0m
+[0m$ [0mgit log --oneline -- research/checks/momentum_sweep.py research/checks/momentum_concentration.py
+2dfc2df5 Kilo activation: update research state
+[0m
+[0m✗ [0mgit merge-base --is-ancestor 1354bd7c HEAD; echo "is-ancestor-exit:$?" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m✗ [0mgit branch -a --contains 1354bd7c failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m
+[0m$ [0mgit log --oneline --all --decorate -8
+f1b8524e (origin/recovery/kilo-campaign-43657769763-1) Kilo campaign: preserve recovery state
+42df10b7 (origin/recovery/kilo-campaign-43638934408-1) Kilo campaign: preserve recovery state
+110caf5d (origin/recovery/kilo-campaign-43614091709-1) Kilo campaign: preserve recovery state
+748ad639 (origin/recovery/kilo-campaign-43582348811-1) Kilo campaign: preserve recovery state
+e20671ec (origin/recovery/kilo-campaign-43548892244-1) Kilo campaign: preserve recovery state
+b5e196d8 (origin/recovery/kilo-campaign-43523181606-1) Kilo campaign: preserve recovery state
+90ab0bbc (origin/recovery/kilo-campaign-43476207596-1) Kilo campaign: preserve recovery state
+5065133b (origin/recovery/kilo-campaign-43407543668-1) Kilo campaign: preserve recovery state
+[0m
+[0m✗ [0mgit branch --contains 1354bd7c failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m
+[0m$ [0mgit log --oneline -1 1354bd7c
+1354bd7c Kilo activation: update research state
+[0m
+[0m$ [0mgit log --oneline --ancestry-path 1354bd7c..HEAD -- research/checks/momentum_sweep.py
+(no output)
+[0m
+[0m✗ [0mgit ls-files state/check_artifacts/ failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+Let me verify the artifact tracking status and confirm the record-loss claim against the current LEARNING_STATE.
+[0m✱ [0mGrep "37324143509|HHI|concentration|DISTRIBUTED"[90m in state/LEARNING_STATE.md · 6 matches[0m
+[0m
+[0m$ [0mgit log --oneline -- research/checks/momentum_concentration.py
+(no output)
+[0m
+[0m$ [0mgit log --oneline -- research/checks/momentum_sweep.py
+2dfc2df5 Kilo activation: update research state
+[0m
+I have strong, verifiable duplicate-work evidence. Let me record my pre-work assessment, then implement the one minimal guard.
+
+**Assessment:**
+1. **What the system is learning to do better:** choose, falsify, validate, and *preserve* quantitative-research evidence so search redirects efficiently.
+2. **What most constrains learning:** negative/completed evidence is not preserved strongly enough — a completed lookback sweep's record and artifacts can vanish, so a later activation re-runs it.
+3. **Uncertainty blocking a better decision:** whether the existing minimal novelty guard (learning rule #2 + frontier status column) actually prevents equivalent re-runs.
+4. **Single bounded action:** audit resolved cells/history for duplicates and add one minimal append-only guard if the audit shows a gap.
+5. **Why worth it:** low cost, reversible, directly targets the stated bottleneck; the audit already shows a concrete duplicate.
+
+Concrete finding (verifiable): two real-data momentum lookback sweeps exist — `momentum_sweep.py` (lookbacks 3/5/10/20 + concentration, commit 1354bd7c) and `momentum_lookback_sweep.py` (lookbacks 3/5/10, commit 5ce6d789) — the second re-sweeping the subset {3,5,10}; the earlier activation's concentration evidence (DISTRIBUTED, HHI 0.1137) is absent from current LEARNING_STATE and its artifacts/verifiers are not in the current tree.
+
+Let me apply the minimal guard to LEARNING_STATE.
+[0m← [0mEdit state/LEARNING_STATE.md
+Index: /home/runner/work/X/X/state/LEARNING_STATE.md
+===================================================================
+--- /home/runner/work/X/X/state/LEARNING_STATE.md
++++ /home/runner/work/X/X/state/LEARNING_STATE.md
+@@ -37,8 +37,34 @@
+ 
+ Use statuses such as UNEXPLORED, TESTED, FALSIFIED, SUPPORTED, BLOCKED, or DEFERRED.
+ Prefer the highest-value unresolved frontier cell over repeating an equivalent experiment.
+ 
++### Closed parameter-axis ledger (append-only novelty guard)
++
++A resolved frontier cell closes its *hypothesis*; a swept parameter axis is also
++closed once any activation reports it. Before authoring a new parameter sweep,
++consult this ledger and either extend a NEW axis or cite the closing activation
++and the materially new information objective. Ledger rows and resolved-cell rows
++are append-only: never delete or rewrite a prior row. This guard exists because a
++completed lookback sweep was not preserved strongly enough to redirect search
++(the earlier {3,5,10,20} momentum lookback + concentration activation is absent
++from the frontier row below and its artifacts/verifier are not in the current
++tree, so a later activation re-swept the {3,5,10} subset).
++
++| Signal | Parameter axis | Values already swept | Closing activation | Artifact / note |
++|---|---|---|---|---|
++| Momentum (long prev N-day return, hold 1d) | lookback | 5 (base, admitted) | 37318950814 | momentum_results.json |
++| Momentum | lookback | 3, 5, 10, 20 (real-data regime + t-stat + concentration: DISTRIBUTED, HHI 0.1137) | 37324143509 | momentum_sweep.py / momentum_concentration — artifacts + verifier NOT in current tree (record restored here) |
++| Momentum | lookback | 3, 5, 10 (lookback-robustness: 6/10 robust, 0 sensitive) | 37361000967 | momentum_lookback_sweep.py — NEAR-DUPLICATE re-sweep of the {3,5,10} subset (different lens) |
++| Momentum | horizon | 20, 60 (longer-horizon magnitude) | 37394344201 | momentum_longer_horizon.py (lookback 20 overlaps the 37324143509 sweep) |
++| Momentum | transaction cost | zero, realistic (1x), conservative (2x) | agent 2 / R-001 (run 43687380362) | momentum_cost_sensitivity.py (near-always-long; slippage cancels) |
++| Momentum | hold period | 1 only (R-002 hold {1,2,3,5} still OPEN) | 37318950814 | momentum.py — hold axis NOT yet swept |
++
++Hypothesis-level cell closures (reversal, cross-sectional relative strength,
++volatility targeting, cross-sectional momentum, 20-day breakout) are already
++recorded as FALSIFIED in the frontier table above; those are closed cells, not
++open parameter axes.
++
+ ## Recent learning history
+ 
+ | Activation | Strategy Delta | Observed Effect | Information Gain | Decision |
+ |---|---|---|---|---|
+
+[0m
+[0m→ [0mRead state/LEARNING_STATE.md[90m [limit=40, offset=78][0m
+[0m
+[0m← [0mEdit state/LEARNING_STATE.md
+Index: /home/runner/work/X/X/state/LEARNING_STATE.md
+===================================================================
+--- /home/runner/work/X/X/state/LEARNING_STATE.md
++++ /home/runner/work/X/X/state/LEARNING_STATE.md
+@@ -86,8 +86,10 @@
+ | 37414038601 (2026-10-06) | Execute the 20-day breakout continuation frontier cell (a genuinely new signal class: long when the close exceeds the highest close of the preceding 20 trading days; hold 1 day; daily rebalance) on the collected universe through the full gate stack | VERIFIED: check ran end-to-end (manifest 10/10 OK, preflight PASSED, leakage PASS on AMZN/JPM + equity-fill audit, regime-stability gate across all 10 tickers with a matched coin-flip null, bounded lookback sensitivity {5, 10, 20}, determinism r1==r2); independent verifier executed — Gate 1 (AMZN/JPM fresh walk_forward + noise_benchmark, lookbacks 5/10/20) MATCH, Gate 2 (all-asset fresh medians/nulls + regenerated regime/sensitivity verdicts from unrounded values) MATCH, Gate 3 determinism identical; 161/161 regression tests pass (156 existing + 5 new `breakout_signals` unit tests); new framework function `regime_stability.py::breakout_signals` and its export verified. Verdict: FALSIFIED — the breakout filter produces no robust edge: lookback-5 REGIME_STABLE=3 / CONSISTENT_WITH_NOISE=7, lookback-10 REGIME_STABLE=1 / CONSISTENT_WITH_NOISE=8 / REGIME_DEPENDENT=1, lookback-20 (canonical) REGIME_STABLE=1 / CONSISTENT_WITH_NOISE=9; sensitivity verdicts ROBUST=1 (TSLA, edges at lookbacks 5 and 20), SENSITIVE=2 (AAPL @5, NVDA @10), NO_EDGE=7. The small positive verdicts (AAPL @5, TSLA @5/@20, NVDA @10) are absent from the momentum-asset list (MSFT/GOOGL/AMZN/META show NO_EDGE) and are non-lookback-robust. The result matches the a-priori prediction (noise-like in most assets; small positive verdicts only among momentum assets) and closes the genuinely-new-signal-class frontier cell as FALSIFIED. | One genuinely new signal class tested and decisively closed (FALSIFIED) with full independent verification; frontier-first selection operated correctly a sixth time | RETAIN (frontier-first delta demonstrated: right cell selected, executed through the full gate stack, and closed with a decisive, independently-verified verdict) |
+ 
+ | agent 2 / R-001 (run 43687380362, 2026-11-15) | Execute the bounded transaction-cost sensitivity cell for the qualified short-horizon momentum evidence: lookback 3/5/10 under the repository's existing realistic cost model and a 2x conservative level, with a cost-matched coin-flip null, through the existing regime gate and independent verifier | VERIFIED: `research/checks/momentum_cost_sensitivity.py` ran end-to-end (manifest 10/10 OK, preflight PASSED, leakage PASS on AMZN/JPM under the realistic cost model incl. equity-fill audit, 3x3 cost/lookback grid over all 10 tickers, internal determinism r1==r2) and wrote `state/check_artifacts/momentum_cost_sensitivity_results.json`; `research/checks/verify_momentum_cost_sensitivity.py` executed 4 independent gates — (1) AMZN/JPM fresh walk_forward + noise_benchmark medians/nulls MATCH at every cost level and lookback, (2) the zero-cost column is cross-consistent with the prior `momentum_lookback_sweep_results.json` on all 10 tickers x 3 lookbacks (medians, nulls, lookback-5 verdicts), (3) verdicts and the cost-robustness classification re-derived from artifact medians/nulls MATCH for all 10 assets, (4) realistic-cost turnover recompute MATCH for all 10 tickers + determinism; 168/168 regression tests pass. Result: 6/10 COST_ROBUST (AAPL, MSFT, GOOGL, AMZN, META, TSLA), 0 COST_ERODED, 0 COST_ELIMINATED, 4 NO_EDGE (NVDA, JPM, JNJ, XOM); the robust-edge asset count is identical at zero and conservative cost (6/10). MATERIAL QUALIFICATION: the cost model barely bites because the momentum signal is nearly always long (9/10 assets ~4460 long / 0 short bars, 1 flip; only NVDA carries short exposure) so it behaves like a constant-notional buy-and-hold with low effective turnover, and the engine adds slippage to buys and sells in the same (+price) direction so it cancels. The classification is cost-robust under the existing model but is NOT evidence of survival under a directionally-correct conservative cost model, and it exposes a validity confound: the edge on strongly trending large caps is largely a persistent long/drift exposure that the symmetric coin-flip null does not control for. | The cost-level qualification of the momentum evidence is resolved at the classification level under the existing model (cost-robust, unchanged), and a new, higher-value uncertainty is identified: the signal's near-always-long composition means the "momentum" edge may be a long/drift exposure rather than a timing anomaly, and the existing cost model is not a conservative long/short stress. No framework code was changed; the existing cost model and gate stack were reused. | RETAIN (frontier-first delta demonstrated a seventh time: the highest-value unresolved cell was selected, executed through the full gate stack, independently verified on four gates, and closed with a decisive, nuanced verdict that also surfaced the next frontier) |
+ 
++| agent 3 / P-002 (run 43687380362, 2026-11-15) | Audit resolved frontier cells and task history for duplicate/near-duplicate work; determine whether the minimal novelty guard is sufficient; add one minimal append-only guard if a gap is observed | VERIFIED (durable-state audit only; no experiment re-run): two real-data momentum lookback sweeps exist — 37324143509 (`momentum_sweep.py`, lookbacks 3/5/10/20 + concentration, DISTRIBUTED / HHI 0.1137) and 37361000967 (`momentum_lookback_sweep.py`, lookbacks 3/5/10) — on the same universe/signal, the second re-sweeping the {3,5,10} subset; the earlier sweep's concentration evidence is absent from the current frontier row and its artifacts/verifier are not in the current tree (`momentum_sweep.py` left orphaned). Controller selection excludes RESOLVED task_ids but has no novelty guard against a new task_id that re-sweeps an already-swept parameter axis. Change: added the append-only "Closed parameter-axis ledger" above + learning rule 8, and restored the overwritten 37324143509 record. | Concrete duplicate/near-duplicate evidence and a minimal, reversible append-only guard; the guard's efficacy on future activations is UNVERIFIED | RETAIN (append-only ledger + citation rule; efficacy unverified) |
++
+ ## Learning rules
+ 
+ 1. One substantive activation should normally choose one primary strategy delta.
+ 2. A repeated experiment requires a new hypothesis, diagnostic purpose, materially new data, independent verification need, or different information objective.
+
+[0m
+[0m← [0mEdit state/LEARNING_STATE.md
+Index: /home/runner/work/X/X/state/LEARNING_STATE.md
+===================================================================
+--- /home/runner/work/X/X/state/LEARNING_STATE.md
++++ /home/runner/work/X/X/state/LEARNING_STATE.md
+@@ -97,4 +97,5 @@
+ 4. Do not use OOS results as a process-tuning oracle.
+ 5. Preserve negative and inconclusive evidence.
+ 6. Do not claim a strategy delta worked until its expected effect is actually observed.
+ 7. When there is insufficient evidence, choose UNVERIFIED rather than forcing RETAIN or REVERT.
++8. Before authoring any new parameter sweep, consult the "Closed parameter-axis ledger"; a swept axis is closed. A later activation may extend only a new axis or cite the closing activation and the materially new information objective. The ledger, resolved frontier rows, and completed-activation history rows are append-only: never overwrite or delete a prior activation's row, evidence, or artifact reference.
+
+[0m
+Let me verify the edits rendered correctly.
+[0m→ [0mRead state/LEARNING_STATE.md[90m [limit=30, offset=38][0m
+[0m→ [0mRead state/LEARNING_STATE.md[90m [limit=15, offset=88][0m
+Now let me add the human-readable activation record to STATE.md.
+[0m
+[0m← [0mEdit state/STATE.md
+Index: /home/runner/work/X/X/state/STATE.md
+===================================================================
+--- /home/runner/work/X/X/state/STATE.md
++++ /home/runner/work/X/X/state/STATE.md
+@@ -1608,4 +1608,103 @@
+ The result is reproducible and independently verified regardless of outcome. The
+ cost-level qualification is closed under the existing model; the drift/long-bias
+ confound and the directionally-correct cost model are the next frontier.
+ 
++---
++
++## Current activation (P-002 duplicate-work audit; novelty guard — agent 3, run 43687380362, 2026-11-15)
++
++LEARNING_PROCESS task P-002. Primary question: does the durable history
++adequately prevent repeating equivalent experiments when a frontier cell is
++already resolved? Objective: audit resolved frontier cells and task history for
++duplicate or near-duplicate work and determine whether the existing minimal
++novelty guard is sufficient. Scope: durable state only; no historical experiment
++was re-run; at most one minimal change.
++
++### Finding (concrete duplicate/near-duplicate evidence)
++
++Two real-data momentum lookback sweeps exist on the same 10-asset universe and
++signal:
++
++- 37324143509 (commit 1354bd7c) — `research/checks/momentum_sweep.py`, lookbacks
++  3/5/10/20 with fold-level t-statistics, plus `momentum_concentration.py`
++  (concentration analysis: base lookback-5 DISTRIBUTED, HHI 0.1137, top-1 16.3%);
++  it admitted momentum.
++- 37361000967 (commit 5ce6d789) — `research/checks/momentum_lookback_sweep.py`,
++  lookbacks 3/5/10 with regime-stability verdicts (6/10 lookback-robust,
++  0 lookback-sensitive); it re-admitted momentum.
++
++The second activation re-swept the {3,5,10} subset that the first had already
++swept (as part of {3,5,10,20}) and framed the lookback sweep as an open gap from
++37318950814, without citing the completed 37324143509 sweep. In the current
++durable tree, the earlier sweep's concentration evidence (DISTRIBUTED, HHI
++0.1137) and its lookback-20 coverage are absent from the LEARNING_STATE frontier
++row, its artifacts (`momentum_sweep_results.json`, `momentum_concentration.json`)
++and its verifier (`verify_momentum_sweep.py`, `verify_momentum_concentration.py`)
++are not present, and `momentum_sweep.py` is left orphaned (its live artifact
++absent). The 5ce6d789 diff shows the earlier frontier-row concentration evidence
++was replaced by the 37361000967 lookback-robustness evidence.
++
++Controller task selection (`.github/scripts/campaign_controller.py`,
++`candidate_tasks_for_role`) excludes RESOLVED task_ids but has no novelty guard
++against a *new* task_id that re-sweeps an already-swept parameter axis; the only
++guard is advisory (LEARNING_STATE learning rule 2 + the frontier status column).
++
++### Process decision
++
++The existing minimal novelty guard (learning rule 2 + frontier status column +
++RESOLVED-task exclusion) is necessary but NOT sufficient: a completed lookback
++sweep was not preserved strongly enough to redirect search, so an equivalent
++re-sweep occurred and the earlier negative/robustness evidence was lost from the
++frontier. One minimal, reversible, append-only guard is therefore justified.
++
++### CHANGED
++
++- `state/LEARNING_STATE.md` — added a "Closed parameter-axis ledger (append-only
++  novelty guard)" subsection enumerating the momentum parameter axes already
++  swept (lookback, horizon, transaction cost, hold period) with their closing
++  activation and artifact, and recording the near-duplicate re-sweep honestly;
++  added learning rule 8 (consult the ledger before any new parameter sweep; ledger
++  and resolved-work rows are append-only); added a P-002 row to the recent
++  learning history.
++
++### VERIFIED (post-change inspection)
++
++- Read-back of `state/LEARNING_STATE.md`: the ledger block is present at lines
++  41-65, the P-002 history row at line 90, and learning rule 8 at line 101; the
++  file remains well-formed markdown.
++- Cross-checked every ledger figure against durable evidence: lookback
++  {3,5,10,20}+concentration from commit 1354bd7c (LEARNING_STATE diff);
++  lookback {3,5,10} robustness from LEARNING_STATE/STATE (37361000967); horizon
++  20/60 from LEARNING_STATE (37394344201); cost {zero,1x,2x} from LEARNING_STATE
++  (agent 2 / R-001); base lookback 5 / hold 1 from LEARNING_STATE (37318950814).
++- Confirmed `research/checks/momentum_sweep.py` exists in the tree
++  (`LOOKBACKS = (3, 5, 10, 20)`) and its artifact `momentum_sweep_results.json`
++  is absent from `state/check_artifacts/` (orphaned), and that
++  `momentum_concentration.py`, `verify_momentum_sweep.py`,
++  `verify_momentum_concentration.py` are absent from the tree.
++- No experiment was re-run; no framework code changed.
++
++### UNVERIFIED
++
++- The guard's efficacy on future activations is UNVERIFIED: it is an advisory,
++  documentation-level discipline and cannot be enforced by the controller without
++  modifying `.github/scripts/` (out of scope).
++- The exact git/branch mechanism by which the earlier concentration evidence left
++  the current tree is only partly reconstructed (the 5ce6d789 diff shows the
++  frontier-row replacement; the artifact/verifier files are absent from the
++  current tree). The duplicate-work conclusion does not depend on that mechanism.
++- Whether the 37361000967 lookback re-sweep was independently justified (it used
++  a different classification lens) or was a genuine equivalent re-run is not fully
++  resolvable from the durable record; it is recorded as a NEAR-DUPLICATE either
++  way.
++- No UTC timestamps were captured (the `date` shell form is denied at this layer);
++  run identity anchored to run_id 43687380362.
++
++### NEXT
++
++Run the predeclared long-only / drift-matched null test (candidate task R-006)
++for the qualified lookback-5 momentum signal through the existing regime gate and
++independent verifier; before authoring it, consult the new closed parameter-axis
++ledger (lookback 5 and the {3,5,10} / {3,5,10,20} sweeps are closed; the
++drift-matched null is a new axis).
++
+
+[0m
+Now update the worker progress milestone and write the durable agent record.
+[0m← [0mWrite state/worker_progress.md
+Wrote file successfully.
+[0m
+[91m[1mError: [0mSign up for free to continue and explore 500 other models. Takes 2 minutes, no credit card required. Or come back later.
