@@ -1,0 +1,64 @@
+=== Gate 1: fresh walk_forward + noise_benchmark (AMZN, JPM, all holds) ===
+  AMZN hold=1 segments=['turbulent', 'calm', 'turbulent'] -> MATCH (medians [0.065, 0.076, 0.077], nulls [0.02, -0.007, -0.005])
+  AMZN hold=2 segments=['turbulent', 'calm', 'turbulent'] -> MATCH (medians [0.065, 0.076, 0.077], nulls [0.036, -0.005, -0.108])
+  AMZN hold=3 segments=['turbulent', 'calm', 'turbulent'] -> MATCH (medians [0.065, 0.076, 0.077], nulls [0.06, 0.009, -0.03])
+  AMZN hold=5 segments=['turbulent', 'calm', 'turbulent'] -> MATCH (medians [0.065, 0.076, 0.077], nulls [-0.007, -0.002, 0.036])
+  JPM hold=1 segments=['turbulent', 'calm', 'turbulent'] -> MATCH (medians [0.113, 0.044, 0.083], nulls [0.027, 0.014, -0.087])
+  JPM hold=2 segments=['turbulent', 'calm', 'turbulent'] -> MATCH (medians [0.113, 0.044, 0.083], nulls [-0.056, 0.036, 0.061])
+  JPM hold=3 segments=['turbulent', 'calm', 'turbulent'] -> MATCH (medians [0.113, 0.044, 0.083], nulls [0.005, 0.03, -0.002])
+  JPM hold=5 segments=['turbulent', 'calm', 'turbulent'] -> MATCH (medians [0.113, 0.044, 0.083], nulls [-0.027, 0.002, -0.008])
+
+=== Gate 2: H=1 cross-consistency vs momentum_results.json ===
+  per-asset H=1 candidate medians + segment labels: 10/10 tickers MATCH
+  H=1 null medians (this artifact): {'AAPL': [0.076, 0.021, -0.018, 0.033], 'AMZN': [0.02, -0.007, -0.005], 'GOOGL': [-0.013, -0.007, -0.01], 'JNJ': [0.017, 0.01], 'JPM': [0.027, 0.014, -0.087], 'META': [0.059, 0.078, -0.043], 'MSFT': [0.03, 0.025], 'NVDA': [0.023, 0.031, 0.028], 'TSLA': [0.137, -0.022, 0.085], 'XOM': [0.032, -0.025]}
+  H=1 null medians (momentum_results.json): {'AAPL': [-0.025, -0.011, 0.04, 0.032], 'AMZN': [-0.007, -0.002, 0.036], 'GOOGL': [-0.081, 0.01, -0.008], 'JNJ': [-0.024, 0.013], 'JPM': [-0.027, 0.002, -0.008], 'META': [-0.015, 0.045, -0.09], 'MSFT': [-0.013, -0.029], 'NVDA': [-0.108, 0.031, 0.001], 'TSLA': [0.063, 0.007, -0.019], 'XOM': [0.004, -0.006]}
+  H=1 verdict differences (null-draw sensitivity, seed from param dict {{'hold':1}} vs {{'lookback':5}}):
+    GOOGL: this artifact REGIME_DEPENDENT | momentum_results.json REGIME_STABLE
+    JPM: this artifact REGIME_STABLE | momentum_results.json REGIME_DEPENDENT
+    MSFT: this artifact REGIME_DEPENDENT | momentum_results.json REGIME_STABLE
+    NVDA: this artifact REGIME_DEPENDENT | momentum_results.json REGIME_STABLE
+  NOTE: identical candidate medians with different verdicts are a null-seed
+        effect, not a signal effect: the coin-flip seed is derived from the
+        parameter dict, which differs between the two checks.
+
+=== Gate 3: classification reproducibility from the artifact ===
+  edge_counts recomputed {'1': 5, '2': 7, '3': 6, '5': 6} | published n_edge_at_h1=5 n_edge_min_across_grid=5
+  hold_profiles reproduce: True | stable_edge_assets ['AAPL', 'AMZN', 'META', 'TSLA'] vs ['AAPL', 'AMZN', 'META', 'TSLA'] | singular [] vs []
+  effect_classification recomputed HORIZON_SENSITIVE | published HORIZON_SENSITIVE
+  -> MATCH
+
+=== Gate 4: signal-degeneracy measurement (can the hold grid be informative?) ===
+  AAPL   non-neutral= 4460 frac(+1)=0.999 frac(-1)=0.000 hold-transform changes position: {2: 0.0, 3: 0.0, 5: 0.0}
+  MSFT   non-neutral= 4460 frac(+1)=0.999 frac(-1)=0.000 hold-transform changes position: {2: 0.0, 3: 0.0, 5: 0.0}
+  GOOGL  non-neutral= 4460 frac(+1)=0.999 frac(-1)=0.000 hold-transform changes position: {2: 0.0, 3: 0.0, 5: 0.0}
+  AMZN   non-neutral= 4460 frac(+1)=0.999 frac(-1)=0.000 hold-transform changes position: {2: 0.0, 3: 0.0, 5: 0.0}
+  META   non-neutral= 3609 frac(+1)=0.999 frac(-1)=0.000 hold-transform changes position: {2: 0.0, 3: 0.0, 5: 0.0}
+  NVDA   non-neutral= 4460 frac(+1)=0.584 frac(-1)=0.415 hold-transform changes position: {2: 0.0, 3: 0.0004, 5: 0.0007}
+  TSLA   non-neutral= 4086 frac(+1)=0.999 frac(-1)=0.000 hold-transform changes position: {2: 0.0, 3: 0.0, 5: 0.0}
+  JPM    non-neutral= 4460 frac(+1)=0.999 frac(-1)=0.000 hold-transform changes position: {2: 0.0, 3: 0.0, 5: 0.0}
+  JNJ    non-neutral= 4460 frac(+1)=0.999 frac(-1)=0.000 hold-transform changes position: {2: 0.0, 3: 0.0, 5: 0.0}
+  XOM    non-neutral= 4460 frac(+1)=0.999 frac(-1)=0.000 hold-transform changes position: {2: 0.0, 3: 0.0, 5: 0.0}
+  tickers whose momentum weight series is a constant +1 long: 9/10
+  implication: for a constant signal the hold transform is a no-op, so the
+  hold grid cannot be informative for those tickers; the HORIZON_SENSITIVE
+  label then reflects null-draw variation, not edge decay.
+
+=== Gate 5: intended momentum definition (sign of the lookback log return) ===
+  diagnostic only; not the predeclared grid and not an artifact replacement
+  AMZN hold=1 medians [-0.05, 0.005, 0.046] nulls [0.02, -0.007, -0.005] cand_disp +0.039 null_disp +0.012 -> CONSISTENT_WITH_NOISE
+  AMZN hold=2 medians [-0.156, -0.039, 0.082] nulls [0.036, -0.005, -0.108] cand_disp +0.097 null_disp +0.061 -> REGIME_STABLE
+  AMZN hold=3 medians [-0.117, -0.015, 0.001] nulls [0.06, 0.009, -0.03] cand_disp +0.052 null_disp +0.037 -> REGIME_STABLE
+  AMZN hold=5 medians [0.005, 0.004, -0.019] nulls [-0.007, -0.002, 0.036] cand_disp +0.011 null_disp +0.019 -> CONSISTENT_WITH_NOISE
+  JPM hold=1 medians [-0.039, 0.028, 0.028] nulls [0.027, 0.014, -0.087] cand_disp +0.032 null_disp +0.051 -> CONSISTENT_WITH_NOISE
+  JPM hold=2 medians [-0.038, 0.028, 0.047] nulls [-0.056, 0.036, 0.061] cand_disp +0.036 null_disp +0.050 -> CONSISTENT_WITH_NOISE
+  JPM hold=3 medians [-0.04, 0.025, 0.043] nulls [0.005, 0.03, -0.002] cand_disp +0.036 null_disp +0.014 -> CONSISTENT_WITH_NOISE
+  JPM hold=5 medians [-0.053, -0.002, 0.045] nulls [-0.027, 0.002, -0.008] cand_disp +0.040 null_disp +0.012 -> REGIME_DEPENDENT
+
+=== Summary ===
+  Gate 1 (independent recomputation): MATCH
+  Gate 2 (H=1 cross-consistency): MATCH (median/segment equality)
+  Gate 3 (classification reproducibility): MATCH
+  Gate 4 (degeneracy): 9/10 tickers constant +1 long
+  Gate 5 (intended definition): diagnostic, reported separately
+All independent recomputations MATCH the artifact.
+NOTE: research/simulation only. No live trading or production execution.
