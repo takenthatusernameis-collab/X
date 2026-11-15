@@ -1,0 +1,645 @@
+diff --git a/state/LEARNING_STATE.md b/state/LEARNING_STATE.md
+index 2b7bae0b..1fb90634 100644
+--- a/state/LEARNING_STATE.md
++++ b/state/LEARNING_STATE.md
+@@ -29,7 +29,7 @@ This is the compact durable learning layer for the autonomous quantitative-resea
+ | Volatility targeting (vol-normalized sizing / long low-vol short high-vol) on collected data | FALSIFIED (executed, 37314710995) | Full-universe spread median -0.084: every segment of every asset shows a negative median walk-forward log return; regime gate medians calm -0.081, turbulent -0.056 vs null calm +0.017, turbulent +0.074; REGIME_STABLE describes stability of *losses* (dispersion +0.018 < 2x null +0.040), not an edge; per-sub-universe verdicts CONSISTENT_WITH_NOISE=1 (TSLA, both segments negative), REGIME_STABLE=9 (uniformly negative), REGIME_DEPENDENT=0 — no positive edge anywhere; synthetic sweep CONSISTENT_WITH_NOISE (baseline +0.001 vs null -0.002, within sample-calibrated tol +0.007); engine-path cross-check MATCH on every segment, determinism r1==r2 across two full runs; independently recomputed and MATCH | None — cell closed FALSIFIED |
+ | Momentum (long the previous 5-day return, hold 1 day, daily rebalance) on collected data |
+ | Momentum: longer-horizon generalization (lookback 20 / 60) | TESTED (activation 37394344201, 2026-10-06) | Lookback-5 momentum (7/10 REGIME_STABLE) was admitted as candidate positive evidence. A longer-horizon sweep (lookback 20 and 60) was executed with three independent paths: (1) `momentum_longer_horizon.py` -- lookback-20 REGIME_STABLE=6 / lookback-60 REGIME_STABLE=4 across the 10-asset universe; horizon-robustness ROBUST=3 (AAPL, AMZN, JPM), SENSITIVE=3 (GOOGL, META, TSLA), NO_EDGE=4 (MSFT, NVDA, JNJ, XOM); determinism r1==r2. (2) `verify_momentum_longer_horizon.py` -- Gate 1 fresh walk_forward + noise_benchmark recomputation of AMZN/JPM MATCH; Gate 2 fresh medians/nulls for all 10 assets + regenerated regime/horizon verdicts MATCH; Gate 3 determinism identical. (3) `momentum_horizon_gap_analysis.py` -- null-dispersion-robust recharacterization (independent fresh path): candidate per-segment medians are IDENTICAL across lookback 20 and 60 for all 10 assets; every asset keeps positive candidate-vs-null gaps in all segments at both lookbacks (2/3 segments for NVDA); determinism identical. Key finding: the apparent 60-day verdict "degradation" (4/10 REGIME_STABLE at 60 vs 6/10 at 20) is entirely a coin-flip-null dispersion artifact -- the null dispersion varies wildly with lookback (e.g. TSLA 0.603 -> 0.013, GOOGL 0.034 -> 0.006, NVDA 0.022 -> 0.132) rather than an edge decay; the momentum edge is horizon-stable in magnitude. Decision: the momentum cell (lookback 5) remains ADMITTED AS CANDIDATE POSITIVE EVIDENCE, now qualified: the edge generalizes to the 60-day horizon in magnitude; the regime-stability verdict at 60-day is reported as null-dispersion-sensitive. | None -- cell closed TESTED; momentum admission now qualified with the horizon finding. |
+- ADMITTED AS CANDIDATE POSITIVE EVIDENCE (executed 37318950814; lookback-sweep verification 37361000967) | Mechanical 1-day-ahead bet LONG the previous 5-day return: uniformly POSITIVE segment medians in 7/10 assets and REGIME_STABLE (regime-stable across blocks): AAPL [+0.071, +0.054, +0.092, +0.069], MSFT [+0.052, +0.072], GOOGL [+0.069, +0.071, +0.101], AMZN [+0.065, +0.076, +0.077], META [+0.073, +0.067, +0.042], NVDA [-0.038, +0.013, +0.100], TSLA [+0.132, +0.016, +0.107]; 2/10 CONSISTENT_WITH_NOISE (JNJ [+0.050, +0.046], XOM [+0.018, +0.037] — small positive, at the noise threshold); 1/10 REGIME_DEPENDENT (JPM [+0.113, +0.044, +0.083], dispersion +0.028 > 2x null +0.012). The result is the exact opposite of the falsified reversal class (reversal lost everywhere; momentum wins 7/10), internally consistent with a genuine short-horizon positive return autocorrelation (documented momentum anomaly). Independent verifier MATCH on all per-asset/universe medians and verdicts; determinism asserted; 134/134 regression tests pass. Lookback-sweep verification (37361000967): real-data lookback sweep 3/5/10 across all 10 collected tickers through the walk-forward regime-stability gate with a matched coin-flip null; the lookback=5 medians/nulls/verdicts reproduce the 37318950814 artifact exactly (cross-consistency gate); fresh walk_forward + noise_benchmark recomputation MATCH on AMZN/JPM; robustness verdicts re-derived from the artifact reproduce for all assets; determinism identical. Outcome: 6/10 assets lookback-ROBUST (positive REGIME_STABLE edge at >=2 lookbacks; MSFT/GOOGL/AMZN/META/TSLA at all three lookbacks), 0/10 lookback-SENSITIVE, 4/10 NO_EDGE. The NO_EDGE group = NVDA (uniformly negative medians across lookbacks, stable losses), JPM (REGIME_DEPENDENT but no robust positive edge), JNJ/XOM (small positives within the noise band). The remaining UNVERIFIED gap — real-data lookback parameter sensitivity — is closed: the momentum edge is not a single-point lookback optimum. Gates passed: leakage, regime-stability, independent-verification, determinism, real-data lookback-robustness. Caveats stand: the edge is short-horizon and mechanical; 3/10 assets show no robust edge; the synthetic generator has no momentum structure so it cannot test momentum robustness. | Tested (37394344201): the momentum edge generalizes to lookback 20 and 60 in magnitude; the 60-day regime-stability verdicts are reported as null-dispersion-sensitive rather than indicating an edge decay. Cell closed TESTED. |
++ INVALIDATED (2026-11-15, R-001 cost check): signal is a static long, not momentum — see "Cost-sensitivity correction" below. Formerly ADMITTED AS CANDIDATE POSITIVE EVIDENCE (executed 37318950814; lookback-sweep verification 37361000967) | Mechanical 1-day-ahead bet LONG the previous 5-day return: uniformly POSITIVE segment medians in 7/10 assets and REGIME_STABLE (regime-stable across blocks): AAPL [+0.071, +0.054, +0.092, +0.069], MSFT [+0.052, +0.072], GOOGL [+0.069, +0.071, +0.101], AMZN [+0.065, +0.076, +0.077], META [+0.073, +0.067, +0.042], NVDA [-0.038, +0.013, +0.100], TSLA [+0.132, +0.016, +0.107]; 2/10 CONSISTENT_WITH_NOISE (JNJ [+0.050, +0.046], XOM [+0.018, +0.037] — small positive, at the noise threshold); 1/10 REGIME_DEPENDENT (JPM [+0.113, +0.044, +0.083], dispersion +0.028 > 2x null +0.012). The result is the exact opposite of the falsified reversal class (reversal lost everywhere; momentum wins 7/10), internally consistent with a genuine short-horizon positive return autocorrelation (documented momentum anomaly). Independent verifier MATCH on all per-asset/universe medians and verdicts; determinism asserted; 134/134 regression tests pass. Lookback-sweep verification (37361000967): real-data lookback sweep 3/5/10 across all 10 collected tickers through the walk-forward regime-stability gate with a matched coin-flip null; the lookback=5 medians/nulls/verdicts reproduce the 37318950814 artifact exactly (cross-consistency gate); fresh walk_forward + noise_benchmark recomputation MATCH on AMZN/JPM; robustness verdicts re-derived from the artifact reproduce for all assets; determinism identical. Outcome: 6/10 assets lookback-ROBUST (positive REGIME_STABLE edge at >=2 lookbacks; MSFT/GOOGL/AMZN/META/TSLA at all three lookbacks), 0/10 lookback-SENSITIVE, 4/10 NO_EDGE. The NO_EDGE group = NVDA (uniformly negative medians across lookbacks, stable losses), JPM (REGIME_DEPENDENT but no robust positive edge), JNJ/XOM (small positives within the noise band). The remaining UNVERIFIED gap — real-data lookback parameter sensitivity — is closed: the momentum edge is not a single-point lookback optimum. Gates passed: leakage, regime-stability, independent-verification, determinism, real-data lookback-robustness. Caveats stand: the edge is short-horizon and mechanical; 3/10 assets show no robust edge; the synthetic generator has no momentum structure so it cannot test momentum robustness. | Tested (37394344201): the momentum edge generalizes to lookback 20 and 60 in magnitude; the 60-day regime-stability verdicts are reported as null-dispersion-sensitive rather than indicating an edge decay. Cell closed TESTED. |
+ 
+ | Cross-sectional momentum (long top-3 / short bottom-3 by 63-day cumulative return, 1-day hold) on collected data | FALSIFIED (verified, current activation) | Independent verifier recomputed via a fresh engine walk-forward + coin-flip null path: regime gate segments/candidate medians/null medians/verdict MATCH; concentration gate (full-universe median +0.002, null tol +0.0305, best share 6.12%, NO_EDGE) MATCH; 9x4 perturbation sweep grid (36 medians candidate & null) MATCH; baseline candidate -0.014 vs null -0.013, within sample-calibrated tolerance; determinism identical. During verification a verifier defect was found and repaired (baseline_nulls populated from previous grid iteration). 9/10 sub-universes CONSISTENT_WITH_NOISE, 1/10 REGIME_DEPENDENT (JNJ, dispersion > 2x null), 1/10 REGIME_STABLE (XOM, small positive stable edge); full-universe spread median +0.002 within null tol +0.0305 (NO_EDGE concentration), sweep CONSISTENT_WITH_NOISE — no robust cross-sectional edge anywhere. | None — cell closed FALSIFIED |
+ | 20-day breakout continuation (long when close exceeds the highest close of the prior 20 trading days; hold 1 day) on collected data | FALSIFIED (executed, 37414038601) | A genuinely new signal class: threshold-activated momentum variant. Gate stack completed: manifest 10/10, preflight PASSED, leakage PASS (AMZN/JPM, equity-fill audit), regime-stability gate across all 10 tickers with matched coin-flip null, bounded lookback sensitivity {5, 10, 20}, determinism, and independent verifier (3 gates: AMZN/JPM fresh walk_forward MATCH, all-asset fresh medians/nulls + regenerated verdicts MATCH, determinism). New framework function `regime_stability.py::breakout_signals`, its export, the check, and the verifier all verified; 161/161 regression tests pass (5 new unit tests). Results: lookback 5 REGIME_STABLE=3 / CWN=7 / DEPENDENT=0; lookback 10 REGIME_STABLE=1 / CWN=8 / DEPENDENT=1; lookback 20 (canonical) REGIME_STABLE=1 / CWN=9 / DEPENDENT=0. Sensitivity: ROBUST=1 (TSLA, edges at lookbacks 5 and 20), SENSITIVE=2 (AAPL @5, NVDA @10), NO_EDGE=7. The three borderline REGIME_STABLE assets (AAPL @5 [0.039,0.021,0.063,0.021], TSLA @5 [0.038,0.013,0.068] + @20 [0.019,0.040,0.053], NVDA @10 [0.003,0.047,0.050]) are small in magnitude, non-lookback-robust (except TSLA), and absent from the momentum-asset list (MSFT/GOOGL/AMZN/META show NO_EDGE). The result matches the a-priori prediction: noise-like in most assets, small positive verdicts only among momentum assets — the breakout filter adds no robust evidence beyond momentum. | None — cell closed FALSIFIED |
+@@ -67,3 +67,37 @@ Prefer the highest-value unresolved frontier cell over repeating an equivalent e
+ 5. Preserve negative and inconclusive evidence.
+ 6. Do not claim a strategy delta worked until its expected effect is actually observed.
+ 7. When there is insufficient evidence, choose UNVERIFIED rather than forcing RETAIN or REVERT.
++
++## Selection evidence audit (P-001, agent 01, run 43724282721, 2026-11-15)
++
++**Question.** Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?
++
++**Verified selector mechanics** (read-only inspection of `.github/scripts/campaign_controller.py::task_rank` / `select_task`): selection is a deterministic ordinal ranking over seven *self-declared* labels (expected_information_gain, downstream_leverage, falsification_power, verifiability, effort, complexity, execution_risk), tie-broken by `task_id`; one task per agent; role-matched; the previous agent's decision propagates status (USEFUL_CHANGE / VERIFIED_NEGATIVE_RESULT / RETAIN -> RESOLVED, REJECT -> REJECTED, otherwise DEFERRED) and its `candidate_tasks` are appended and de-duplicated by `task_id`. The observed P-001 contract's `compared_against` order [P-001, P-002, P-004, P-003, P-006] reproduces exactly from the declared labels, so the selector is reproducible and auditable.
++
++**Verified evidence gap.** The selector has exactly one realized selection: `campaign_status.json` holds one `selection_history` entry (agent 1 -> P-001), `state/campaign/runs/` holds no earlier run, and `global_agent_counter.json` is at campaign 1. There is no outcome observation, no counterfactual, and no measured-value ranking; the "highest-value" claim rests on labels, not on measured information gain.
++
++**Verified comparison that does exist (worker-level, not selector-level).** Before the frontier-first rule, eight recorded MA(20/60) activation sections in `state/STATE.md` (real-data pipeline, per-asset perturbation, AAPL/NVDA/universe regime-stability, per-asset t-statistic, AMZN/JPM deep-dive, regime-adaptive MA) worked one hypothesis lineage without closing it. After the rule, seven consecutive activations (37263008074, 37304873966, 37314710995, 37318950814, 37361000967, 37394344201, 37414038601) each closed one distinct cell with a decisive, independently verified verdict (six FALSIFIED, one SUPPORTED). Closures per activation: 0/8 -> 6/7.
++
++**Contradictory evidence (preserved).** The "no equivalent re-tests" phrase in the 2026-10-06 entry is overstated for the momentum cell. `research/checks/momentum_sweep.py` (lookback 3/5/10/20, added in 2dfc2df5) and `research/checks/momentum_lookback_sweep.py` (lookback 3/5/10, added in 5ce6d789) implement the same information objective, and only the latter has an artifact. `momentum_sweep_results.json`, `momentum_concentration.py`, `verify_momentum_sweep.py` and `momentum_concentration.json` were added in 1354bd7c (2026-10-05) but are absent from the working tree and from the controller's 2026-11-15T14:26:36Z capture; no deletion commit was found. Attribution is also confounded: the frontier era added the engine cross-check, concentration gate, and independent verifier at the same time.
++
++**Process decision: RETAIN (qualified).** Retain frontier-first focused-task selection: it is the only rule with observed closure evidence, and the controller implements it reproducibly with structural dedupe and status propagation. The controller-side selector's own efficiency advantage is UNVERIFIED (n=1, label-based ranking, lexical tie-break). Do not claim a measured selector advantage until a later campaign records a rank-1 selection whose cell closes decisively and compares that against the recorded rank order.
++
++**Next.** One bounded action: a later campaign agent verifies from `campaign_status.selection_history` that each selected task was the rank-1 OPEN task of its role at selection time, and whether its cell closed decisively.
++
++## Cost-sensitivity correction (R-001, agent 02, run 43724282721, 2026-11-15)
++
++**Question.** Does the admitted short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?
++
++**CHANGED.** Added `research/checks/momentum_cost_sensitivity.py` (predeclared cost grid zero / repo-realistic / 2x-stress x lookback {3,5,10} x 10-asset universe through the existing `stress_segments` + matched coin-flip null), its independent verifier `research/checks/verify_momentum_cost_sensitivity.py`, and the artifact `state/check_artifacts/momentum_cost_sensitivity_results.json`. No signal rule, cost assumption, benchmark, date boundary, or universe was changed.
++
++**Cost verdict (reference lookback 5).** All 10 assets classify COST_ROBUST by the predeclared absolute-net rule; net cost-inclusive medians are essentially unchanged from zero to 2x costs (AAPL 0.0700/0.0700/0.0700; AMZN 0.0760/0.0760/0.0760; NVDA 0.0130/0.0120/0.0110). But the informative subset — signals that actually trade (turnover > 3) — is EMPTY (0/10).
++
++**Dominant finding (falsifies the premise).** `research/backtest/regime_stability.py::momentum_signals` computes `mean(log(closes[i-lookback+1:i+1]))` and goes long when > 0. For prices above 1 this is always positive, so the signal is a STATIC LONG (buy-and-hold), not a momentum rule; the lookback is inert. 9/10 assets show exactly 1 weight change over 4,465 bars (frac_long 0.9986-0.9993); NVDA shows 2. For AAPL/AMZN/TSLA the repo momentum medians are exactly identical to a fresh always-long walk-forward; a textbook trailing-return momentum would trade 500-1200 times (AAPL 799). The earlier "identical medians across lookbacks / horizon-stable magnitude" observation was this inert lookback, not robustness. The matched-null gap widens with cost (AAPL +0.0587/+0.0642/+0.0702) only because the iid null churns ~2,400-2,950 times vs 1-2 for momentum; the gap is confounded and is stored as a secondary diagnostic only.
++
++**VERIFIED.** Manifest 10/10 OK; preflight PASSED; leakage PASS (AMZN/JPM); independent verifier 5/5 gates MATCH/PASS (fresh `walk_forward`+`noise_benchmark` per segment for AMZN/JPM at all lookbacks/costs with no `stress_segments`; independent static-signal confirmation; cost-verdict re-derivation for all 10x3 cells; zero-cost column cross-consistent with `momentum_lookback_sweep_results.json`; determinism); regression suite 168 tests OK.
++
++**UNVERIFIED.** The magnitude of any *genuine* momentum edge on this universe remains untested: the corrected return-based signal was deliberately NOT run here (out of scope — "do not tune signal rules after seeing cost results"). `mean_reversion_signals` shares the identical log-price defect (always short), so the reversal falsification is likewise "always-short loses"; that cell is also UNVERIFIED as reversal evidence.
++
++**Decision: RETAIN (as a durable negative correction).** The prior momentum admission is downgraded to INVALID: it is a static long, not momentum. Do not cite the momentum/reversal cells as signal-class evidence until re-derived with a corrected return-based signal.
++
++**Next.** One bounded action: add a corrected return-based momentum signal (sign of `log(c_t) - log(c_{t-lb})`) as a new framework function and re-run the momentum lookback cell (3/5/10) through the existing cost-aware gate stack, then decide admission.
+diff --git a/state/STATE.md b/state/STATE.md
+index d53ebb88..1d3b24c1 100644
+--- a/state/STATE.md
++++ b/state/STATE.md
+@@ -1513,6 +1513,67 @@ edge.)
+ 
+ ---
+ 
++## Current activation (momentum cost-sensitivity on the collected universe — R-001, agent 02, run 43724282721, 2026-11-15)
++
++Bounded transaction-cost sensitivity for the admitted short-horizon momentum
++evidence (lookback 3/5/10). The check
++(`research/checks/momentum_cost_sensitivity.py`) runs the existing
++`stress_segments` walk-forward gate (train=252d/test=84d/warmup=60d/overlap=60d;
++4 contiguous volatility blocks; min 400 bars/segment) across the 10-asset
++universe under a predeclared cost grid — zero, the repository's existing
++realistic model (commission_per_trade=2.0, commission_per_share=0.003,
++slippage_cents=2.0, slippage_proportional=0.0005, from
++`examples/ma_crossover_real_data.py`), and a 2x conservative stress — with the
++matched coin-flip null costed identically. Artifact:
++`state/check_artifacts/momentum_cost_sensitivity_results.json`.
++
++The decisive finding is not the cost verdict but *what the signal trades*.
++`research/backtest/regime_stability.py::momentum_signals` computes
++`mean(log(closes[i-lookback+1:i+1]))` and goes long when that is > 0. For any
++price above 1 this is always positive, so the signal is a **static long
++(buy-and-hold)**, not a momentum rule: the lookback is inert. Measured on the
++full series, 9/10 assets have exactly 1 weight change over 4,465 bars
++(frac_long 0.9986-0.9993) and NVDA has 2 (frac_long 0.5841, an early sub-$1
++split-adjusted period). For AAPL/AMZN/TSLA the repo momentum medians are exactly
++identical to a fresh always-long (all +1) walk-forward. A textbook
++trailing-return momentum (sign of `log(c_t) - log(c_{t-lb})`) would trade ~500-
++1200 times (AAPL 799 sign changes); the repo formula trades once. The earlier
++"identical medians across lookbacks" that was read as horizon-stable magnitude is
++the signature of this inert lookback, not evidence of robustness.
++
++Consequences for the cost question (reference lookback 5):
++- All 10 assets classify COST_ROBUST by the predeclared absolute-net rule
++  (net cost-inclusive medians essentially unchanged from zero to 2x costs:
++  AAPL 0.0700/0.0700/0.0700, AMZN 0.0760/0.0760/0.0760, NVDA
++  0.0130/0.0120/0.0110, etc.), but the informative subset (signals that actually
++  trade, TRADING turnover > 3) is **empty**. The robustness is real but vacuous:
++  a position that never rebalances barely pays costs.
++- The matched-null gap *widens* with cost (e.g. AAPL +0.0587/+0.0642/+0.0702)
++  because the iid coin-flip null churns ~2,384-2,953 times per series versus 1-2
++  for momentum; cost stress penalises the null far more. The gap is therefore
++  confounded and is stored only as a secondary, clearly-labelled diagnostic — it
++  must not be read as the edge strengthening under costs.
++
++Verification: independent verifier `verify_momentum_cost_sensitivity.py` (5
++gates) all MATCH/PASS — fresh `walk_forward`+`noise_benchmark` per segment for
++AMZN/JPM across all lookbacks and cost levels (no `stress_segments`); independent
++static-signal confirmation (repo formula sign changes = 1; repo momentum medians
++== fresh always-long for AAPL/AMZN/TSLA); cost-verdict re-derivation for all
++10 assets x 3 lookbacks; zero-cost column cross-consistent with
++`momentum_lookback_sweep_results.json`; determinism. Manifest 10/10 OK, preflight
++PASSED, leakage PASS (AMZN/JPM). Regression suite: 168 tests, all passing.
++
++Assessment: the cost question is answered, but it dissolves the premise. The
++admitted "short-horizon momentum edge" is a static long / buy-and-hold drift, not
++a momentum strategy; its cost robustness is trivially high and carries no
++information about a tradable momentum edge. The same defect affects
++`mean_reversion_signals` (always short), so the reversal falsification is also
++"always-short loses." Both cells must be re-derived with a corrected return-based
++signal before any momentum/reversal claim is admitted. Recorded as a durable
++negative correction; the signal rule was NOT changed here (out of scope).
++
++---
++
+ ## Evidence standard
+ 
+ Synthetic data validates tooling only; it is not evidence that any
+diff --git a/state/campaign/global_agent_counter.json b/state/campaign/global_agent_counter.json
+index 1f71a6a2..67042c54 100644
+--- a/state/campaign/global_agent_counter.json
++++ b/state/campaign/global_agent_counter.json
+@@ -1,5 +1,12 @@
+ {
+-  "schema_version": 1,
+-  "next_global_agent_number": 1,
+-  "campaigns": []
++  "campaigns": [
++    {
++      "agent_count": 10,
++      "global_end": 10,
++      "global_start": 1,
++      "run_id": "43724282721"
++    }
++  ],
++  "next_global_agent_number": 11,
++  "schema_version": 1
+ }
+diff --git a/state/campaign/task_queue.json b/state/campaign/task_queue.json
+index b06d4bfa..f81f6a6d 100644
+--- a/state/campaign/task_queue.json
++++ b/state/campaign/task_queue.json
+@@ -3,257 +3,282 @@
+   "selection_principle": "qualitative_evidence_backed_priority",
+   "tasks": [
+     {
+-      "task_id": "P-001",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+       "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+-      "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+-      "scope": "Use LEARNING_STATE, STATE, activation records, and current controller state; produce one bounded process judgment.",
+-      "out_of_scope": "Do not redesign the controller architecture or add a numerical reward score.",
++      "complexity": "LOW",
+       "deliverable": "A durable process decision with evidence-backed examples from recent activations.",
+-      "success_criterion": "The assessment distinguishes a concrete selector advantage, no demonstrated advantage, or an unresolved result using actual durable evidence.",
+-      "stop_condition": "Stop once the selector decision is supported or the evidence is insufficient for a stronger conclusion.",
+-      "verification_requirement": "Controller-side validation plus inspection of cited durable evidence; no reliance on agent confidence.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "LEARNING_STATE documents the previous frontier-first selection gap and five recent frontier cells closed without equivalent retests.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
++      "out_of_scope": "Do not redesign the controller architecture or add a numerical reward score.",
++      "primary_question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Use LEARNING_STATE, STATE, activation records, and current controller state; produce one bounded process judgment.",
++      "selected_agent": 1,
++      "status": "RESOLVED",
++      "stop_condition": "Stop once the selector decision is supported or the evidence is insufficient for a stronger conclusion.",
++      "success_criterion": "The assessment distinguishes a concrete selector advantage, no demonstrated advantage, or an unresolved result using actual durable evidence.",
++      "task_id": "P-001",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Controller-side validation plus inspection of cited durable evidence; no reliance on agent confidence."
+     },
+     {
+-      "task_id": "P-002",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+       "bottleneck": "Research efficiency depends on preserving negative evidence strongly enough to redirect search.",
+-      "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
+-      "scope": "Inspect LEARNING_STATE, STATE, research checks, and campaign queue semantics; propose at most one minimal change.",
+-      "out_of_scope": "Do not rerun historical experiments or add broad metadata systems.",
++      "complexity": "LOW",
+       "deliverable": "A retain/reject/unverified process decision with concrete duplicate-avoidance evidence.",
+-      "success_criterion": "At least one evidence-backed conclusion about duplicate-work prevention is established.",
+-      "stop_condition": "Stop when the duplicate-work question is resolved or clearly unverified.",
+-      "verification_requirement": "Independent controller validation of any implementation change.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "LEARNING_EFFICIENCY already calls for a novelty guard and recent research cells were closed as FALSIFIED/TESTED.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
++      "out_of_scope": "Do not rerun historical experiments or add broad metadata systems.",
++      "primary_question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Inspect LEARNING_STATE, STATE, research checks, and campaign queue semantics; propose at most one minimal change.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the duplicate-work question is resolved or clearly unverified.",
++      "success_criterion": "At least one evidence-backed conclusion about duplicate-work prevention is established.",
++      "task_id": "P-002",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Independent controller validation of any implementation change."
+     },
+     {
+-      "task_id": "P-003",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the durable evidence layer preserve useful negative evidence strongly enough to redirect future research?",
+       "bottleneck": "Negative findings are valuable only if later agents can reliably see and use them.",
+-      "objective": "Audit whether recent falsified frontiers and rejected process decisions are discoverable and actually reflected in the current task queue.",
+-      "scope": "Use durable state only; compare a sample of falsified cells with current task candidates.",
+-      "out_of_scope": "Do not rewrite the entire state model or duplicate the research history.",
++      "complexity": "LOW",
+       "deliverable": "A bounded evidence-preservation assessment and, only if necessary, one minimal durable-state repair.",
+-      "success_criterion": "The audit either verifies preservation/reuse or identifies one specific failure that can be repaired and verified.",
+-      "stop_condition": "Stop after the sampled evidence is sufficient to classify the preservation mechanism.",
+-      "verification_requirement": "Controller-side schema validation plus inspection of the referenced durable records.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "The repository contains extensive FALSIFIED and TESTED frontier entries plus a dedicated LEARNING_STATE layer.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Audit whether recent falsified frontiers and rejected process decisions are discoverable and actually reflected in the current task queue.",
++      "out_of_scope": "Do not rewrite the entire state model or duplicate the research history.",
++      "primary_question": "Does the durable evidence layer preserve useful negative evidence strongly enough to redirect future research?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Use durable state only; compare a sample of falsified cells with current task candidates.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the sampled evidence is sufficient to classify the preservation mechanism.",
++      "success_criterion": "The audit either verifies preservation/reuse or identifies one specific failure that can be repaired and verified.",
++      "task_id": "P-003",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Controller-side schema validation plus inspection of the referenced durable records."
+     },
+     {
+-      "task_id": "P-004",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the odd/even role split add measurable learning value without creating unnecessary orchestration complexity?",
+       "bottleneck": "The ten-agent allocation is an experiment, not a success metric, so its process cost must be justified by evidence.",
+-      "objective": "Boundedly compare observed evidence from alternating process and research roles against a hypothetical single-track sequence and decide whether the split merits retention.",
+-      "scope": "Inspect campaign records only; use qualitative evidence and complexity observations.",
+-      "out_of_scope": "Do not add a quantitative reward score or duplicate workflow infrastructure.",
++      "complexity": "MEDIUM",
+       "deliverable": "A process decision supported by campaign evidence.",
+-      "success_criterion": "The role split is classified as RETAIN, REJECT, or UNVERIFIED using actual campaign evidence.",
+-      "stop_condition": "Stop when the current campaign contains enough observations to classify the split.",
+-      "verification_requirement": "Final controller synthesis must preserve disagreement and unverified evidence.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "The campaign explicitly alternates LEARNING_PROCESS and HIGHER_ORDER_OBJECTIVE roles to create a meta-learning loop.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Boundedly compare observed evidence from alternating process and research roles against a hypothetical single-track sequence and decide whether the split merits retention.",
++      "out_of_scope": "Do not add a quantitative reward score or duplicate workflow infrastructure.",
++      "primary_question": "Does the odd/even role split add measurable learning value without creating unnecessary orchestration complexity?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Inspect campaign records only; use qualitative evidence and complexity observations.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the current campaign contains enough observations to classify the split.",
++      "success_criterion": "The role split is classified as RETAIN, REJECT, or UNVERIFIED using actual campaign evidence.",
++      "task_id": "P-004",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Final controller synthesis must preserve disagreement and unverified evidence."
+     },
+     {
+-      "task_id": "P-005",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does an explicit stop condition reduce scope expansion enough to improve validated learning efficiency?",
+       "bottleneck": "Focused tasks lose efficiency if agents continue interesting side paths after the evidence gate is already satisfied.",
+-      "objective": "Audit the campaign contracts and agent records for scope expansion pressure and determine whether the explicit stop boundary should be retained or minimally strengthened.",
+-      "scope": "Inspect campaign contracts, agent records, and worker progress; propose at most one minimal process change.",
+-      "out_of_scope": "Do not redesign Kilo execution, add scoring, or pursue any secondary research experiment.",
++      "complexity": "LOW",
+       "deliverable": "A bounded process decision with evidence about scope control and stop-condition effectiveness.",
+-      "success_criterion": "The evidence supports RETAIN, REJECT, or UNVERIFIED for the explicit stop boundary.",
+-      "stop_condition": "Stop once observed scope behavior is sufficient to classify the stop-condition mechanism.",
+-      "verification_requirement": "Controller-side validation of the durable record and any changed process artifact.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "The campaign requires zero intentional scope expansion and exactly one stop condition per focused task.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Audit the campaign contracts and agent records for scope expansion pressure and determine whether the explicit stop boundary should be retained or minimally strengthened.",
++      "out_of_scope": "Do not redesign Kilo execution, add scoring, or pursue any secondary research experiment.",
++      "primary_question": "Does an explicit stop condition reduce scope expansion enough to improve validated learning efficiency?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Inspect campaign contracts, agent records, and worker progress; propose at most one minimal process change.",
++      "status": "OPEN",
++      "stop_condition": "Stop once observed scope behavior is sufficient to classify the stop-condition mechanism.",
++      "success_criterion": "The evidence supports RETAIN, REJECT, or UNVERIFIED for the explicit stop boundary.",
++      "task_id": "P-005",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Controller-side validation of the durable record and any changed process artifact."
+     },
+     {
+-      "task_id": "P-006",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does independent controller validation distinguish evidence quality from agent-reported confidence reliably enough for campaign decisions?",
+       "bottleneck": "The research system must not confuse a plausible explanation or successful session with validated learning.",
+-      "objective": "Inspect agent records and controller validation outputs to determine whether the current evidence hierarchy catches unsupported claims and whether one minimal safeguard is warranted.",
+-      "scope": "Audit controller validation outputs, durable records, and final synthesis semantics.",
+-      "out_of_scope": "Do not add a numeric reward score or duplicate an independent research engine.",
++      "complexity": "LOW",
+       "deliverable": "A bounded process decision about evidence-versus-confidence separation.",
+-      "success_criterion": "The sampled controller records support a clear process classification or expose one specific verifiable gap.",
+-      "stop_condition": "Stop when the sampled records are sufficient to classify the separation mechanism.",
+-      "verification_requirement": "Independent inspection of controller validation outputs and regression tests for any implementation change.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "The repository explicitly treats Kilo success status, activity, and confidence as insufficient evidence.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Inspect agent records and controller validation outputs to determine whether the current evidence hierarchy catches unsupported claims and whether one minimal safeguard is warranted.",
++      "out_of_scope": "Do not add a numeric reward score or duplicate an independent research engine.",
++      "primary_question": "Does independent controller validation distinguish evidence quality from agent-reported confidence reliably enough for campaign decisions?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Audit controller validation outputs, durable records, and final synthesis semantics.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the sampled records are sufficient to classify the separation mechanism.",
++      "success_criterion": "The sampled controller records support a clear process classification or expose one specific verifiable gap.",
++      "task_id": "P-006",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Independent inspection of controller validation outputs and regression tests for any implementation change."
+     },
+     {
+-      "task_id": "R-001",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+       "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+-      "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+-      "scope": "Use the existing 10-asset collected universe and existing momentum implementation/check framework.",
+-      "out_of_scope": "Do not tune signal rules after seeing cost results, expand the universe, or introduce leverage.",
++      "complexity": "LOW",
+       "deliverable": "A reproducible artifact and independent verification result classifying cost robustness.",
+-      "success_criterion": "The result is reproducible and independently verified, regardless of positive or negative outcome.",
+-      "stop_condition": "Stop after the predeclared cost grid is evaluated and the independent verifier agrees or records the exact discrepancy.",
+-      "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, and existing regression suite.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "LEARNING_STATE admits short-horizon momentum as candidate positive evidence but leaves execution-cost robustness as a meaningful qualification.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
++      "out_of_scope": "Do not tune signal rules after seeing cost results, expand the universe, or introduce leverage.",
++      "primary_question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "Use the existing 10-asset collected universe and existing momentum implementation/check framework.",
++      "selected_agent": 2,
++      "status": "SELECTED",
++      "stop_condition": "Stop after the predeclared cost grid is evaluated and the independent verifier agrees or records the exact discrepancy.",
++      "success_criterion": "The result is reproducible and independently verified, regardless of positive or negative outcome.",
++      "task_id": "R-001",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": true
++      "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, and existing regression suite."
+     },
+     {
+-      "task_id": "R-002",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does the qualified momentum effect survive a small predeclared holding-period variation without becoming a single-point timing artifact?",
+       "bottleneck": "The current evidence is strongest for one-day holding, so temporal robustness is still partly unresolved.",
+-      "objective": "Test a fixed lookback-5 momentum signal with a predeclared small holding-period set using the existing walk-forward/null methodology.",
+-      "scope": "Use only the existing 10-asset universe and a fixed hold-period grid declared before execution.",
+-      "out_of_scope": "Do not tune the lookback or choose a holding period after inspecting results.",
++      "complexity": "LOW",
+       "deliverable": "A reproducible robustness artifact plus independent verification.",
+-      "success_criterion": "The holding-period sensitivity is classified and any positive finding is reproducible.",
+-      "stop_condition": "Stop after the declared holding-period grid is complete and independently checked.",
+-      "verification_requirement": "Matched null, leakage review, independent recomputation, determinism, regression suite.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "Momentum is candidate positive evidence at a one-day hold and has already survived lookback and horizon robustness in magnitude.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Test a fixed lookback-5 momentum signal with a predeclared small holding-period set using the existing walk-forward/null methodology.",
++      "out_of_scope": "Do not tune the lookback or choose a holding period after inspecting results.",
++      "primary_question": "Does the qualified momentum effect survive a small predeclared holding-period variation without becoming a single-point timing artifact?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "Use only the existing 10-asset universe and a fixed hold-period grid declared before execution.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the declared holding-period grid is complete and independently checked.",
++      "success_criterion": "The holding-period sensitivity is classified and any positive finding is reproducible.",
++      "task_id": "R-002",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": true
++      "verification_requirement": "Matched null, leakage review, independent recomputation, determinism, regression suite."
+     },
+     {
+-      "task_id": "R-003",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does a single past-only volatility gate create a predeclared robustness improvement for the qualified momentum effect?",
+       "bottleneck": "A candidate momentum effect may depend on market regime even after horizon robustness.",
+-      "objective": "Test one explicitly predeclared past-only volatility gate on lookback-5 momentum through the existing regime-stability and null framework.",
+-      "scope": "One volatility feature, one threshold rule declared before execution, existing 10-asset universe.",
+-      "out_of_scope": "Do not search a threshold grid or optimize the gate after seeing results.",
++      "complexity": "MEDIUM",
+       "deliverable": "A falsifiable regime-conditioned momentum result with independent verification.",
+-      "success_criterion": "The gate either demonstrates a reproducible improvement in robustness or is falsified/unsupported.",
+-      "stop_condition": "Stop after the one predeclared gate is evaluated and independently checked.",
+-      "verification_requirement": "Leakage gate, matched null, regime-stability, independent recomputation, determinism.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "MA regime filters were previously falsified; whether the same class of conditioning helps the different momentum mechanism remains unresolved.",
++      "execution_risk": "MEDIUM",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Test one explicitly predeclared past-only volatility gate on lookback-5 momentum through the existing regime-stability and null framework.",
++      "out_of_scope": "Do not search a threshold grid or optimize the gate after seeing results.",
++      "primary_question": "Does a single past-only volatility gate create a predeclared robustness improvement for the qualified momentum effect?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "One volatility feature, one threshold rule declared before execution, existing 10-asset universe.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the one predeclared gate is evaluated and independently checked.",
++      "success_criterion": "The gate either demonstrates a reproducible improvement in robustness or is falsified/unsupported.",
++      "task_id": "R-003",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "MEDIUM",
+-      "tests_preceding_process": true
++      "verification_requirement": "Leakage gate, matched null, regime-stability, independent recomputation, determinism."
+     },
+     {
+-      "task_id": "R-004",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "RESOLVED",
+-      "primary_question": "Does a fixed 20-day breakout continuation signal produce reproducible evidence beyond the currently qualified momentum family?",
+       "bottleneck": "The research frontier needs genuinely new signal classes rather than endless momentum variants.",
+-      "objective": "Test one fixed 20-day breakout continuation rule on the collected universe through the existing robustness gate stack.",
+-      "scope": "One predeclared breakout rule, existing data universe, existing walk-forward, regime, null, and independent-verification infrastructure.",
+-      "out_of_scope": "Do not sweep breakout lengths, tune after seeing results, or add new data dependencies.",
++      "complexity": "MEDIUM",
+       "deliverable": "A reproducible new-signal-class artifact with independent verification and a clear verdict.",
+-      "success_criterion": "The hypothesis is classified as falsified, supported, or unverified by the existing evidence standard.",
+-      "stop_condition": "Stop after the fixed rule completes the declared gate stack.",
+-      "verification_requirement": "Data preflight, leakage, regime stability, matched null, independent recomputation, determinism, regression suite.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "The current frontier explicitly calls for a genuinely new signal class or new data/method frontier after momentum qualification.",
++      "execution_risk": "MEDIUM",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Test one fixed 20-day breakout continuation rule on the collected universe through the existing robustness gate stack.",
++      "out_of_scope": "Do not sweep breakout lengths, tune after seeing results, or add new data dependencies.",
++      "primary_question": "Does a fixed 20-day breakout continuation signal produce reproducible evidence beyond the currently qualified momentum family?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "One predeclared breakout rule, existing data universe, existing walk-forward, regime, null, and independent-verification infrastructure.",
++      "status": "RESOLVED",
++      "stop_condition": "Stop after the fixed rule completes the declared gate stack.",
++      "success_criterion": "The hypothesis is classified as falsified, supported, or unverified by the existing evidence standard.",
++      "task_id": "R-004",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "MEDIUM",
+-      "tests_preceding_process": true
++      "verification_requirement": "Data preflight, leakage, regime stability, matched null, independent recomputation, determinism, regression suite."
+     },
+     {
+-      "task_id": "R-005",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does a conservative volatility-normalized sizing variant preserve a positive momentum signal without creating leverage-dependent evidence?",
+       "bottleneck": "A research candidate should not depend on uncontrolled sizing assumptions.",
+-      "objective": "Evaluate one fixed volatility-normalized sizing rule for the already-qualified momentum signal without leverage and with the existing null.",
+-      "scope": "One fixed sizing rule, existing universe, existing research engine, no leverage.",
+-      "out_of_scope": "Do not optimize sizing parameters or compare many variants.",
++      "complexity": "MEDIUM",
+       "deliverable": "A bounded sizing robustness result and independent verification.",
+-      "success_criterion": "The result distinguishes signal robustness from sizing artifacts.",
+-      "stop_condition": "Stop after the fixed sizing rule is tested and independently checked.",
+-      "verification_requirement": "Leakage, cost assumptions, matched null, independent recomputation, determinism.",
++      "downstream_leverage": "MEDIUM",
++      "effort": "MEDIUM",
+       "evidence_basis": "The current candidate is mechanical and short-horizon; separating signal evidence from sizing effects is decision-relevant.",
++      "execution_risk": "MEDIUM",
+       "expected_information_gain": "MEDIUM",
++      "falsification_power": "MEDIUM",
++      "objective": "Evaluate one fixed volatility-normalized sizing rule for the already-qualified momentum signal without leverage and with the existing null.",
++      "out_of_scope": "Do not optimize sizing parameters or compare many variants.",
++      "primary_question": "Does a conservative volatility-normalized sizing variant preserve a positive momentum signal without creating leverage-dependent evidence?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "One fixed sizing rule, existing universe, existing research engine, no leverage.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the fixed sizing rule is tested and independently checked.",
++      "success_criterion": "The result distinguishes signal robustness from sizing artifacts.",
++      "task_id": "R-005",
++      "tests_preceding_process": true,
++      "verifiability": "HIGH",
++      "verification_requirement": "Leakage, cost assumptions, matched null, independent recomputation, determinism."
++    },
++    {
++      "bottleneck": "Durable artifacts created in 1354bd7c (momentum_sweep_results.json, momentum_concentration.json) and their checks are absent from HEAD, so a completed momentum robustness result is no longer reproducible from the working tree.",
++      "complexity": "LOW",
++      "deliverable": "A durable recovery-or-loss record with the exact git commands and their outcomes.",
+       "downstream_leverage": "MEDIUM",
++      "effort": "LOW",
++      "evidence_basis": "Agent 01 run 43724282721 audit: commit 1354bd7c added the files; they are absent from the working tree and from the 2026-11-15T14:26:36Z controller capture; no deletion commit was found.",
++      "execution_risk": "LOW",
++      "expected_information_gain": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Determine whether the missing momentum concentration and sweep artifacts can be recovered from git history, and if not, record the loss and the smallest reconstruction step.",
++      "out_of_scope": "Do not rerun historical experiments, rewrite history, or redesign the persistence workflow.",
++      "primary_question": "Can the missing momentum concentration evidence from commit 1354bd7c be restored or reconstructed from git history?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Use git history and the existing momentum check scripts only; do not rerun the full research gate stack.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the artifacts are restored or the loss is documented with the exact blocker.",
++      "success_criterion": "The record either restores the artifacts reproducibly or states the loss and the next executable step.",
++      "task_id": "P-007",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "MEDIUM",
+-      "tests_preceding_process": true
++      "verification_requirement": "Controller-side validation plus independent re-inspection of the cited git objects and working-tree files."
+     }
+   ]
+ }
+diff --git a/state/worker_progress.md b/state/worker_progress.md
+index d6db99bd..029fb6c9 100644
+--- a/state/worker_progress.md
++++ b/state/worker_progress.md
+@@ -1,38 +1,9 @@
+ # Worker Progress
+ 
+-activation_id: 37414038601
+-phase: COMPLETE
+-status: COMPLETE
+-last_verified_milestone: breakout_20day_cont cell closed FALSIFIED with full independent verification; 161/161 regression tests pass; state artifacts and frontier records updated
+-
+-This file is a liveness contract. Updated after the final verified milestone.
+-
+-## Objective completed (task R-004 from state/campaign/task_queue.json)
+-
+-**Test:** Does a fixed 20-day breakout continuation signal (long when the close exceeds the highest close of the preceding 20 trading days; hold 1 day; daily rebalance) produce reproducible evidence beyond the currently qualified momentum family?
+-
+-**Verdict: FALSIFIED.** Gate stack completed end-to-end (manifest 10/10 OK, preflight PASSED, leakage PASS on AMZN/JPM + equity-fill audit, walk-forward regime-stability gate across all 10 collected tickers with a matched coin-flip null, bounded lookback sensitivity {5, 10, 20}, determinism r1==r2, independent verifier 3 gates all MATCH). Results: canonical 20-day lookback = 9/10 CONSISTENT_WITH_NOISE, 1/10 REGIME_STABLE (TSLA, small edge); sensitivity = ROBUST=1 (TSLA @5/@20), SENSITIVE=2 (AAPL @5, NVDA @10), NO_EDGE=7. The small positive verdicts are absent from the momentum-asset list (MSFT/GOOGL/AMZN/META show NO_EDGE) and are non-lookback-robust. The result matches the a-priori prediction: noise-like in most assets, small positive verdicts only among momentum assets — the breakout filter adds no robust evidence beyond momentum.
+-
+-## Deliverables
+-- `research/backtest/regime_stability.py::breakout_signals` (new signal function, exported)
+-- `research/checks/breakout_20day_cont.py` (check)
+-- `research/checks/verify_breakout_20day_cont.py` (independent verifier)
+-- `research/checks/smoke_breakout_signals.py` (scratch smoke test; retained as a useful diagnostic)
+-- `tests/test_regime_stability.py` (5 new unit tests)
+-- `state/check_artifacts/breakout_20day_cont_results.json` (artifact)
+-- `state/STATE.md`, `state/LEARNING_STATE.md`, `state/activation_status.json`, `state/worker_progress.md`, `logs/ACTIVATION-2026-10-06.md` (records)
+-
+-## Post-change verification
+-- `python3 research/checks/smoke_breakout_signals.py`: exits 0.
+-- `python3 research/checks/breakout_20day_cont.py`: exits 0; all gates complete; artifact written.
+-- `python3 research/checks/verify_breakout_20day_cont.py`: GATE 1 PASS (AMZN/JPM MATCH), GATE 2 PASS (all-asset MATCH + verdicts MATCH), GATE 3 PASS (determinism identical).
+-- `python3 -m unittest discover -s tests -v`: 161 tests, all passing (156 existing + 5 new), no regressions.
+-- Py_compile on all edited modules: OK.
+-
+-## Unresolved / caveats
+-- The three borderline REGIME_STABLE verdicts (AAPL @5, TSLA @5/@20, NVDA @10) sit just above the framework's 0.05 noise band; their threshold sensitivity is not independently quantified (flagged in STATE.md).
+-- No per-checkpoint UTC timestamps captured (the `date` shell form is denied); run identity anchored to GITHUB_RUN_ID=37414038601.
+-- No KILO_RECOVERY_BRANCH present; no outstanding recovery work.
+-
+-## Next
+-Task R-001: cost-sensitivity test of the qualified momentum edge (fixed cost model, lookback 3/5/10, matched null) through the full gate stack; report whether costs erase the edge.
++activation_id: 43724282721
++agent_number: 02
++task_id: R-001
++phase: AGENT_02_COMPLETE
++status: DONE
++last_verified_milestone: 2026-11-15T14:42Z — cost-sensitivity grid evaluated; independent verifier 5/5 MATCH; 168 regression tests OK; momentum admission invalidated (static-long signal defect)
++next_bounded_action: re-derive momentum/reversal with a corrected return-based signal, then re-run the cost-aware gate stack
+\ No newline at end of file

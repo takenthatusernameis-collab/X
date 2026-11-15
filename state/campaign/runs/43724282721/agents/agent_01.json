@@ -1,0 +1,66 @@
+{
+  "agent_number": 1,
+  "campaign_slot": 1,
+  "global_agent_number": 1,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-001",
+  "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+  "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+  "question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+  "action": "Audited the controller selector (campaign_controller.task_rank / select_task), campaign_status.json, task_queue.json, global_agent_counter.json, LEARNING_STATE frontier and history, STATE.md activation sections, and the momentum check/artifact set; appended a dated selection-evidence audit to state/LEARNING_STATE.md.",
+  "changed": [
+    "state/LEARNING_STATE.md",
+    "state/worker_progress.md",
+    "state/campaign/runs/43724282721/agents/agent_01.json"
+  ],
+  "verified": [
+    "read .github/scripts/campaign_controller.py:198-380 -- task_rank is a deterministic ordinal tuple over seven self-declared labels (expected_information_gain, downstream_leverage, falsification_power, verifiability, effort, complexity, execution_risk) with task_id as tie-break; select_task propagates the previous agent's decision to task status (USEFUL_CHANGE/VERIFIED_NEGATIVE_RESULT/RETAIN -> RESOLVED, REJECT -> REJECTED, else DEFERRED) and appends candidate_tasks de-duplicated by task_id",
+    "recomputed the rank tuples by hand from state/campaign/task_queue.json and reproduced the P-001 contract's compared_against order [P-001, P-002, P-004, P-003, P-006] exactly (P-004 outranks P-003 on falsification_power MEDIUM vs HIGH being outweighed by expected_information_gain HIGH vs MEDIUM)",
+    "state/campaign/runs/ contains only 43724282721 and manual-deep-grind-20261006-0404; campaign_status.json holds exactly one selection_history entry (agent 1 -> P-001); state/campaign/global_agent_counter.json is at campaign 1",
+    "grep '^## ' state/STATE.md -- eight recorded MA(20/60) activation sections at lines 313, 358, 958, 999, 1028, 1117, 1178, 1234, none of which closed the MA cell",
+    "git log --diff-filter=A -- research/checks/momentum_sweep.py research/checks/momentum_lookback_sweep.py -- momentum_sweep.py added in 2dfc2df5 (2026-10-05), momentum_lookback_sweep.py added in 5ce6d789 (2026-10-05); momentum_sweep.py covers lookback 3/5/10/20 and momentum_lookback_sweep.py covers 3/5/10 on the same universe",
+    "git show --stat 1354bd7c (2026-10-05) -- added research/checks/momentum_concentration.py, research/checks/verify_momentum_sweep.py, state/check_artifacts/momentum_sweep_results.json, state/check_artifacts/momentum_concentration.json",
+    "ls state/check_artifacts -- momentum_sweep_results.json and momentum_concentration.json are absent; glob research/checks/*.py -- momentum_concentration.py and verify_momentum_sweep.py are absent",
+    "grep momentum_sweep across the repository -- only the controller hash capture, this session's own log, and the file's own artifact path reference it; no durable record cites its figures"
+  ],
+  "unverified": [
+    "why momentum_concentration.py, verify_momentum_sweep.py, momentum_sweep_results.json and momentum_concentration.json are absent from HEAD: git log --diff-filter=D found no deletion commit, and git cat-file -e HEAD:... and git branch -a were denied by tool policy, so the loss mechanism (rebase vs delete) is unresolved",
+    "whether research/checks/momentum_sweep.py ever completed a run: no artifact and no durable record of its figures exist",
+    "the controller selector's efficiency advantage: one realized selection, no counterfactual arm, no measured-value ranking, so no selector-level effect is demonstrated"
+  ],
+  "observed_effect": "At worker level the frontier-first rule is associated with a measured change in closure throughput: 0 closures in 8 MA(20/60) activations before it, 6 closures in 7 activations after it. The controller selector itself has one realized selection and no outcome observation. The strong 'no equivalent re-tests' claim is contradicted by an orphaned duplicate lookback-sweep pair (momentum_sweep.py vs momentum_lookback_sweep.py) and by four artifacts/checks that were created in 1354bd7c but are absent from HEAD.",
+  "uncertainty_targeted": "Does explicit highest-value focused-task selection improve learning efficiency relative to prior opportunistic task choice?",
+  "uncertainty_reduced": "Resolved at worker level: frontier-first selection now has a quantified closure contrast (0/8 -> 6/7 activations) and the controller implementation is reproducible and auditable. Narrowed at selector level: the advantage is now precisely characterized as unmeasured (n=1, label-declared ranking, lexical tie-break) rather than unknown, and the overstated 'no equivalent re-tests' evidence basis is falsified for the momentum cell.",
+  "process_decision": "RETAIN",
+  "research_result": "No market research claim (process audit). Negative finding: the selector's 'highest-value' ordering is derived from self-declared ordinal labels and a task_id tie-break, so it cannot discriminate value among equally labelled tasks; one duplicate experiment pair exists despite the frontier record, and four durable artifacts are missing from HEAD.",
+  "decision": "RETAIN",
+  "next": "A later campaign agent verifies from state/campaign/runs/*/campaign_status.json whether each selected task was the rank-1 OPEN task of its role at selection time and whether its cell closed decisively.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-007",
+      "role": "LEARNING_PROCESS",
+      "status": "OPEN",
+      "primary_question": "Can the missing momentum concentration evidence from commit 1354bd7c be restored or reconstructed from git history?",
+      "bottleneck": "Durable artifacts created in 1354bd7c (momentum_sweep_results.json, momentum_concentration.json) and their checks are absent from HEAD, so a completed momentum robustness result is no longer reproducible from the working tree.",
+      "objective": "Determine whether the missing momentum concentration and sweep artifacts can be recovered from git history, and if not, record the loss and the smallest reconstruction step.",
+      "scope": "Use git history and the existing momentum check scripts only; do not rerun the full research gate stack.",
+      "out_of_scope": "Do not rerun historical experiments, rewrite history, or redesign the persistence workflow.",
+      "deliverable": "A durable recovery-or-loss record with the exact git commands and their outcomes.",
+      "success_criterion": "The record either restores the artifacts reproducibly or states the loss and the next executable step.",
+      "stop_condition": "Stop when the artifacts are restored or the loss is documented with the exact blocker.",
+      "verification_requirement": "Controller-side validation plus independent re-inspection of the cited git objects and working-tree files.",
+      "evidence_basis": "Agent 01 run 43724282721 audit: commit 1354bd7c added the files; they are absent from the working tree and from the 2026-11-15T14:26:36Z controller capture; no deletion commit was found.",
+      "expected_information_gain": "HIGH",
+      "downstream_leverage": "MEDIUM",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "effort": "LOW",
+      "complexity": "LOW",
+      "execution_risk": "LOW",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "LOW: one appended audit section in state/LEARNING_STATE.md; no controller, queue, or research-code change.",
+  "failure_class": "NONE",
+  "task_selection_observation": "UNCHANGED"
+}
