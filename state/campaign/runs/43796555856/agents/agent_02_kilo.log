@@ -1,0 +1,3437 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+I'll start by inspecting the durable evidence: LEARNING_STATE, the momentum implementation, the cost model, and the campaign state.
+[0m→ [0mRead state/LEARNING_STATE.md
+[0m
+[0m$ [0mls /home/runner/work/X/X
+AGENTS.md
+ENTERPRISE.md
+LEARNING_EFFICIENCY.md
+MANUAL_SETUP.md
+PERSISTENCE_POLICY.md
+README.md
+REPOSITORY_PLAYBOOK.md
+append_activation_log.py
+check_adjacent.py
+check_compile.py
+check_compile2.py
+check_determinism.py
+check_determinism_nvda.py
+check_determinism_real_data.py
+check_determinism_universe.py
+check_exports.py
+check_gaps.py
+check_json1.py
+check_network.py
+debug_diff.py
+debug_holidays.py
+debug_stress.py
+debug_sweep.py
+debug_ts.py
+debug_ts2.py
+debug_ts3.py
+debug_yahoo.py
+debug_yahoo2.py
+diag_fold_detail.py
+diag_mom_vs_rev.py
+diag_null.py
+diag_null2.py
+diag_null3.py
+diag_null4.py
+diag_null5.py
+diag_null6.py
+dump_artifact.py
+examples
+log_append.py
+logs
+probe_env.py
+probe_hosts.py
+probe_manifest.py
+probe_mean_reversion_artifact.py
+probe_stooq.py
+probe_yahoo.py
+probe_yahoo3.py
+read_env.py
+repro_engine.py
+repro_engine2.py
+research
+scratch
+smoke_csrs.py
+state
+test_loader_tmp.py
+test_segment_merge.py
+test_timer.py
+test_write.py
+tests
+tmp_art.py
+tmp_artifact_check.py
+tmp_cleanup.py
+tmp_edit_ls.py
+tmp_json_check.py
+tmp_read.py
+tmp_read2.py
+tmp_read3.py
+update_manifest_gaps.py
+validate_receipt.py
+verify_json.py
+verify_perfold.py
+[0m
+[0m$ [0mls /home/runner/work/X/X/research /home/runner/work/X/X/research/backtest /home/runner/work/X/X/research/checks
+/home/runner/work/X/X/research:
+METHODOLOGY.md
+README.md
+REAL_DATA_FEASIBILITY.md
+backtest
+checks
+data
+
+/home/runner/work/X/X/research/backtest:
+__init__.py
+__pycache__
+data.py
+engine.py
+leakage.py
+metrics.py
+perturbation.py
+real_data.py
+regime_stability.py
+requirements.txt
+universe.py
+
+/home/runner/work/X/X/research/checks:
+breakout_20day_cont.py
+cross_sectional_momentum.py
+cross_sectional_regime_diagnostic.py
+cross_sectional_relative_strength.py
+determinism_check.py
+mean_reversion.py
+momentum.py
+momentum_hold_period_sensitivity.py
+momentum_horizon_gap_analysis.py
+momentum_longer_horizon.py
+momentum_lookback_sweep.py
+momentum_sweep.py
+regime_adaptive_ma.py
+regime_dependent_deep_dive.py
+smoke_breakout_signals.py
+smoke_cs_momentum.py
+test_count.py
+universe_stats.py
+verify_aapl_stats.py
+verify_breakout_20day_cont.py
+verify_cross_sectional.py
+verify_cross_sectional_momentum.py
+verify_dd_independent.py
+verify_mean_reversion.py
+verify_momentum.py
+verify_momentum_longer_horizon.py
+verify_momentum_lookback_sweep.py
+verify_regime_adaptive.py
+verify_volatility_targeting.py
+volatility_targeting.py
+[0m
+[0m$ [0mls -R /home/runner/work/X/X/state | head -60
+/home/runner/work/X/X/state:
+LEARNING_STATE.md
+STATE.md
+activation_status.json
+campaign
+capture_identity.py
+check_artifacts
+check_smoke
+smoke
+smoke_volatility_targeting.py
+validate_receipt.py
+verify_artifact.py
+worker_progress.md
+
+/home/runner/work/X/X/state/campaign:
+current_task.json
+global_agent_counter.json
+runs
+task_queue.json
+
+/home/runner/work/X/X/state/campaign/runs:
+43796555856
+manual-deep-grind-20261006-0404
+
+/home/runner/work/X/X/state/campaign/runs/43796555856:
+agents
+campaign_status.json
+task_queue_initial.json
+
+/home/runner/work/X/X/state/campaign/runs/43796555856/agents:
+agent_01.json
+agent_01_before.json
+agent_01_contract.json
+agent_01_kilo.log
+agent_01_runtime.json
+agent_01_validation.json
+agent_02_before.json
+agent_02_contract.json
+agent_02_kilo.log
+
+/home/runner/work/X/X/state/campaign/runs/manual-deep-grind-20261006-0404:
+deep_grind_engineering_record.md
+
+/home/runner/work/X/X/state/check_artifacts:
+breakout_20day_cont_results.json
+cross_sectional_momentum_results.json
+cross_sectional_relative_strength_results.json
+mean_reversion_results.json
+momentum_horizon_gap_analysis.json
+momentum_longer_horizon_results.json
+momentum_lookback_sweep_results.json
+momentum_results.json
+smoke_cs_momentum.json
+volatility_targeting_results.json
+volatility_targeting_smoke.json
+
+/home/runner/work/X/X/state/check_smoke:
+smoke_momentum.py
+
+/home/runner/work/X/X/state/smoke:
+[0m
+[0m→ [0mRead state/STATE.md
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py
+[0m
+[0m$ [0mgrep -n "cost" -i /home/runner/work/X/X/research/backtest/engine.py | head -60
+57:    """Costs, cash and warmup policy for one backtest.
+273:        cfg: backtest costs and cash policy.
+[0m
+[0m→ [0mRead research/checks/momentum.py
+[0m
+[0m$ [0msed -n 40,130p /home/runner/work/X/X/research/backtest/engine.py
+shares: float     # signed shares traded (positive = net long leg)
+    price: float
+    commission: float
+
+
+@dataclasses.dataclass
+class MarginCall:
+    """Record of a maintenance-margin call and forced liquidation."""
+    date: int
+    gross_notional: float
+    required_margin: float
+    equity: float
+    liquidated_shares: float
+
+
+@dataclasses.dataclass
+class BacktestConfig:
+    """Costs, cash and warmup policy for one backtest.
+
+    Position sizing is constant-dollar: `target_exposure` is applied to
+    initial_capital, so a weight of 1.0 holds a position worth
+    initial_capital * target_exposure in each signal bar. This keeps
+    sizing independent of accumulated (unrealized) gains.
+    """
+    initial_capital: float = 1e6
+    target_exposure: float = 1.0     # gross exposure (long or short) as fraction of cash
+    commission_per_trade: float = 0.0
+    commission_per_share: float = 0.0
+    slippage_cents: float = 0.0      # fixed slippage per share, in cents
+    slippage_proportional: float = 0.0  # proportional slippage (0.001 = 10 bps)
+    warmup_periods: int = 0          # leading bars to skip for indicator warmup
+    risk_free: float = 0.0
+    periods_per_year: int = 252
+    margin_rate: float = 0.0         # maintenance margin, fraction of gross notional
+    margin_call_liquidate: bool = True  # on margin call, liquidate position to neutral
+
+
+@dataclasses.dataclass
+class FillResult:
+    """Output of one backtest run."""
+    equity_curve: np.ndarray
+    trades: List[Fill]
+    orders: List[Order]
+    positions: List[float]  # shares held after each bar (signed)
+    margin_calls: List[MarginCall] = dataclasses.field(default_factory=list)
+
+
+@dataclasses.dataclass
+class FoldResult:
+    """Result of one walk-forward fold."""
+    fold_index: int
+    start_date: int
+    end_date: int
+    train_window_bars: int
+    test_window_bars: int
+    metrics: dict
+    equity_curve: np.ndarray
+
+
+@dataclasses.dataclass
+class WalkForwardResult:
+    """Results over all walk-forward folds."""
+    folds: List[FoldResult]
+    aggregate_metrics: dict
+
+
+def _side_label(delta: float, shares: float) -> str:
+    if abs(delta) < 1e-12:
+        return "neutralize"
+    if delta > 0:
+        if shares <= 0:
+            return "cover" if shares < 0 else "buy"
+        return "increase_long"
+    if shares >= 0:
+        return "sell" if shares > 0 else "short"
+    return "reduce_short"
+
+
+def _run_bars(
+    bars: List[Bar],
+    signals: List[Signal],
+    cfg: BacktestConfig,
+) -> FillResult:
+    cash = float(cfg.initial_capital)
+    shares = 0.0
+    orders: List[Order] = []
+    fills: List[Fill] = []
+    margin_calls: List[MarginCall] = []
+    n = len(bars)
+    positions = [0.0] * n
+    equity_curve = np.zeros(n, dtype=np.float64)
+[0m
+[0m$ [0mgrep -n "cost\|slippage\|commission\|spread" /home/runner/work/X/X/research/backtest/engine.py
+5:  lookahead. Fill price = close + fixed slippage + proportional slippage.
+10:- Commission and slippage apply to every round trip.
+42:    commission: float
+66:    commission_per_trade: float = 0.0
+67:    commission_per_share: float = 0.0
+68:    slippage_cents: float = 0.0      # fixed slippage per share, in cents
+69:    slippage_proportional: float = 0.0  # proportional slippage (0.001 = 10 bps)
+152:            # Fill at close + fixed slippage + proportional slippage.
+156:                + cfg.slippage_cents / 100.0
+157:                + bar.close * cfg.slippage_proportional
+159:            commission = (
+160:                cfg.commission_per_trade
+161:                + abs(delta) * cfg.commission_per_share
+165:                cash -= delta * fill_price + commission
+167:                cash += -delta * fill_price - commission
+172:            fills.append(Fill(bar.date, delta, fill_price, commission))
+190:                    + cfg.slippage_cents / 100.0
+191:                    + bar.close * cfg.slippage_proportional
+193:                commission = (
+194:                    cfg.commission_per_trade
+195:                    + abs(delta) * cfg.commission_per_share
+198:                    cash -= delta * fill_price + commission
+200:                    cash += -delta * fill_price - commission
+204:                fills.append(Fill(bar.date, delta, fill_price, commission))
+273:        cfg: backtest costs and cash policy.
+307:            commission_per_trade=cfg.commission_per_trade,
+308:            commission_per_share=cfg.commission_per_share,
+309:            slippage_cents=cfg.slippage_cents,
+310:            slippage_proportional=cfg.slippage_proportional,
+[0m
+[0m$ [0mgrep -rn "slippage_proportional\|commission_per_trade\|realistic_costs\|cost" /home/runner/work/X/X/examples/*.py | head -40
+/home/runner/work/X/X/examples/ma_crossover.py:7:- cost sensitivity (0 vs realistic costs);
+/home/runner/work/X/X/examples/ma_crossover.py:66:        commission_per_trade=2.0,
+/home/runner/work/X/X/examples/ma_crossover.py:69:        slippage_proportional=0.0005,
+/home/runner/work/X/X/examples/ma_crossover.py:73:    for label, cfg in (("zero cost", cfg0), ("realistic costs", cfg1)):
+/home/runner/work/X/X/examples/ma_crossover_real_data.py:11:   zero cost and realistic cost models
+/home/runner/work/X/X/examples/ma_crossover_real_data.py:104:    # 5. Full-sample and walk-forward results, zero cost
+/home/runner/work/X/X/examples/ma_crossover_real_data.py:105:    print("\n=== 5. Full-sample (zero cost) ===")
+/home/runner/work/X/X/examples/ma_crossover_real_data.py:129:    # 5b. Realistic costs
+/home/runner/work/X/X/examples/ma_crossover_real_data.py:130:    print("\n=== 7. Walk-forward with realistic costs ===")
+/home/runner/work/X/X/examples/ma_crossover_real_data.py:133:        commission_per_trade=2.0, commission_per_share=0.003,
+/home/runner/work/X/X/examples/ma_crossover_real_data.py:134:        slippage_cents=2.0, slippage_proportional=0.0005,
+/home/runner/work/X/X/examples/ma_crossover_real_data.py:188:    print(f"  Walk-forward (zero cost):    folds={result.aggregate_metrics['n_folds']}, "
+/home/runner/work/X/X/examples/ma_crossover_real_data.py:192:    print(f"  Walk-forward (realistic costs): mean log ret={result1.aggregate_metrics['mean_log_total_return']:.3f}, "
+/home/runner/work/X/X/examples/volatility_regime_filter.py:11:- cost sensitivity (0 vs realistic costs);
+/home/runner/work/X/X/examples/volatility_regime_filter.py:69:        commission_per_trade=2.0,
+/home/runner/work/X/X/examples/volatility_regime_filter.py:72:        slippage_proportional=0.0005,
+/home/runner/work/X/X/examples/volatility_regime_filter.py:76:    for label, cfg in (("zero cost", cfg0), ("realistic costs", cfg1)):
+[0m
+[0m$ [0mls /home/runner/work/X/X/examples; ls /home/runner/work/X/X/tests
+__pycache__
+ma_crossover.py
+ma_crossover_real_data.py
+regime_stability_demo.py
+regime_stability_nvda.py
+regime_stability_real_data.py
+regime_stability_universe.py
+universe_sweep.py
+volatility_regime_filter.py
+__pycache__
+test_activation_receipt.py
+test_campaign_agent_validation.py
+test_campaign_architecture.py
+test_campaign_outcome.py
+test_data.py
+test_engine.py
+test_kilo_outcome.py
+test_loader.py
+test_metrics.py
+test_perturbation.py
+test_preflight.py
+test_regime_stability.py
+test_regime_universe.py
+test_staged_secret_scan.py
+test_universe.py
+[0m
+[0m$ [0mgrep -n "def stress_segments\|def stress_segments_across_tickers\|def run_scenario\|def regime_stress\|def walk_forward\|BacktestConfig\|cfg" /home/runner/work/X/X/research/backtest/regime_stability.py | head -40
+39:from .engine import BacktestConfig, Signal
+192:def run_scenario(
+202:    cfg: BacktestConfig = BacktestConfig(),
+214:        train_window, test_window, warmup, overlap_window, cfg, periods_per_year:
+231:        cfg=cfg,
+242:        cfg=cfg,
+461:def regime_stress(
+471:    cfg: BacktestConfig = BacktestConfig(),
+485:        train_window, test_window, warmup, overlap_window, cfg, periods_per_year:
+508:            cfg=cfg,
+600:def stress_segments(
+611:    cfg: BacktestConfig = BacktestConfig(),
+640:        train_window, test_window, warmup, overlap_window, cfg, periods_per_year:
+705:            cfg=cfg,
+716:            cfg=cfg,
+1061:def stress_segments_across_tickers(
+1071:    cfg: BacktestConfig = BacktestConfig(),
+1100:        train_window, test_window, warmup, overlap_window, cfg, periods_per_year:
+1137:            cfg=cfg,
+[0m
+[0m$ [0mgrep -n "def \|BacktestConfig\|cfg" /home/runner/work/X/X/research/backtest/engine.py | sed -n 1,80p
+56:class BacktestConfig:
+106:def _side_label(delta: float, shares: float) -> str:
+118:def _run_bars(
+121:    cfg: BacktestConfig,
+123:    cash = float(cfg.initial_capital)
+133:        if i < cfg.warmup_periods:
+141:            * cfg.target_exposure
+142:            * cfg.initial_capital
+156:                + cfg.slippage_cents / 100.0
+157:                + bar.close * cfg.slippage_proportional
+160:                cfg.commission_per_trade
+161:                + abs(delta) * cfg.commission_per_share
+180:        if cfg.margin_rate > 0.0:
+182:            required_margin = cfg.margin_rate * gross_notional
+190:                    + cfg.slippage_cents / 100.0
+191:                    + bar.close * cfg.slippage_proportional
+194:                    cfg.commission_per_trade
+195:                    + abs(delta) * cfg.commission_per_share
+226:    def __init__(self, cfg: BacktestConfig):
+227:        self.cfg = cfg
+229:    def run(self, bars: List[Bar], signals: List[Signal]) -> FillResult:
+232:        return _run_bars(bars, signals, self.cfg)
+235:def run_bars(
+238:    cfg: BacktestConfig = BacktestConfig(),
+241:    return Backtest(cfg).run(bars, signals)
+244:def walk_forward(
+251:    cfg: BacktestConfig = BacktestConfig(),
+273:        cfg: backtest costs and cash policy.
+304:        fold_cfg = BacktestConfig(
+305:            initial_capital=cfg.initial_capital,
+306:            target_exposure=cfg.target_exposure,
+307:            commission_per_trade=cfg.commission_per_trade,
+308:            commission_per_share=cfg.commission_per_share,
+309:            slippage_cents=cfg.slippage_cents,
+310:            slippage_proportional=cfg.slippage_proportional,
+312:            risk_free=cfg.risk_free,
+313:            periods_per_year=cfg.periods_per_year,
+314:            margin_rate=cfg.margin_rate,
+315:            margin_call_liquidate=cfg.margin_call_liquidate,
+317:        result = Backtest(fold_cfg).run(fold_bars, fold_signals)
+344:            risk_free=cfg.risk_free,
+345:            periods_per_year=cfg.periods_per_year,
+[0m
+[0m$ [0msed -n 560,760p /home/runner/work/X/X/research/backtest/regime_stability.py
+Uses only closes[:i], so no look-ahead is possible. Bars return one of
+    'calm', 'normal', or 'turbulent'; very short prefixes return 'insufficient'
+    and are dropped as segments (they cannot hold a walk-forward).
+
+    Args:
+        closes: closing prices.
+        vol_calm, vol_turbulent: annualized realized-vol thresholds.
+        window: trailing-bar window for realized volatility.
+
+    Returns:
+        List of labels, one per bar.
+    """
+    labels: List[str] = []
+    for i in range(len(closes)):
+        if i < window:
+            labels.append("insufficient")
+        else:
+            rv = float(np.std(np.log(closes[i - window : i]), ddof=1)) * np.sqrt(
+                252.0
+            )
+            if rv < vol_calm:
+                labels.append("calm")
+            elif rv < vol_turbulent:
+                labels.append("normal")
+            else:
+                labels.append("turbulent")
+    return labels
+
+
+def segment_fn_from_labels(labels: List[str]) -> Callable[[NDArray, int], str]:
+    """Turn a precomputed past-only label list into the segment_fn callable
+    expected by ``stress_segments``. Labels do not depend on closes, so the
+    closes argument is unused."""
+
+    def fn(_closes: NDArray, i: int) -> str:
+        return labels[i]
+
+    return fn
+
+
+def stress_segments(
+    signals_fn: Callable[[NDArray, ...], List[Signal]],
+    bars: BarSequence,
+    signals: List[Signal],
+    param_grid: List[Dict[str, Any]],
+    baseline: ParameterSet,
+    segment_fn: Callable[[NDArray, int], str],
+    train_window: int,
+    test_window: int,
+    warmup: int = 0,
+    overlap_window: int = 0,
+    cfg: BacktestConfig = BacktestConfig(),
+    periods_per_year: int = 252,
+    min_segment_bars: int = 400,
+) -> RegimeStressResult:
+    """Stress-test a candidate across contiguous segments of a real series
+    classified by a past-only regime function.
+
+    Each bar is classified by `segment_fn(closes, i)` using only closes[:i]
+    (past-only), producing contiguous segments. Each qualifying segment is
+    backtested with walk-forward IS/OOS, and the candidate's per-segment
+    median log returns are compared against a coin-flip null benchmark run on
+    the same segments, using the same verdict logic as ``regime_stress``:
+    CONSISTENT_WITH_NOISE (no edge in any segment), REGIME_DEPENDENT
+    (candidate's cross-segment swing exceeds 2x the null's), or
+    REGIME_STABLE (consistent edge or no edge everywhere).
+
+    Segments are shorter than a full series by construction, so walk-forward
+    fold counts may differ across segments; per-segment fold counts are
+    reported in the result.
+
+    Args:
+        signals_fn: past-only signal function, called as
+            `signals_fn(closes, **params)`.
+        bars: the bar series (full length).
+        signals: the full past-only signal series (same length as `bars`).
+        param_grid: parameter sets to sweep inside each segment.
+        baseline: the reference parameter set.
+        segment_fn: callable(closes: np.ndarray, i: int) -> segment label,
+            using closes[:i] only (past-only).
+        train_window, test_window, warmup, overlap_window, cfg, periods_per_year:
+            forwarded to walk_forward.
+        min_segment_bars: minimum segment length to include; shorter segments
+            cannot hold a meaningful walk-forward.
+
+    Returns:
+        RegimeStressResult with one scenario per segment and an overall
+        verdict.
+    """
+    if isinstance(bars, BarSequence):
+        closes = bars.closes_array()
+    else:
+        closes = np.array([float(b.close) for b in bars], dtype=np.float64)
+
+    # BarSequence only supports single-index getitem, so convert once here.
+    bars_list = list(bars) if isinstance(bars, BarSequence) else bars
+
+    if len(signals) != len(closes):
+        raise ValueError("signals must have the same length as bars")
+
+    labels = [segment_fn(closes, i) for i in range(len(closes))]
+    segments: List[Tuple[str, int, int]] = []
+    cur = labels[0]
+    start = 0
+    for i in range(1, len(labels)):
+        if labels[i] != cur:
+            if i - start >= min_segment_bars:
+                segments.append((cur, start, i))
+            cur = labels[i]
+            start = i
+    if len(labels) - start >= min_segment_bars:
+        segments.append((cur, start, len(labels)))
+
+    if not segments:
+        raise ValueError(f"no segment has >= {min_segment_bars} bars")
+
+    scenario_results: List[RegimeScenarioResult] = []
+    import inspect
+    for name, s, e in segments:
+        seg_bars = bars_list[s:e]
+        seg_signals = signals[s:e]
+
+        # Wrap the signal function so that it routes by the same labels that
+        # define the segments. For signal functions that classify their input
+        # series on their own (e.g. a regime-adaptive MA), recomputing labels on
+        # a segment slice would differ from the global classification used to
+        # find the segment; passing the segment's label slice makes the routing
+        # consistent with the segment boundaries. Only functions exposing a
+        # `labels` parameter receive it; the others are passed through unchanged.
+        _sig = inspect.signature(signals_fn)
+        if "labels" in _sig.parameters:
+            segment_signals_fn = (
+                lambda closes, **params: signals_fn(closes, labels=labels[s:e], **params)
+            )
+        else:
+            segment_signals_fn = signals_fn
+
+        sweep = parameter_sweep(
+            signals_fn=segment_signals_fn,
+            bars=seg_bars,
+            param_grid=param_grid,
+            train_window=train_window,
+            test_window=test_window,
+            warmup=warmup,
+            overlap_window=overlap_window,
+            cfg=cfg,
+            periods_per_year=periods_per_year,
+        )
+        cand_summary = sweep_summary(sweep, baseline)
+        noise = noise_benchmark(
+            seg_bars,
+            param_grid=param_grid,
+            train_window=train_window,
+            test_window=test_window,
+            warmup=0,
+            overlap_window=0,
+            cfg=cfg,
+            periods_per_year=periods_per_year,
+        )
+        edge_status = (
+            EdgeFree
+            if abs(cand_summary.baseline_median_log_return - noise.baseline_median_log_return)
+            <= OUTLIER_TOL
+            else EdgePresent
+        )
+        scenario_results.append(RegimeScenarioResult(
+            name=name,
+            param_sets=sweep.param_sets,
+            baseline_param_set=baseline,
+            baseline_median_log_return=cand_summary.baseline_median_log_return,
+            noise_median_log_return=noise.baseline_median_log_return,
+            edge_status=edge_status,
+            n_folds=sweep.n_folds,
+            n_periods=sweep.n_periods,
+            median_log_returns=cand_summary.median_log_returns,
+        ))
+
+    candidate_medians = np.array([s.baseline_median_log_return for s in scenario_results])
+    null_medians = np.array([s.noise_median_log_return for s in scenario_results])
+    candidate_dispersion = float(np.std(candidate_medians))
+    null_dispersion = float(np.std(null_medians))
+
+    if all(abs(s.baseline_median_log_return) <= OUTLIER_TOL for s in scenario_results):
+        verdict = "CONSISTENT_WITH_NOISE"
+    elif candidate_dispersion > 2.0 * null_dispersion:
+        verdict = "REGIME_DEPENDENT"
+    elif all(m < 0 for m in candidate_medians):
+        # Every segment shows a negative median but the cross-segment swing
+        # stays within twice the null dispersion: the candidate loses money
+        # consistently across regimes. This is REGIME_STABLE_LOSS — stability
+        # of losses, not a robust edge — and it must be read alongside the
+        # medians rather than treated as an edge.
+        verdict = REGIME_STABLE_LOSS
+    else:
+        verdict = "REGIME_STABLE"
+
+    first = scenario_results[0]
+    return RegimeStressResult(
+        scenarios=scenario_results,
+        param_sets=first.param_sets,
+        baseline_param_set=first.baseline_param_set,
+[0m
+[0m$ [0mgrep -n "def momentum_signals" -A 30 /home/runner/work/X/X/research/backtest/regime_stability.py
+886:def momentum_signals(
+887-    closes: NDArray,
+888-    lookback: int = 5,
+889-) -> List[Signal]:
+890-    """Past-only short-horizon momentum signal (new signal class).
+891-
+892-    Long the previous ``lookback``-day return and hold for one day: if the
+893-    last ``lookback`` days were up, go long; if they were down, go short.
+894-    Neutral before the ``lookback`` window. Daily rebalancing (a fresh
+895-    signal at every bar) — the standard 1-day-ahead momentum implementation.
+896-
+897-    This is the conceptual opposite of `mean_reversion_signals` (same
+898-    construction, opposite sign). It is the competing hypothesis to the
+899-    reversal class tested previously: if shorting the previous N-day return
+900-    produces uniformly negative results, the momentum variant should
+901-    produce uniformly positive results; either outcome settles whether the
+902-    5-day-lookback direction bet is a robust edge on this universe.
+903-
+904-    No look-ahead: each signal uses only closes up to and including its own
+905-    bar.
+906-    """
+907-    n = len(closes)
+908-    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+909-    lookback = int(lookback)
+910-    for i in range(lookback, n):
+911-        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+912-        out[i] = Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+913-    return out
+914-
+915-
+916-def breakout_signals(
+[0m
+[0m$ [0msed -n 244,360p /home/runner/work/X/X/research/backtest/engine.py
+def walk_forward(
+    bars: List[Bar],
+    signals: List[Signal],
+    train_window: int,
+    test_window: int,
+    warmup: int = 0,
+    overlap_window: int = 0,
+    cfg: BacktestConfig = BacktestConfig(),
+) -> WalkForwardResult:
+    """Walk-forward IS/OOS validation.
+
+    Folds slide across the series: each fold uses a contiguous
+    window [start, end) with a warmup segment, a train segment and a
+    test segment. Only the test segment is backtested; the train
+    segment represents information available at fold start (and is not
+    used to compute signals here — signal authors must have already
+    produced signals consistent with the walk-forward discipline).
+
+    The fold's equity curve is returned for the full window, but only
+    the test segment is included in fold metrics.
+
+    Args:
+        bars: full bar series.
+        signals: full signal series, warmup-padded by the caller if needed.
+        train_window: bars dedicated to the training segment per fold.
+        test_window: bars of the out-of-sample segment per fold.
+        warmup: warmup bars at the start of each fold.
+        overlap_window: how much the train segment overlaps the previous
+            test segment (0 = non-overlapping folds).
+        cfg: backtest costs and cash policy.
+
+    Returns:
+        WalkForwardResult with per-fold metrics and aggregates.
+    """
+    if train_window < 1:
+        raise ValueError("train_window must be >= 1")
+    if test_window < 1:
+        raise ValueError("test_window must be >= 1")
+    if warmup < 0:
+        raise ValueError("warmup must be >= 0")
+    if overlap_window > test_window:
+        raise ValueError("overlap_window must be <= test_window")
+
+    n = len(bars)
+    if len(signals) != n:
+        raise ValueError("bars and signals must have equal length")
+
+    folds: List[FoldResult] = []
+    step = test_window - overlap_window
+    fold_start = 0
+    cumulative_test = 0
+    margin_calls_total = 0
+
+    while True:
+        fold_end = fold_start + warmup + train_window + test_window
+        if fold_end > n:
+            break
+        fs = max(0, fold_start)
+        fold_bars = bars[fs : fold_end]
+        fold_signals = signals[fs : fold_end]
+        fold_cfg = BacktestConfig(
+            initial_capital=cfg.initial_capital,
+            target_exposure=cfg.target_exposure,
+            commission_per_trade=cfg.commission_per_trade,
+            commission_per_share=cfg.commission_per_share,
+            slippage_cents=cfg.slippage_cents,
+            slippage_proportional=cfg.slippage_proportional,
+            warmup_periods=warmup,
+            risk_free=cfg.risk_free,
+            periods_per_year=cfg.periods_per_year,
+            margin_rate=cfg.margin_rate,
+            margin_call_liquidate=cfg.margin_call_liquidate,
+        )
+        result = Backtest(fold_cfg).run(fold_bars, fold_signals)
+
+        # The OOS segment is the last test_window bars of the fold window.
+        test_eq = result.equity_curve[-test_window:]
+        if len(test_eq) == 0:
+            break
+
+        # per-fold metrics on the OOS segment only
+        from .metrics import compute_metrics
+        # only trades executed within the OOS window belong in OOS metrics;
+        # positions opened in the IS (warmup/train) segment may be carried into
+        # the OOS segment, and their mark-to-market is already in test_eq.
+        oos_window_start = fold_bars[-test_window].date
+        oos_window_end = fold_bars[-1].date
+        oos_trades = [
+            f for f in result.trades
+            if oos_window_start <= f.date <= oos_window_end
+        ]
+        oos_prices = (
+            np.array([f.price for f in oos_trades], dtype=np.float64)
+            if oos_trades
+            else np.array([], dtype=np.float64)
+        )
+        fold_metrics = compute_metrics(
+            test_eq,
+            fills=oos_trades,
+            fill_prices=oos_prices,
+            risk_free=cfg.risk_free,
+            periods_per_year=cfg.periods_per_year,
+        )
+        folds.append(FoldResult(
+            fold_index=len(folds),
+            start_date=fold_bars[0].date,
+            end_date=fold_bars[-1].date,
+            train_window_bars=train_window,
+            test_window_bars=len(test_eq),
+            metrics=dataclasses.asdict(fold_metrics),
+            equity_curve=result.equity_curve,
+        ))
+        cumulative_test += len(test_eq)
+        margin_calls_total += len(result.margin_calls)
+        fold_start += step
+
+    aggregate: dict
+[0m
+[0m→ [0mRead research/checks/verify_momentum_lookback_sweep.py
+[0m
+[0m$ [0mgrep -n "def noise_benchmark" -A 60 /home/runner/work/X/X/research/backtest/perturbation.py
+284:def noise_benchmark(
+285-    bars,
+286-    param_grid: List[Dict[str, Any]],
+287-    train_window: int,
+288-    test_window: int,
+289-    warmup: int = 0,
+290-    overlap_window: int = 0,
+291-    cfg: BacktestConfig = BacktestConfig(),
+292-    periods_per_year: int = 252,
+293-    seed: Optional[int] = None,
+294-) -> SweepSummary:
+295-    """Run a parameter sweep on a coin-flip signal.
+296-
+297-    Returns a SweepSummary whose medians should be near zero. Use it as
+298-    the null hypothesis when judging whether a real signal's sweep shows
+299-    structure beyond randomness.
+300-
+301-    Args:
+302-        bars: full bar series (length is used only for the signal shape).
+303-        param_grid, train_window, test_window, warmup, overlap_window, cfg, periods_per_year:
+304-            forwarded to parameter_sweep.
+305-        seed: random seed for the coin flips.
+306-    """
+307-    n = len(bars)
+308-    base_seed = seed if seed is not None else 42
+309-
+310-    def _param_seed(params):
+311-        # deterministic, process-independent mapping from params to a seed.
+312-        total = sum(float(v) for v in params.values())
+313-        return base_seed + int(round(total) * 1000)
+314-
+315-    result = parameter_sweep(
+316-        signals_fn=lambda closes, **params: random_signals(n, seed=_param_seed(params)),
+317-        bars=bars,
+318-        param_grid=param_grid,
+319-        train_window=train_window,
+320-        test_window=test_window,
+321-        warmup=warmup,
+322-        overlap_window=overlap_window,
+323-        cfg=cfg,
+324-        periods_per_year=periods_per_year,
+325-    )
+326-    # The baseline param set is the first set; its fold-level log returns are
+327-    # the coin-flip null's fold distribution, used by ``compare_noise`` for
+328-    # the sample-calibrated tolerance.
+329-    fold_rets = np.array(result.fold_total_returns[0], dtype=np.float64)
+330-    null_fold_log_returns = np.log1p(np.clip(fold_rets, -1.0 + 1e-12, None)).tolist()
+331-    return sweep_summary(
+332-        result,
+333-        result.param_sets[0],
+334-        noise_median=None,
+335-        noise_fold_median_log_returns=null_fold_log_returns,
+336-    )
+337-
+338-
+339-def sweep_summary(
+340-    result: SweepResult,
+341-    baseline: ParameterSet,
+342-    noise_median: Optional[float] = None,
+343-    noise_fold_median_log_returns: Optional[Sequence[float]] = None,
+344-) -> SweepSummary:
+[0m
+[0m$ [0mgrep -n "def parameter_sweep" -A 70 /home/runner/work/X/X/research/backtest/perturbation.py
+182:def parameter_sweep(
+183-    signals_fn,
+184-    bars,
+185-    param_grid: List[Dict[str, Any]],
+186-    train_window: int,
+187-    test_window: int,
+188-    warmup: int = 0,
+189-    overlap_window: int = 0,
+190-    cfg: BacktestConfig = BacktestConfig(),
+191-    periods_per_year: int = 252,
+192-) -> SweepResult:
+193-    """Run walk-forward backtests for every parameter set in the grid.
+194-
+195-    Args:
+196-        signals_fn: callable(closes: np.ndarray, **params) returning a list
+197-            of Signal with the same length as `bars`. Must be past-only: it
+198-            may use only closes up to and including each signal bar's date
+199-            and must not touch open/high/low.
+200-        bars: full bar series (BarSequence or iterable of Bar).
+201-        param_grid: list of parameter sets; each is a dict of name -> value.
+202-        train_window, test_window, warmup, overlap_window, cfg, periods_per_year:
+203-            forwarded to walk_forward.
+204-
+205-    Returns:
+206-        SweepResult with per-fold total returns for every parameter set.
+207-    """
+208-    if not param_grid:
+209-        raise ValueError("param_grid must contain at least one parameter set")
+210-
+211-    if isinstance(bars, BarSequence):
+212-        closes = bars.closes_array()
+213-        bars_list = list(bars)
+214-    else:
+215-        closes = np.array([float(b.close) for b in bars], dtype=np.float64)
+216-        bars_list = list(bars)
+217-    n = len(closes)
+218-
+219-    fold_returns: List[List[float]] = []
+220-    for params in param_grid:
+221-        signals = signals_fn(closes, **params)
+222-        if len(signals) != n:
+223-            raise ValueError(
+224-                f"signals_fn returned {len(signals)} signals for {n} bars"
+225-            )
+226-        result = walk_forward(
+227-            bars=bars_list,
+228-            signals=signals,
+229-            train_window=train_window,
+230-            test_window=test_window,
+231-            warmup=warmup,
+232-            overlap_window=overlap_window,
+233-            cfg=cfg,
+234-        )
+235-        fold_returns.append([float(f.metrics["total_return"]) for f in result.folds])
+236-
+237-    param_sets = [tuple((str(k), v) for k, v in p.items()) for p in param_grid]
+238-    return SweepResult(
+239-        param_sets=param_sets,
+240-        fold_total_returns=fold_returns,
+241-        train_window_bars=train_window,
+242-        test_window_bars=test_window,
+243-        n_folds=len(next(iter(fold_returns), [])),
+244-        n_periods=n,
+245-    )
+246-
+247-
+248-def parameter_grid_around(
+249-    baseline: ParameterSet,
+250-    multipliers: Sequence[float] = (0.5, 1.0, 2.0),
+251-) -> List[Dict[str, Any]]:
+252-    """Build a parameter grid around a baseline by scaling each parameter.
+[0m
+[0m✗ [0mpython3 -c "
+import json
+a=json.load(open('state/check_artifacts/momentum_lookback_sweep_results.json'))
+print(a['universe']['robustness_counts'])
+for t,v in a['universe']['per_asset'].items():
+    print(t, v['robustness_verdict'], {k:v['lookback_medians'][k] for k in ('3','5','10')}, v['verdicts_5'])
+" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python3 -c *","action":"deny","source":"project"}
+[0m
+[0m$ [0mgrep -c "" state/check_artifacts/momentum_lookback_sweep_results.json
+1493
+[0m
+[0m$ [0mpython3 --version
+Python 3.12.3
+[0m
+[0m$ [0mgrep -n "robustness_verdict" state/check_artifacts/momentum_lookback_sweep_results.json | head -20
+130:      "robustness_verdict": "ROBUST"
+235:      "robustness_verdict": "ROBUST"
+340:      "robustness_verdict": "ROBUST"
+430:      "robustness_verdict": "NO_EDGE"
+535:      "robustness_verdict": "NO_EDGE"
+640:      "robustness_verdict": "ROBUST"
+730:      "robustness_verdict": "ROBUST"
+835:      "robustness_verdict": "NO_EDGE"
+940:      "robustness_verdict": "ROBUST"
+1030:      "robustness_verdict": "NO_EDGE"
+1091:        "robustness_verdict": "ROBUST",
+1135:        "robustness_verdict": "ROBUST",
+1179:        "robustness_verdict": "ROBUST",
+1217:        "robustness_verdict": "NO_EDGE",
+1261:        "robustness_verdict": "NO_EDGE",
+1305:        "robustness_verdict": "ROBUST",
+1343:        "robustness_verdict": "ROBUST",
+1387:        "robustness_verdict": "NO_EDGE",
+1431:        "robustness_verdict": "ROBUST",
+1469:        "robustness_verdict": "NO_EDGE",
+[0m
+[0m$ [0mgrep -n "\"universe\"\|\"per_asset\"\|\"robustness_counts\"" state/check_artifacts/momentum_lookback_sweep_results.json | head -20
+11:  "per_asset": {
+1036:  "universe": {
+1043:    "per_asset": {
+1473:    "robustness_counts": {
+[0m
+[0m$ [0mpython3 -m unittest discover -s tests 2>&1 | tail -5
+............................................
+----------------------------------------------------------------------
+Ran 168 tests in 16.728s
+
+OK
+[0m
+[0m→ [0mRead state/campaign/runs/43796555856/agents/agent_02_contract.json
+[0m→ [0mRead state/worker_progress.md
+[0m
+[0m$ [0mgrep -n "def volatility_blocks" -A 12 research/backtest/regime_stability.py
+775:def volatility_blocks(
+776-    closes: NDArray,
+777-    n_blocks: int = 4,
+778-    window: int = 60,
+779-) -> List[str]:
+780-    """Split a real series into `n_blocks` contiguous blocks by date and label
+781-    each block by its realized-volatility regime.
+782-
+783-    Each block is labeled 'turbulent' if its median trailing-`window`-bar
+784-    realized volatility (annualized) exceeds the series-wide median, else
+785-    'calm'. Bars before `window` bars into the series are 'insufficient' and
+786-    dropped as a short leading segment (they cannot hold a walk-forward).
+787-
+[0m
+[0m$ [0mgrep -n "def load_ticker\|class BarSequence" -A 8 research/backtest/real_data.py | head -40
+56:def load_ticker(ticker: str) -> Tuple[BarSequence, List[str]]:
+57-    """Load one ticker's adjusted-close series from the collected universe.
+58-
+59-    Returns:
+60-        (bars, dates): bars is a BarSequence with consecutive int dates
+61-            (1..n); dates maps each bar index (1-based) to its
+62-            "YYYY-MM-DD" calendar date string.
+63-    """
+64-    opens, highs, lows, closes, volumes, dates = _read_ticker_csv(ticker)
+[0m
+Answers to the pre-work questions:
+
+1. **Better at learning:** selecting unresolved, falsifiable research cells and closing them with reproducible, independently verified evidence.
+2. **Current binding constraint:** the only positive candidate (short-horizon momentum, daily rebalance) has never been priced under transaction costs, and its construction implies extreme turnover.
+3. **Decision-relevant uncertainty:** do the 7/10 REGIME_STABLE positive medians survive realistic costs, or are they a zero-cost artifact?
+4. **Bounded action:** predeclared 3-level cost grid (zero / repo-realistic / 2× stress) × lookback 3/5/10 on the existing 10-asset universe through the existing regime gate with matched nulls.
+5. **Worth it:** low cost/risk, existing infrastructure, and it converts an unqualified positive candidate into either cost-robust evidence or a clean negative.
+[0m← [0mWrite research/checks/momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -327,35 +327,29 @@
+     prior_lp = prior["universe"]["per_asset"]
+     for ticker in ticker_order:
+         pub_med = prior_lp[ticker]["lookback_medians"]
+         pub_null = prior_lp[ticker]["lookback_null_medians"]
+-        pub_verdicts = {
+-            str(lb): prior_lp[ticker]["verdicts_5"] if str(lb) == "5"
+-            else None for lb in LOOKBACKS
+-        }
+         for lb in LOOKBACKS:
+             cur = per_cost["zero"][ticker][str(lb)]
++            pub = prior["per_asset"][ticker][str(lb)]
+             ok = (
+                 [round(m, 3) for m in cur["medians"]] == pub_med[str(lb)]
+                 and [round(m, 3) for m in cur["null_medians"]] == pub_null[str(lb)]
+-                and cur["segments"] == prior["per_asset"][ticker][str(lb)]["segments"]
+-                and cur["verdict"] == prior["per_asset"][ticker][str(lb)]["verdict"]
++                and cur["segments"] == pub["segments"]
++                and cur["verdict"] == pub["verdict"]
+             )
+             if not ok:
+                 cross_ok = False
+-                print("  MISMATCH {} lookback {}: {}".format(ticker, lb, cur["verdict"]))
+-    prior_rob = prior_lp[ticker]["robustness_verdict"]
+-    cur_rob = per_asset[ticker]["n_edge_cells"]["zero"]
+-    prior_edge = {"ROBUST": True}.get(prior_rob, False)
++                print("  MISMATCH {} lookback {}: recomputed {} vs published {}".format(
++                    ticker, lb, cur["verdict"], pub["verdict"]))
+     print("  cross-consistency vs momentum_lookback_sweep_results.json: {}".format(
+         "MATCH" if cross_ok else "MISMATCH"))
+     print("  zero-cost edge-cell counts vs published robustness verdicts "
+-          "(ROBUST means >=2):")
++          "(ROBUST means >=2 lookbacks with a positive edge):")
+     for ticker in ticker_order:
+         print("    {:6s} zero-cost edge cells={} published={}".format(
+             ticker, per_asset[ticker]["n_edge_cells"]["zero"],
+             prior_lp[ticker]["robustness_verdict"]))
+-    del pub_verdicts, prior_edge, cur_rob, prior_rob, prior
+ 
+ print("\n=== 6. Determinism (AMZN/JPM subset rerun at every cost level) ===")
+ det_ok = True
+ for level in LEVEL_NAMES:
+
+[0m
+[0m$ [0mpython3 -m py_compile research/checks/momentum_cost_sensitivity.py
+(no output)
+[0m
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py 2>&1 | tail -80
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review at the realistic cost level (lookback=5) ===
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 390, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 215, in main
+    leak = leakage_review(manifest)
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 177, in leakage_review
+    traded = sum(abs(f.delta * f.price) for f in res.trades)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 177, in <genexpr>
+    traded = sum(abs(f.delta * f.price) for f in res.trades)
+                     ^^^^^^^
+AttributeError: 'Fill' object has no attribute 'delta'
+[0m
+[0m$ [0msed -n 1,45p research/backtest/engine.py
+"""Event-driven daily backtest engine.
+
+Design rules (enforced here and documented in research/METHODOLOGY.md):
+- Signals are applied at the close of the same bar: no open/high/low
+  lookahead. Fill price = close + fixed slippage + proportional slippage.
+- warmup_periods bars are skipped: equity is initial capital and no
+  signals are used. Signal authors must pad their signal series so that
+  no real signal exists before the warmup boundary.
+- IS/OOS walk-forward validation is provided by walk_forward().
+- Commission and slippage apply to every round trip.
+- Net equity = cash + shares * close; negative cash is allowed
+  (short-sale proceeds are not reinvested) — conservative.
+
+Research/simulation only. Not live trading.
+"""
+from __future__ import annotations
+
+import dataclasses
+from typing import List, NamedTuple
+
+import numpy as np
+
+from .data import Bar
+
+
+class Signal(NamedTuple):
+    """Signal applied at bar close. weight in [-1, 1]: short..neutral..long."""
+    date: int
+    weight: float
+
+
+class Order(NamedTuple):
+    date: int
+    target_shares: float
+    side: str  # 'buy' | 'sell' | 'cover' | 'short' | 'neutralize' | 'increase_long' | 'reduce_short'
+
+
+class Fill(NamedTuple):
+    date: int
+    shares: float     # signed shares traded (positive = net long leg)
+    price: float
+    commission: float
+
+
+@dataclasses.dataclass
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -173,9 +173,9 @@
+ signals = bt.momentum_signals(closes, lookback=5)
+ bt.check_signal_integrity(signals, [b.date for b in bars], warmup=0)
+ res = bt.run_bars(list(bars), signals, cfg)
+ bt.check_equity_matches_fills(res.equity_curve, res.trades, closes, 1e6)
+-traded = sum(abs(f.delta * f.price) for f in res.trades)
++traded = sum(abs(f.shares * f.price) for f in res.trades)
+ commission = sum(f.commission for f in res.trades)
+ years = len(closes) / 252.0
+ out[ticker] = dict(
+     n_bars=len(closes),
+
+[0m
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py 2>&1 | tail -60
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review at the realistic cost level (lookback=5) ===
+  AMZN: fills=4451 traded=67.567x capital turnover=3.813x/yr commission=0.0211x total_return=+5.518 [leakage PASS]
+  JPM: fills=4439 traded=58.876x capital turnover=3.323x/yr commission=0.0131x total_return=+3.904 [leakage PASS]
+
+=== 4. Predeclared cost grid x lookback sweep over the universe ===
+  cost levels: ('zero', 'realistic', 'stress_2x')
+  params: train=252d / test=84d / warmup=60d / overlap=60d, 4 volatility blocks, matched coin-flip null per cost level
+
+  level zero       done
+  level realistic  done
+  level stress_2x  done
+
+  Per-asset cost classification (rule: NO_EDGE_ZERO_COST if no lookback has a positive REGIME_STABLE edge at zero cost; else COST_ROBUST if >=2 lookbacks have such an edge at the realistic level; else COST_FRAGILE if exactly 1 does; else COST_ELIMINATED.)
+    AAPL   COST_ROBUST        n_edge={'zero': 2, 'realistic': 3, 'stress_2x': 3} drag(real)=-0.000  3:EDGE/EDGE/EDGE | 5:EDGE/EDGE/EDGE | 10:NO_E/EDGE/EDGE
+    MSFT   COST_ROBUST        n_edge={'zero': 3, 'realistic': 2, 'stress_2x': 2} drag(real)=+0.000  3:EDGE/EDGE/EDGE | 5:EDGE/NO_E/NO_E | 10:EDGE/EDGE/EDGE
+    GOOGL  COST_ROBUST        n_edge={'zero': 3, 'realistic': 3, 'stress_2x': 3} drag(real)=-0.000  3:EDGE/EDGE/EDGE | 5:EDGE/EDGE/EDGE | 10:EDGE/EDGE/EDGE
+    AMZN   COST_ROBUST        n_edge={'zero': 3, 'realistic': 3, 'stress_2x': 3} drag(real)=-0.000  3:EDGE/EDGE/EDGE | 5:EDGE/EDGE/EDGE | 10:EDGE/EDGE/EDGE
+    META   COST_ROBUST        n_edge={'zero': 3, 'realistic': 3, 'stress_2x': 3} drag(real)=+0.000  3:EDGE/EDGE/EDGE | 5:EDGE/EDGE/EDGE | 10:EDGE/EDGE/EDGE
+    NVDA   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.001  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    TSLA   COST_ROBUST        n_edge={'zero': 3, 'realistic': 3, 'stress_2x': 3} drag(real)=-0.000  3:EDGE/EDGE/EDGE | 5:EDGE/EDGE/EDGE | 10:EDGE/EDGE/EDGE
+    JPM    NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 1, 'stress_2x': 1} drag(real)=+0.000  3:NO_E/NO_E/NO_E | 5:NO_E/EDGE/EDGE | 10:NO_E/NO_E/NO_E
+    JNJ    NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.000  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    XOM    NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.000  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+
+  Universe summary by cost level:
+    zero       EDGE cells 17/30 | LOSS cells 0 | median of cell medians +0.0686 | positive share 1.0
+    realistic  EDGE cells 18/30 | LOSS cells 0 | median of cell medians +0.0686 | positive share 1.0
+    stress_2x  EDGE cells 18/30 | LOSS cells 0 | median of cell medians +0.0686 | positive share 1.0
+
+=== 5. Cross-consistency gate: zero-cost column vs lookback sweep ===
+  cross-consistency vs momentum_lookback_sweep_results.json: MATCH
+  zero-cost edge-cell counts vs published robustness verdicts (ROBUST means >=2 lookbacks with a positive edge):
+    AAPL   zero-cost edge cells=2 published=ROBUST
+    MSFT   zero-cost edge cells=3 published=ROBUST
+    GOOGL  zero-cost edge cells=3 published=ROBUST
+    AMZN   zero-cost edge cells=3 published=ROBUST
+    META   zero-cost edge cells=3 published=ROBUST
+    NVDA   zero-cost edge cells=0 published=NO_EDGE
+    TSLA   zero-cost edge cells=3 published=ROBUST
+    JPM    zero-cost edge cells=0 published=NO_EDGE
+    JNJ    zero-cost edge cells=0 published=NO_EDGE
+    XOM    zero-cost edge cells=0 published=NO_EDGE
+
+=== 6. Determinism (AMZN/JPM subset rerun at every cost level) ===
+  zero       AMZN  r1 == r2: True
+  zero       JPM   r1 == r2: True
+  realistic  AMZN  r1 == r2: True
+  realistic  JPM   r1 == r2: True
+  stress_2x  AMZN  r1 == r2: True
+  stress_2x  JPM   r1 == r2: True
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Cost levels are stated assumptions, not calibrated execution forecasts.
+[0m
+[0m$ [0mgrep -n "np.log(closes\|np.log(np\|def mean_reversion_signals\|def always_long_signal\|def direction_signal\|def ma_crossover_signals\|def vol_rank\|def csrs" research/backtest/regime_stability.py
+109:            np.std(np.log(closes[window // 2 : window]), ddof=1)
+146:def direction_signal(closes: NDArray, fast: int, slow: int) -> List[Signal]:
+159:def always_long_signal(closes: NDArray, fast: int, slow: int) -> List[Signal]:
+577:            rv = float(np.std(np.log(closes[i - window : i]), ddof=1)) * np.sqrt(
+809:                float(np.std(np.log(closes[i - window : i]), ddof=1)) * np.sqrt(252.0)
+832:def ma_crossover_signals(
+857:def mean_reversion_signals(
+881:        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+911:        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+1148:def csrs_spread_daily_returns(tickers, lookback=20, top_k=3, bottom_k=3):
+1197:def csrs_null_spread_family(family, lookback, top_k, bottom_k, seed=42):
+1233:def csrs_null_spread_daily_returns(tickers, lookback=20, top_k=3, bottom_k=3,
+1477:def csrs_spread_family(family, lookback, top_k, bottom_k):
+1513:def vol_rank_spread_daily_returns(tickers, lookback=60, top_k=3, bottom_k=3):
+1548:        vols = {t: float(np.std(np.log(closes[t][i - lookback : i]), ddof=1))
+1563:def vol_rank_spread_family(family, lookback, top_k, bottom_k):
+1595:def vol_rank_null_spread_daily_returns(tickers, lookback=60, top_k=3, bottom_k=3,
+1618:        vols = {t: float(np.std(np.log(closes[t][i - lookback : i]), ddof=1))
+1632:def vol_rank_null_spread_family(family, lookback, top_k, bottom_k, seed=42):
+[0m
+The cost drag is ~0.000 and medians are identical across cost levels — an anomaly worth investigating. The turnover figure (3.8x/yr) contradicts a daily-rebalanced ±1 constant-dollar position.
+[0m$ [0msed -n 830,915p research/backtest/regime_stability.py
+def ma_crossover_signals(
+    closes: NDArray,
+    fast: int = 20,
+    slow: int = 60,
+) -> List[Signal]:
+    """Past-only dual moving-average crossover signal (long/short).
+
+    Long when the fast MA > slow MA, short otherwise; neutral before the
+    slow window. This matches the signals used in `examples/regime_stability_*`
+    so regime-stability runs on the collected universe use the same signal
+    contract as the AAPL/NVDA runs.
+
+    No look-ahead: each signal uses only closes up to and including its own
+    bar.
+    """
+    n = len(closes)
+    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    fast, slow = int(fast), int(slow)
+    for i in range(max(fast, slow) - 1, n):
+        fast_ma = float(np.mean(closes[i - fast + 1 : i + 1]))
+        slow_ma = float(np.mean(closes[i - slow + 1 : i + 1]))
+        out[i] = Signal(date=i + 1, weight=1.0 if fast_ma > slow_ma else -1.0)
+    return out
+
+
+def mean_reversion_signals(
+    closes: NDArray,
+    lookback: int = 5,
+) -> List[Signal]:
+    """Past-only short-horizon return-reversal signal (new signal class).
+
+    Short the previous ``lookback``-day return and hold for one day: if the
+    last ``lookback`` days were up, go short; if they were down, go long.
+    Neutral before the ``lookback`` window. Daily rebalancing (a fresh
+    signal at every bar) — the standard 1-day-ahead reversal implementation.
+
+    This is the enterprise's new-signal-class test candidate: mean
+    reversion on large-cap US equities, the conceptual opposite of the
+    trend-following MA crossover tested previously. Like the MA crossover,
+    it is judged through the same perturbation / coin-flip-null /
+    regime-stability gates before any positive claim is considered.
+
+    No look-ahead: each signal uses only closes up to and including its own
+    bar.
+    """
+    n = len(closes)
+    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    lookback = int(lookback)
+    for i in range(lookback, n):
+        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+        out[i] = Signal(date=i + 1, weight=-1.0 if ret > 0 else 1.0)
+    return out
+
+
+def momentum_signals(
+    closes: NDArray,
+    lookback: int = 5,
+) -> List[Signal]:
+    """Past-only short-horizon momentum signal (new signal class).
+
+    Long the previous ``lookback``-day return and hold for one day: if the
+    last ``lookback`` days were up, go long; if they were down, go short.
+    Neutral before the ``lookback`` window. Daily rebalancing (a fresh
+    signal at every bar) — the standard 1-day-ahead momentum implementation.
+
+    This is the conceptual opposite of `mean_reversion_signals` (same
+    construction, opposite sign). It is the competing hypothesis to the
+    reversal class tested previously: if shorting the previous N-day return
+    produces uniformly negative results, the momentum variant should
+    produce uniformly positive results; either outcome settles whether the
+    5-day-lookback direction bet is a robust edge on this universe.
+
+    No look-ahead: each signal uses only closes up to and including its own
+    bar.
+    """
+    n = len(closes)
+    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    lookback = int(lookback)
+    for i in range(lookback, n):
+        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+        out[i] = Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+    return out
+[0m
+[0m$ [0msed -n 146,175p research/backtest/regime_stability.py
+def direction_signal(closes: NDArray, fast: int, slow: int) -> List[Signal]:
+    """A contrived signal that takes the direction of the opening move.
+
+    If the first bar closes above the start price the series is an
+    up-trend regime and the signal is long everywhere; otherwise it is
+    short everywhere. The rule is past-only (it uses only bar 1) and is
+    an ideal contrived candidate for testing regime-dependence.
+    """
+    n = len(closes)
+    direction = 1.0 if closes[0] > 100.0 else -1.0
+    return [Signal(date=i + 1, weight=direction) for i in range(n)]
+
+
+def always_long_signal(closes: NDArray, fast: int, slow: int) -> List[Signal]:
+    """A contrived signal that is long in every bar, regardless of price.
+
+    It has no look-ahead and is purely mechanical; on a positive-drift
+    regime it shows a large edge, on a negative-drift regime a large
+    drag. It is an ideal contrived candidate for demonstrating
+    regime-dependence.
+    """
+    n = len(closes)
+    return [Signal(date=i + 1, weight=1.0) for i in range(n)]
+
+
+@dataclass(frozen=True)
+class RegimeScenarioResult:
+    """Results for one regime scenario.
+
+    The overall verdict of the surrounding regime-stability run is one of
+[0m
+[0m$ [0mgrep -rn "momentum_signals\|mean_reversion_signals" research/checks/*.py | grep -v "cost_sensitivity" | head -20
+research/checks/mean_reversion.py:82:        ("mean_reversion", lambda c, **p: bt.mean_reversion_signals(c, lookback=LOOKBACK), {"lookback": LOOKBACK}),
+research/checks/mean_reversion.py:123:        signals_fn=bt.mean_reversion_signals,
+research/checks/mean_reversion.py:184:        signals = bt.mean_reversion_signals(closes, lookback=LOOKBACK)
+research/checks/mean_reversion.py:225:        signals_fn=lambda c, **kw: bt.mean_reversion_signals(c, lookback=LOOKBACK),
+research/checks/momentum.py:80:        ("momentum", lambda c, **p: bt.momentum_signals(c, lookback=LOOKBACK), {"lookback": LOOKBACK}),
+research/checks/momentum.py:121:        signals_fn=bt.momentum_signals,
+research/checks/momentum.py:183:        signals = bt.momentum_signals(closes, lookback=LOOKBACK)
+research/checks/momentum.py:225:        signals_fn=lambda c, **kw: bt.momentum_signals(c, lookback=LOOKBACK),
+research/checks/momentum_hold_period_sensitivity.py:118:    sig = bt.momentum_signals(closes, lookback=LOOKBACK)
+research/checks/momentum_hold_period_sensitivity.py:123:        signals_fn=lambda c, **p: hold_effective_signals(bt.momentum_signals(c, lookback=LOOKBACK), hold),
+research/checks/momentum_hold_period_sensitivity.py:146:            bt.momentum_signals(c, lookback=LOOKBACK), int(round(p["hold"]))),
+research/checks/momentum_hold_period_sensitivity.py:223:            eff = hold_effective_signals(bt.momentum_signals(closes, lookback=LOOKBACK), hold)
+research/checks/momentum_hold_period_sensitivity.py:279:                bt.momentum_signals(c, lookback=LOOKBACK), h),
+research/checks/momentum_horizon_gap_analysis.py:91:def momentum_signals(closes, lookback):
+research/checks/momentum_horizon_gap_analysis.py:105:    sig = momentum_signals(closes, lookback)
+research/checks/momentum_longer_horizon.py:64:    sig = bt.momentum_signals(closes, lookback=lookback)
+research/checks/momentum_longer_horizon.py:68:        signals_fn=bt.momentum_signals,
+research/checks/momentum_longer_horizon.py:154:            signals = bt.momentum_signals(closes, lookback=lb)
+research/checks/momentum_longer_horizon.py:156:        res = bt.run_bars(list(bars), bt.momentum_signals(closes, lookback=20),
+research/checks/momentum_lookback_sweep.py:61:    sig = bt.momentum_signals(closes, lookback=lookback)
+[0m
+[0m$ [0msed -n 85,115p research/checks/momentum_horizon_gap_analysis.py
+run_start = i
+    if len(labels) - run_start >= min_segment_bars:
+        runs.append((cur, run_start, len(labels)))
+    return runs
+
+
+def momentum_signals(closes, lookback):
+    n = len(closes)
+    out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
+    lookback = int(lookback)
+    for i in range(lookback, n):
+        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+        out[i] = bt.Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+    return out
+
+
+def segment_gap(ticker, s, e, train, test, warm, overlap, lookback):
+    bars, dates = bt.load_ticker(ticker)
+    closes = bars.closes_array()
+    seg_bars = list(bars)[s:e]
+    sig = momentum_signals(closes, lookback)
+    seg_signals = sig[s:e]
+    res = bt.walk_forward(
+        seg_bars, seg_signals, train_window=train, test_window=test,
+        warmup=warm, overlap_window=overlap, cfg=bt.BacktestConfig())
+    cand_log = np.array([np.log1p(np.clip(f.metrics["total_return"], -1.0 + 1e-12, None))
+                         for f in res.folds], dtype=np.float64)
+    noise = bt.noise_benchmark(
+        bars=seg_bars,
+        param_grid=[{"lookback": lookback}],
+        train_window=train, test_window=test,
+[0m
+[0m$ [0mgrep -rn "LEARNING_STATE" .github/scripts/*.py tests/*.py | head -20
+.github/scripts/synthesize_campaign.py:210:        Path("state/LEARNING_STATE.md"),
+[0m
+[0m$ [0mgrep -rn "worker_progress" .github/scripts/*.py | head -20
+.github/scripts/campaign_controller.py:522:- Update state/worker_progress.md only at genuine semantic milestones.
+.github/scripts/reconcile_worker_progress.py:57:                "Controller reconciliation synchronized worker_progress.md with the authoritative activation receipt.",
+.github/scripts/reconcile_worker_progress.py:74:        progress = root / "worker_progress.md"
+.github/scripts/reconcile_worker_progress.py:104:    parser.add_argument("--progress", default="state/worker_progress.md")
+.github/scripts/run_campaign_agent.py:109:    progress = Path("state/worker_progress.md")
+.github/scripts/run_campaign_agent.py:263:        "worker_progress_sha256": sha(progress),
+.github/scripts/validate_campaign_agent.py:175:        if rel.startswith("state/campaign/") or rel == "state/worker_progress.md":
+.github/scripts/validate_campaign_agent.py:290:            p for p in touched if not p.startswith("state/campaign/") and p != "state/worker_progress.md"
+[0m
+[0m$ [0msed -n 150,200p .github/scripts/validate_campaign_agent.py
+try:
+                controller.validate_task(task)
+            except SystemExit as exc:
+                failures.append(f"candidate_task_{idx}_invalid:{exc}")
+    if not isinstance(record["next"], str) or not record["next"].strip():
+        failures.append("next_missing")
+    if len([x for x in record["next"].splitlines() if x.strip()]) != 1:
+        failures.append("next_must_be_one_bounded_action")
+    return failures
+
+
+def quarantine_workspace(agent: int, run_root: Path, failures: list[str]) -> dict[str, object]:
+    quarantine = run_root / "quarantine" / f"agent_{agent:02d}"
+    quarantine.mkdir(parents=True, exist_ok=True)
+    rc, diff = run(["git", "diff", "--binary"])
+    (quarantine / "tracked_worktree.diff").write_text(diff, encoding="utf-8")
+    _, cached = run(["git", "diff", "--cached", "--binary"])
+    (quarantine / "tracked_index.diff").write_text(cached, encoding="utf-8")
+    _, status = run(["git", "status", "--porcelain=v1"])
+    (quarantine / "status.txt").write_text(status, encoding="utf-8")
+    (quarantine / "failure_reasons.json").write_text(json.dumps(failures, indent=2) + "\n", encoding="utf-8")
+
+    _, untracked_text = run(["git", "ls-files", "--others", "--exclude-standard"])
+    moved: list[str] = []
+    for rel in [x for x in untracked_text.splitlines() if x]:
+        if rel.startswith("state/campaign/") or rel == "state/worker_progress.md":
+            continue
+        source = Path(rel)
+        if not source.exists():
+            continue
+        destination = quarantine / "workspace" / rel
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(source), str(destination))
+        moved.append(rel)
+    (quarantine / "untracked_moved.json").write_text(json.dumps(moved, indent=2) + "\n", encoding="utf-8")
+
+    run(["git", "restore", "--staged", "--worktree", "--", "."])
+    return {"path": str(quarantine), "moved_untracked": moved, "diff_return_code": rc}
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--run-id", required=True)
+    ap.add_argument("--agent-number", required=True, type=int)
+    ap.add_argument("--worker-exit-code", type=int, default=1)
+    args = ap.parse_args()
+
+    run_root = Path("state/campaign/runs") / str(args.run_id)
+    agent_dir = run_root / "agents"
+    contract = json.loads((agent_dir / f"agent_{args.agent_number:02d}_contract.json").read_text(encoding="utf-8"))
+    record_path = agent_dir / f"agent_{args.agent_number:02d}.json"
+[0m
+[0m$ [0msed -n 195,235p .github/scripts/synthesize_campaign.py
+"status": outcome,
+        "objective": "Sequential focused-task campaign to improve validated learning efficiency and higher-order quantitative-research capability.",
+        "phase": "COMPLETE",
+        "changed": sorted({p for r in records for p in r.get("changed", [])}),
+        "verified": sorted({x for r in records for x in r.get("verified", [])})[:100],
+        "unverified": sorted({x for r in records for x in r.get("unverified", [])})[:100],
+        "next": next_task,
+        "research_conclusion": [r.get("research_result") for r in records if r.get("role") == "HIGHER_ORDER_OBJECTIVE" and r.get("research_result")],
+        "process_conclusion": [r.get("observed_effect") for r in records if r.get("role") == "LEARNING_PROCESS" and r.get("observed_effect")],
+        "campaign_outcome": outcome,
+        "persistence_decision": persistence,
+    }
+    write(Path("state/activation_status.json"), activation)
+
+    append_section(
+        Path("state/LEARNING_STATE.md"),
+        f"""## Sequential campaign {args.run_id}
+- **Validated process improvement:** agents {process_improvement or 'NONE'}
+- **Validated research progress:** agents {research_progress or 'NONE'}
+- **Validated negative/rejected evidence:** agents {rejected or 'NONE'}
+- **Unresolved uncertainty:** agents {unresolved or 'NONE'}
+- **Odd/even process observations:** {json.dumps(synthesis["odd_even_process_pairs"], sort_keys=True)}
+- **Task-selection observation:** {json.dumps(synthesis["focused_task_selection_observations"], sort_keys=True)}
+- **Highest-value unresolved next task:** {next_task}
+- **New complexity introduced:** {json.dumps(complexity, sort_keys=True)}
+- **Campaign persistence decision:** {persistence}
+- **Contradictory/unverified evidence:** {contradictions or 'NONE'}
+"""
+    )
+
+    status["status"] = "SYNTHESIZED"
+    status["phase"] = "SYNTHESIS"
+    status["completed_agents"] = [r["agent_number"] for r in records]
+    status["terminal_outcome"] = outcome
+    status["persistence_decision"] = persistence
+    status["next_task"] = next_task
+    write(root / "campaign_status.json", status)
+    print(json.dumps(synthesis, indent=2, sort_keys=True))
+    return 0 if outcome in {"COMPLETE", "PARTIAL", "QUARANTINED"} else 1
+[0m
+The cost drag of ~0.000 and 3.8x/yr turnover are diagnostic: a daily-rebalanced constant-dollar ±1 position should turn over ~500x capital/yr. Inspecting the signal implementation:
+[0m$ [0msed -n 905,915p research/backtest/regime_stability.py
+bar.
+    """
+    n = len(closes)
+    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    lookback = int(lookback)
+    for i in range(lookback, n):
+        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+        out[i] = Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+    return out
+[0m
+Confirmed defect: `np.mean(np.log(closes[...]))` is the mean of log **prices**, not log returns. For any price > \$1 it is always positive, so `momentum_signals` is constant-long and `mean_reversion_signals` constant-short. I'll record this in the artifact and add a predeclared corrected-signal diagnostic.
+[0m← [0mWrite research/checks/momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py 2>&1 | tail -70
+Per-asset cost classification (rule: NO_EDGE_ZERO_COST if no lookback has a positive REGIME_STABLE edge at zero cost; else COST_ROBUST if >=2 lookbacks have such an edge at the realistic level; else COST_FRAGILE if exactly 1 does; else COST_ELIMINATED.)
+    AAPL   COST_ROBUST        n_edge={'zero': 2, 'realistic': 3, 'stress_2x': 3} drag(real)=-0.000  3:EDGE/EDGE/EDGE | 5:EDGE/EDGE/EDGE | 10:NO_E/EDGE/EDGE
+    MSFT   COST_ROBUST        n_edge={'zero': 3, 'realistic': 2, 'stress_2x': 2} drag(real)=+0.000  3:EDGE/EDGE/EDGE | 5:EDGE/NO_E/NO_E | 10:EDGE/EDGE/EDGE
+    GOOGL  COST_ROBUST        n_edge={'zero': 3, 'realistic': 3, 'stress_2x': 3} drag(real)=-0.000  3:EDGE/EDGE/EDGE | 5:EDGE/EDGE/EDGE | 10:EDGE/EDGE/EDGE
+    AMZN   COST_ROBUST        n_edge={'zero': 3, 'realistic': 3, 'stress_2x': 3} drag(real)=-0.000  3:EDGE/EDGE/EDGE | 5:EDGE/EDGE/EDGE | 10:EDGE/EDGE/EDGE
+    META   COST_ROBUST        n_edge={'zero': 3, 'realistic': 3, 'stress_2x': 3} drag(real)=+0.000  3:EDGE/EDGE/EDGE | 5:EDGE/EDGE/EDGE | 10:EDGE/EDGE/EDGE
+    NVDA   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.001  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    TSLA   COST_ROBUST        n_edge={'zero': 3, 'realistic': 3, 'stress_2x': 3} drag(real)=-0.000  3:EDGE/EDGE/EDGE | 5:EDGE/EDGE/EDGE | 10:EDGE/EDGE/EDGE
+    JPM    NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 1, 'stress_2x': 1} drag(real)=+0.000  3:NO_E/NO_E/NO_E | 5:NO_E/EDGE/EDGE | 10:NO_E/NO_E/NO_E
+    JNJ    NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.000  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    XOM    NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.000  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    zero       EDGE 17/30 | LOSS 0 | median of cell medians +0.0686 | positive share 1.0
+    realistic  EDGE 18/30 | LOSS 0 | median of cell medians +0.0686 | positive share 1.0
+    stress_2x  EDGE 18/30 | LOSS 0 | median of cell medians +0.0686 | positive share 1.0
+
+=== 5. Cross-consistency gate: zero-cost column vs lookback sweep ===
+  cross-consistency vs momentum_lookback_sweep_results.json: MATCH
+  zero-cost edge-cell counts vs published robustness verdicts (ROBUST means >=2 lookbacks with a positive edge):
+    AAPL   zero-cost edge cells=2 published=ROBUST
+    MSFT   zero-cost edge cells=3 published=ROBUST
+    GOOGL  zero-cost edge cells=3 published=ROBUST
+    AMZN   zero-cost edge cells=3 published=ROBUST
+    META   zero-cost edge cells=3 published=ROBUST
+    NVDA   zero-cost edge cells=0 published=NO_EDGE
+    TSLA   zero-cost edge cells=3 published=ROBUST
+    JPM    zero-cost edge cells=0 published=NO_EDGE
+    JNJ    zero-cost edge cells=0 published=NO_EDGE
+    XOM    zero-cost edge cells=0 published=NO_EDGE
+
+=== 6. Determinism (AMZN/JPM subset rerun at every cost level) ===
+  zero       AMZN  r1 == r2: True
+  zero       JPM   r1 == r2: True
+  realistic  AMZN  r1 == r2: True
+  realistic  JPM   r1 == r2: True
+  stress_2x  AMZN  r1 == r2: True
+  stress_2x  JPM   r1 == r2: True
+
+=== 7. Signal integrity audit (validity of the signal under test) ===
+  expression under test : np.mean(np.log(closes[i - lookback + 1 : i + 1]))
+  docstring intent      : np.log(closes[i]) - np.log(closes[i - lookback])
+  min window mean log price over all tickers/lookbacks/bars: -1.777204
+  AMZN lookback 5: distinct weights after warmup=[1.0] long=4460 short=0 neutral=0 matches_always_long=True
+  DIAGNOSIS: The framework signal is a constant +1.0 (always long) after the lookback warmup for every collected asset at every lookback, so it is not a function of the lookback parameter.
+  constant-long at every ticker/lookback: False
+
+=== 8. DIAGNOSTIC: corrected log-return momentum through the same grid ===
+  (predeclared before execution; see module docstring)
+  turnover check at the realistic level, corrected signal:
+    AMZN: fills=4454 traded=1865.419x capital turnover=105.282x/yr commission=0.2847x
+    JPM: fills=4442 traded=1818.872x capital turnover=102.655x/yr commission=0.1146x
+
+  Corrected-signal classification (same predeclared rule)
+    AAPL   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.002  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    MSFT   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.003  3:NO_E/LOSS/LOSS | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    GOOGL  NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.000  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    AMZN   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.007  3:NO_E/NO_E/LOSS | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    META   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.002  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    NVDA   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.086  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    TSLA   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=-0.001  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    JPM    NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.002  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    JNJ    NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.001  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    XOM    NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.002  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    zero       EDGE 0/30 | LOSS 0 | median of cell medians +0.0069 | positive share 0.6
+    realistic  EDGE 0/30 | LOSS 1 | median of cell medians +0.0010 | positive share 0.5
+    stress_2x  EDGE 0/30 | LOSS 2 | median of cell medians +0.0008 | positive share 0.5
+  corrected-signal determinism r1 == r2: True
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Cost levels are stated assumptions, not calibrated execution forecasts.
+[0m
+Decisive, but I need the exact scope of the constant-long defect — one asset apparently shows non-`+1` weights. Let me inspect the artifact.
+[0m✗ [0mWrite /tmp/kilo/inspect_cost_artifact.py failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"external_directory","action":"deny","pattern":"*","source":"project"}
+[0m
+[0m$ [0msed -n 250,320p .github/scripts/validate_campaign_agent.py
+warnings.append(f"controller_filled_identity_fields:{identity_filled}")
+            record_path.write_text(json.dumps(raw_record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        record_failures = validate_record(raw_record, args.agent_number, contract)
+        failures.extend(record_failures)
+        if record_failures:
+            invalid_path = agent_dir / f"agent_{args.agent_number:02d}_invalid_record.json"
+            invalid_path.write_text(json.dumps(raw_record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            raw_record = fallback_record(
+                args.agent_number, contract, runtime, "agent record failed controller validation"
+            )
+            raw_record["unverified"].append("; ".join(record_failures))
+            record_path.write_text(json.dumps(raw_record, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            warnings.append("invalid_agent_record_replaced_with_UNVERIFIED_fallback")
+
+    expected_record = f"state/campaign/runs/{args.run_id}/agents/agent_{args.agent_number:02d}.json"
+    unexpected_campaign_paths = [
+        p for p in touched
+        if p.startswith("state/campaign/")
+        and p not in {expected_record}
+        and not p.startswith(f"state/campaign/runs/{args.run_id}/agents/agent_{args.agent_number:02d}_")
+    ]
+    if unexpected_campaign_paths:
+        failures.append("controller_state_modified")
+        warnings.extend(f"unexpected_campaign_path:{p}" for p in unexpected_campaign_paths)
+
+    if protected:
+        failures.append("protected_control_plane_modified")
+    if args.worker_exit_code != 0:
+        warnings.append(f"worker_exit_code={args.worker_exit_code}")
+
+    status = "VERIFIED_SESSION" if not failures and args.worker_exit_code == 0 else "UNVERIFIED_SESSION"
+    validation = {
+        "agent_number": args.agent_number,
+        "worker_exit_code": args.worker_exit_code,
+        "touched_paths": touched,
+        "protected_paths": protected,
+        "status": status,
+        "warnings": warnings,
+        "failures": failures,
+        "substantive_changed": [
+            p for p in touched if not p.startswith("state/campaign/") and p != "state/worker_progress.md"
+        ],
+        "runtime": runtime,
+        "quarantine": None,
+    }
+
+    if status != "VERIFIED_SESSION":
+        validation["quarantine"] = quarantine_workspace(args.agent_number, run_root, failures)
+
+    out_path = agent_dir / f"agent_{args.agent_number:02d}_validation.json"
+    out_path.write_text(json.dumps(validation, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    print(json.dumps(validation, indent=2, sort_keys=True))
+    return 0 if status == "VERIFIED_SESSION" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+[0m
+[0m$ [0mgrep -n "n_short_after_warmup" state/check_artifacts/momentum_cost_sensitivity_results.json | head -40
+4551:          "n_short_after_warmup": 0
+4561:          "n_short_after_warmup": 0
+4571:          "n_short_after_warmup": 0
+4583:          "n_short_after_warmup": 0
+4593:          "n_short_after_warmup": 0
+4603:          "n_short_after_warmup": 0
+4615:          "n_short_after_warmup": 0
+4625:          "n_short_after_warmup": 0
+4635:          "n_short_after_warmup": 0
+4647:          "n_short_after_warmup": 0
+4657:          "n_short_after_warmup": 0
+4667:          "n_short_after_warmup": 0
+4679:          "n_short_after_warmup": 0
+4689:          "n_short_after_warmup": 0
+4699:          "n_short_after_warmup": 0
+4711:          "n_short_after_warmup": 0
+4721:          "n_short_after_warmup": 0
+4731:          "n_short_after_warmup": 0
+4743:          "n_short_after_warmup": 0
+4753:          "n_short_after_warmup": 0
+4763:          "n_short_after_warmup": 0
+4776:          "n_short_after_warmup": 1850
+4787:          "n_short_after_warmup": 1852
+4798:          "n_short_after_warmup": 1852
+4810:          "n_short_after_warmup": 0
+4820:          "n_short_after_warmup": 0
+4830:          "n_short_after_warmup": 0
+4842:          "n_short_after_warmup": 0
+4852:          "n_short_after_warmup": 0
+4862:          "n_short_after_warmup": 0
+[0m
+[0m$ [0mgrep -n "\-1.0" state/check_artifacts/momentum_cost_sensitivity_results.json | head -20
+4769:            -1.0,
+4780:            -1.0,
+4791:            -1.0,
+[0m
+[0m→ [0mRead state/check_artifacts/momentum_cost_sensitivity_results.json[90m [limit=60, offset=4755][0m
+The artifact records the precise scope: only NVDA deviates (its split-adjusted price crosses \$1). I'll correct the diagnosis wording and write the independent verifier.
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -367,11 +367,16 @@
+     intended_expression="np.log(closes[i]) - np.log(closes[i - lookback])",
+     min_window_mean_log_price=round(min_mean_log_price, 6),
+     per_ticker=per_ticker,
+     diagnosis=(
+-        "The framework signal is a constant +1.0 (always long) after the "
+-        "lookback warmup for every collected asset at every lookback, so it "
+-        "is not a function of the lookback parameter."
++        "The recorded expression is the mean of log PRICES over the window, "
++        "not a return. The resulting weight is therefore a function of the "
++        "price LEVEL, not of the lookback: it is +1.0 for every bar whose "
++        "window geometric-mean adjusted price exceeds 1.0 and -1.0 below it. "
++        "Nine of ten collected assets never cross that level and are "
++        "constant +1.0 after the warmup; NVDA (split-adjusted early prices "
++        "below 1.0) flips sign once when its adjusted price crosses 1.0. "
++        "The lookback parameter only delays the start of the position."
+     ),
+ )
+ 
+ 
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -493,9 +493,14 @@
+ constant_long = all(
+     v[str(lb)]["distinct_weights_after_warmup"] == [1.0]
+     and v[str(lb)]["n_short_after_warmup"] == 0
+     for v in integrity["per_ticker"].values() for lb in LOOKBACKS)
+-print("  constant-long at every ticker/lookback: {}".format(constant_long))
++n_constant_long = sum(
++    1 for v in integrity["per_ticker"].values() for lb in LOOKBACKS
++    if v[str(lb)]["distinct_weights_after_warmup"] == [1.0]
++    and v[str(lb)]["n_short_after_warmup"] == 0)
++print("  (asset, lookback) cells that are constant +1.0 after warmup: "
++      "{}/{}".format(n_constant_long, len(ticker_order) * len(LOOKBACKS)))
+ 
+ print("\n=== 8. DIAGNOSTIC: corrected log-return momentum through the same grid ===")
+ print("  (predeclared before execution; see module docstring)")
+ print("  turnover check at the realistic level, corrected signal:")
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -489,18 +489,18 @@
+           sample["n_long_after_warmup"], sample["n_short_after_warmup"],
+           sample["n_neutral_after_warmup"],
+           sample["matches_always_long_after_warmup"]))
+ print("  DIAGNOSIS: {}".format(integrity["diagnosis"]))
+-constant_long = all(
+-    v[str(lb)]["distinct_weights_after_warmup"] == [1.0]
+-    and v[str(lb)]["n_short_after_warmup"] == 0
+-    for v in integrity["per_ticker"].values() for lb in LOOKBACKS)
+ n_constant_long = sum(
+     1 for v in integrity["per_ticker"].values() for lb in LOOKBACKS
+     if v[str(lb)]["distinct_weights_after_warmup"] == [1.0]
+     and v[str(lb)]["n_short_after_warmup"] == 0)
+-print("  (asset, lookback) cells that are constant +1.0 after warmup: "
+-      "{}/{}".format(n_constant_long, len(ticker_order) * len(LOOKBACKS)))
++flippers = [t for t in ticker_order if any(
++    integrity["per_ticker"][t][str(lb)]["n_short_after_warmup"] > 0
++    for lb in LOOKBACKS)]
++print("  (asset, lookback) cells constant +1.0 after warmup: {}/{}; "
++      "assets with any short bar: {}".format(
++          n_constant_long, len(ticker_order) * len(LOOKBACKS), flippers))
+ 
+ print("\n=== 8. DIAGNOSTIC: corrected log-return momentum through the same grid ===")
+ print("  (predeclared before execution; see module docstring)")
+ print("  turnover check at the realistic level, corrected signal:")
+
+[0m
+[0m✗ [0mEdit research/checks/momentum_cost_sensitivity.py failed
+[91m[1mError: [0mNo changes to apply: oldString and newString are identical.
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -127,9 +127,20 @@
+ ARTIFACT_DIR = Path.cwd() / "state" / "check_artifacts"
+ ARTIFACT_PATH = ARTIFACT_DIR / "momentum_cost_sensitivity_results.json"
+ LOOKBACK_SWEEP_ARTIFACT = ARTIFACT_DIR / "momentum_lookback_sweep_results.json"
+ 
++COST_MODEL_CAVEAT = (
++    "BacktestConfig's per-share charges (commission_per_share, slippage_cents) "
++    "are not invariant to split adjustment: the collected series are "
++    "split-adjusted, so a per-share charge is a different fraction of notional "
++    "at different price levels. Only the proportional component "
++    "(slippage_proportional, commission_per_trade relative to capital) is "
++    "scale-free. Cost levels here are therefore stated assumptions, not "
++    "calibrated execution forecasts, and the stress_2x level is a sensitivity "
++    "device rather than a realistic estimate."
++)
+ 
++
+ def log_return_momentum_signals(closes, lookback: int = 5):
+     """Docstring-faithful momentum: sign of the past ``lookback``-day log return.
+ 
+     Local diagnostic implementation used only by section 8; the framework
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -543,8 +543,9 @@
+ lookbacks=list(LOOKBACKS),
+ cost_levels=[dict(name=n, **p) for n, p in COST_LEVELS],
+ level_names=list(LEVEL_NAMES),
+ classification_rule=CLASSIFICATION_RULE,
++cost_model_caveat=COST_MODEL_CAVEAT,
+ train=TRAIN, test=TEST, warmup=WARM, overlap=OVERLAP,
+ window=WINDOW, n_blocks=N_BLOCKS, min_segment_bars=MIN_SEGMENT_BARS,
+ leakage_recorded_implementation=leak,
+ per_cost=per_cost,
+
+[0m
+Now the independent verifier:
+[0m← [0mWrite research/checks/verify_momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py 2>&1 | tail -32
+=== 7. Signal integrity audit (validity of the signal under test) ===
+  expression under test : np.mean(np.log(closes[i - lookback + 1 : i + 1]))
+  docstring intent      : np.log(closes[i]) - np.log(closes[i - lookback])
+  min window mean log price over all tickers/lookbacks/bars: -1.777204
+  AMZN lookback 5: distinct weights after warmup=[1.0] long=4460 short=0 neutral=0 matches_always_long=True
+  DIAGNOSIS: The recorded expression is the mean of log PRICES over the window, not a return. The resulting weight is therefore a function of the price LEVEL, not of the lookback: it is +1.0 for every bar whose window geometric-mean adjusted price exceeds 1.0 and -1.0 below it. Nine of ten collected assets never cross that level and are constant +1.0 after the warmup; NVDA (split-adjusted early prices below 1.0) flips sign once when its adjusted price crosses 1.0. The lookback parameter only delays the start of the position.
+  (asset, lookback) cells constant +1.0 after warmup: 27/30; assets with any short bar: ['NVDA']
+
+=== 8. DIAGNOSTIC: corrected log-return momentum through the same grid ===
+  (predeclared before execution; see module docstring)
+  turnover check at the realistic level, corrected signal:
+    AMZN: fills=4454 traded=1865.419x capital turnover=105.282x/yr commission=0.2847x
+    JPM: fills=4442 traded=1818.872x capital turnover=102.655x/yr commission=0.1146x
+
+  Corrected-signal classification (same predeclared rule)
+    AAPL   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.002  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    MSFT   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.003  3:NO_E/LOSS/LOSS | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    GOOGL  NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.000  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    AMZN   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.007  3:NO_E/NO_E/LOSS | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    META   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.002  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    NVDA   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.086  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    TSLA   NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=-0.001  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    JPM    NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.002  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    JNJ    NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.001  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    XOM    NO_EDGE_ZERO_COST  n_edge={'zero': 0, 'realistic': 0, 'stress_2x': 0} drag(real)=+0.002  3:NO_E/NO_E/NO_E | 5:NO_E/NO_E/NO_E | 10:NO_E/NO_E/NO_E
+    zero       EDGE 0/30 | LOSS 0 | median of cell medians +0.0069 | positive share 0.6
+    realistic  EDGE 0/30 | LOSS 1 | median of cell medians +0.0010 | positive share 0.5
+    stress_2x  EDGE 0/30 | LOSS 2 | median of cell medians +0.0008 | positive share 0.5
+  corrected-signal determinism r1 == r2: True
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Cost levels are stated assumptions, not calibrated execution forecasts.
+[0m
+[0m$ [0mpython3 research/checks/verify_momentum_cost_sensitivity.py 2>&1 | tail -70
+recomputed medians [0.113, 0.044, 0.083] nulls [0.024, 0.001, 0.014] verdict REGIME_DEPENDENT | published medians [0.113, 0.044, 0.083] nulls [0.024, 0.001, 0.014] verdict REGIME_DEPENDENT
+  JPM    realistic  lb= 3 -> MISMATCH (n_folds=31)
+    recomputed medians [0.113, 0.044, 0.083] nulls [-0.0, 0.026, -0.003] verdict REGIME_DEPENDENT | published medians [0.113, 0.044, 0.083] nulls [-0.0, 0.026, -0.003] verdict REGIME_DEPENDENT
+  JPM    realistic  lb= 5 -> MISMATCH (n_folds=31)
+    recomputed medians [0.113, 0.044, 0.083] nulls [-0.039, -0.003, -0.009] verdict REGIME_STABLE | published medians [0.113, 0.044, 0.083] nulls [-0.039, -0.003, -0.009] verdict REGIME_STABLE
+  JPM    realistic  lb=10 -> MISMATCH (n_folds=31)
+    recomputed medians [0.113, 0.044, 0.083] nulls [0.009, -0.001, 0.013] verdict REGIME_DEPENDENT | published medians [0.113, 0.044, 0.083] nulls [0.009, -0.001, 0.013] verdict REGIME_DEPENDENT
+  JPM    stress_2x  lb= 3 -> MISMATCH (n_folds=31)
+    recomputed medians [0.113, 0.044, 0.083] nulls [-0.005, 0.023, -0.004] verdict REGIME_DEPENDENT | published medians [0.113, 0.044, 0.083] nulls [-0.005, 0.023, -0.004] verdict REGIME_DEPENDENT
+  JPM    stress_2x  lb= 5 -> MISMATCH (n_folds=31)
+    recomputed medians [0.113, 0.044, 0.083] nulls [-0.052, -0.007, -0.01] verdict REGIME_STABLE | published medians [0.113, 0.044, 0.083] nulls [-0.052, -0.007, -0.01] verdict REGIME_STABLE
+  JPM    stress_2x  lb=10 -> MISMATCH (n_folds=31)
+    recomputed medians [0.113, 0.044, 0.083] nulls [-0.008, -0.003, 0.012] verdict REGIME_DEPENDENT | published medians [0.113, 0.044, 0.083] nulls [-0.008, -0.003, 0.012] verdict REGIME_DEPENDENT
+
+=== Gate 2: corrected signal, fresh walk_forward + null (AMZN, JPM) ===
+  AMZN   zero       lb= 3 -> MATCH
+  AMZN   zero       lb= 5 -> MATCH
+  AMZN   zero       lb=10 -> MATCH
+  AMZN   realistic  lb= 3 -> MATCH
+  AMZN   realistic  lb= 5 -> MATCH
+  AMZN   realistic  lb=10 -> MATCH
+  AMZN   stress_2x  lb= 3 -> MATCH
+  AMZN   stress_2x  lb= 5 -> MATCH
+  AMZN   stress_2x  lb=10 -> MATCH
+  JPM    zero       lb= 3 -> MATCH
+  JPM    zero       lb= 5 -> MATCH
+  JPM    zero       lb=10 -> MATCH
+  JPM    realistic  lb= 3 -> MATCH
+  JPM    realistic  lb= 5 -> MATCH
+  JPM    realistic  lb=10 -> MATCH
+  JPM    stress_2x  lb= 3 -> MATCH
+  JPM    stress_2x  lb= 5 -> MATCH
+  JPM    stress_2x  lb=10 -> MATCH
+
+=== Gate 3: signal-integrity re-derivation (all tickers, all lookbacks) ===
+  independent (asset, lookback) cells constant +1.0 after warmup: 27/30
+  independent sign-flip cells: [('NVDA', 3, 1852), ('NVDA', 5, 1852), ('NVDA', 10, 1850)]
+  published constant +1.0 cells: 27/30
+
+=== Gate 4: classification re-derived from published medians/nulls ===
+  recorded  AAPL   derived=COST_ROBUST        published=COST_ROBUST        MATCH
+  recorded  MSFT   derived=COST_ROBUST        published=COST_ROBUST        MATCH
+  recorded  GOOGL  derived=COST_ROBUST        published=COST_ROBUST        MATCH
+  recorded  AMZN   derived=COST_ROBUST        published=COST_ROBUST        MATCH
+  recorded  META   derived=COST_ROBUST        published=COST_ROBUST        MATCH
+  recorded  NVDA   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  recorded  TSLA   derived=COST_ROBUST        published=COST_ROBUST        MATCH
+  recorded  JPM    derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  recorded  JNJ    derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  recorded  XOM    derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  recorded  derived counts {'NO_EDGE_ZERO_COST': 4, 'COST_ROBUST': 6, 'COST_FRAGILE': 0, 'COST_ELIMINATED': 0}
+  corrected AAPL   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected MSFT   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected GOOGL  derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected AMZN   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected META   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected NVDA   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected TSLA   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected JPM    derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected JNJ    derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected XOM    derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected derived counts {'NO_EDGE_ZERO_COST': 10, 'COST_ROBUST': 0, 'COST_FRAGILE': 0, 'COST_ELIMINATED': 0}
+
+=== Gate 5: zero-cost column vs momentum_lookback_sweep_results.json ===
+  all 10 tickers x 3 lookbacks compared -> SEE MISMATCHES ABOVE
+
+=== Gate 6: determinism of the verification path ===
+  AMZN lb=5 realistic r1 == r2 (both signals): True
+
+MISMATCH FOUND: see the printed recomputed vs published values.
+[0m
+[0m$ [0mgrep -n "n_folds" research/backtest/regime_stability.py | sed -n 1,40p
+187:    n_folds: int
+259:        n_folds=sweep.n_folds,
+274:    n_folds: int
+303:            __dummy_result(s.param_sets, s.median_log_returns, s.n_folds), baseline
+313:            f"Folds per scenario: {self.n_folds}  Periods per scenario: {self.n_periods}",
+359:    n_folds: int,
+374:        n_folds=n_folds,
+545:        n_folds=first.n_folds,
+732:            n_folds=sweep.n_folds,
+764:        n_folds=first.n_folds,
+[0m
+[0m$ [0msed -n 755,775p research/backtest/regime_stability.py
+first = scenario_results[0]
+    return RegimeStressResult(
+        scenarios=scenario_results,
+        param_sets=first.param_sets,
+        baseline_param_set=first.baseline_param_set,
+        overall_verdict=verdict,
+        candidate_dispersion=candidate_dispersion,
+        null_dispersion=null_dispersion,
+        n_folds=first.n_folds,
+        n_periods=first.n_periods,
+        train_window_bars=train_window,
+        test_window_bars=test_window,
+    )
+
+
+# ==============================================================================
+# Reusable real-data utilities
+# ==============================================================================
+
+def volatility_blocks(
+[0m
+[0m$ [0mgrep -n "\"n_folds\"" state/check_artifacts/momentum_cost_sensitivity_results.json | head -12
+338:            "n_folds": 28,
+362:            "n_folds": 28,
+386:            "n_folds": 28,
+411:            "n_folds": 28,
+432:            "n_folds": 28,
+453:            "n_folds": 28,
+476:            "n_folds": 28,
+497:            "n_folds": 28,
+518:            "n_folds": 28,
+540:            "n_folds": 75,
+558:            "n_folds": 75,
+576:            "n_folds": 75,
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -192,8 +192,9 @@
+     null_medians=[float(s.noise_median_log_return) for s in res.scenarios],
+     candidate_dispersion=float(res.candidate_dispersion),
+     null_dispersion=float(res.null_dispersion),
+     n_folds=int(res.n_folds),
++    n_folds_per_segment=[int(s.n_folds) for s in res.scenarios],
+     verdict=res.overall_verdict,
+ )
+ 
+ 
+
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -149,9 +149,9 @@
+     runs = segments_from_labels(labels, MIN_SEGMENT_BARS)
+     sig = signals_fn(closes, lookback)
+     cfg = bt.BacktestConfig(initial_capital=1e6, target_exposure=1.0,
+                             **COST_PARAMS[level])
+-    medians, nulls, names = [], [], []
++    medians, nulls, names, fold_counts = [], [], [], []
+     nfolds = None
+     for lab, s, e in runs:
+         seg_bars = list(bars)[s:e]
+         seg_signals = sig[s:e]
+@@ -162,18 +162,19 @@
+                                             -1.0 + 1e-12, None))
+                            for f in res.folds], dtype=np.float64)
+         medians.append(float(np.median(cand)))
+         names.append(lab)
+-        nfolds = len(res.folds)
++        fold_counts.append(len(res.folds))
++        nfolds = len(res.folds) if nfolds is None else nfolds
+         noise = noise_benchmark(
+             bars=seg_bars,
+             param_grid=[{"lookback": lookback}],
+             train_window=TRAIN, test_window=TEST,
+             warmup=0, overlap_window=0, cfg=cfg, periods_per_year=252)
+         nulls.append(float(noise.baseline_median_log_return))
+     verdict = verdict_of(medians, nulls)
+     return dict(segments=names, medians=medians, null_medians=nulls,
+-                verdict=verdict, n_folds=nfolds)
++                verdict=verdict, n_folds=nfolds, n_folds_per_segment=fold_counts)
+ 
+ 
+ def classify(n_edge):
+     n0, n1 = n_edge["zero"], n_edge["realistic"]
+
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -224,8 +224,9 @@
+     and pub_null == [round(n, 3) for n in pub["null_medians"]]
+     and got["segments"] == pub["segments"]
+     and got["verdict"] == pub["verdict"]
+     and got["n_folds"] == pub["n_folds"]
++    and got["n_folds_per_segment"] == pub["n_folds_per_segment"]
+ )
+ all_ok = all_ok and ok
+ print("  {:6s} {:10s} lb={:2d} -> {} (n_folds={})".format(
+     ticker, level, lb, "MATCH" if ok else "MISMATCH",
+
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -326,8 +326,9 @@
+ 
+ print("\n=== Gate 5: zero-cost column vs momentum_lookback_sweep_results.json ===")
+ prior = json.loads(LOOKBACK_SWEEP.read_text())
+ prior_lp = prior["universe"]["per_asset"]
++gate5 = True
+ for ticker in tickers:
+     for lb in LOOKBACKS:
+         cur = art["per_cost"]["zero"][ticker][str(lb)]
+         pub = prior["per_asset"][ticker][str(lb)]
+@@ -338,14 +339,15 @@
+             == prior_lp[ticker]["lookback_null_medians"][str(lb)]
+             and cur["segments"] == pub["segments"]
+             and cur["verdict"] == pub["verdict"]
+         )
+-        all_ok = all_ok and ok
++        gate5 = gate5 and ok
+         if not ok:
+             print("  MISMATCH {} lb={}: {} vs published {}".format(
+                 ticker, lb, cur["verdict"], pub["verdict"]))
++all_ok = all_ok and gate5
+ print("  all 10 tickers x 3 lookbacks compared -> {}".format(
+-    "MATCH" if all_ok else "SEE MISMATCHES ABOVE"))
++    "MATCH" if gate5 else "MISMATCH"))
+ 
+ print("\n=== Gate 6: determinism of the verification path ===")
+ a1 = fresh_cell("AMZN", 5, "realistic", recorded_signals)
+ a2 = fresh_cell("AMZN", 5, "realistic", recorded_signals)
+
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -252,8 +252,9 @@
+     and [round(n, 3) for n in got["null_medians"]]
+     == [round(n, 3) for n in pub["null_medians"]]
+     and got["segments"] == pub["segments"]
+     and got["verdict"] == pub["verdict"]
++    and got["n_folds_per_segment"] == pub["n_folds_per_segment"]
+ )
+ all_ok = all_ok and ok
+ print("  {:6s} {:10s} lb={:2d} -> {}".format(
+     ticker, level, lb, "MATCH" if ok else "MISMATCH"))
+
+[0m
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py 2>&1 | tail -6
+realistic  EDGE 0/30 | LOSS 1 | median of cell medians +0.0010 | positive share 0.5
+    stress_2x  EDGE 0/30 | LOSS 2 | median of cell medians +0.0008 | positive share 0.5
+  corrected-signal determinism r1 == r2: True
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Cost levels are stated assumptions, not calibrated execution forecasts.
+[0m
+[0m$ [0mpython3 research/checks/verify_momentum_cost_sensitivity.py 2>&1 | tail -40
+JPM    stress_2x  lb= 5 -> MATCH
+  JPM    stress_2x  lb=10 -> MATCH
+
+=== Gate 3: signal-integrity re-derivation (all tickers, all lookbacks) ===
+  independent (asset, lookback) cells constant +1.0 after warmup: 27/30
+  independent sign-flip cells: [('NVDA', 3, 1852), ('NVDA', 5, 1852), ('NVDA', 10, 1850)]
+  published constant +1.0 cells: 27/30
+
+=== Gate 4: classification re-derived from published medians/nulls ===
+  recorded  AAPL   derived=COST_ROBUST        published=COST_ROBUST        MATCH
+  recorded  MSFT   derived=COST_ROBUST        published=COST_ROBUST        MATCH
+  recorded  GOOGL  derived=COST_ROBUST        published=COST_ROBUST        MATCH
+  recorded  AMZN   derived=COST_ROBUST        published=COST_ROBUST        MATCH
+  recorded  META   derived=COST_ROBUST        published=COST_ROBUST        MATCH
+  recorded  NVDA   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  recorded  TSLA   derived=COST_ROBUST        published=COST_ROBUST        MATCH
+  recorded  JPM    derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  recorded  JNJ    derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  recorded  XOM    derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  recorded  derived counts {'NO_EDGE_ZERO_COST': 4, 'COST_ROBUST': 6, 'COST_FRAGILE': 0, 'COST_ELIMINATED': 0}
+  corrected AAPL   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected MSFT   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected GOOGL  derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected AMZN   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected META   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected NVDA   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected TSLA   derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected JPM    derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected JNJ    derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected XOM    derived=NO_EDGE_ZERO_COST  published=NO_EDGE_ZERO_COST  MATCH
+  corrected derived counts {'NO_EDGE_ZERO_COST': 10, 'COST_ROBUST': 0, 'COST_FRAGILE': 0, 'COST_ELIMINATED': 0}
+
+=== Gate 5: zero-cost column vs momentum_lookback_sweep_results.json ===
+  all 10 tickers x 3 lookbacks compared -> MATCH
+
+=== Gate 6: determinism of the verification path ===
+  AMZN lb=5 realistic r1 == r2 (both signals): True
+
+All independent recomputations MATCH the artifact: recorded and corrected cells, signal-integrity counts, classifications, zero-cost cross-consistency, determinism.
+NOTE: research/simulation only. No live trading or production execution. Independent verification of a cost-sensitivity simulation.
+[0m
+[0m$ [0mgit status --porcelain=v1
+M state/campaign/global_agent_counter.json
+ M state/campaign/task_queue.json
+ M state/worker_progress.md
+?? research/checks/momentum_cost_sensitivity.py
+?? research/checks/verify_momentum_cost_sensitivity.py
+?? state/campaign/current_task.json
+?? state/campaign/runs/43796555856/
+?? state/check_artifacts/momentum_cost_sensitivity_results.json
+[0m
+[0m$ [0mpython3 -m unittest discover -s tests 2>&1 | tail -4
+----------------------------------------------------------------------
+Ran 168 tests in 17.127s
+
+OK
+[0m
+[0m$ [0mgrep -n -A 7 '"median_cost_drag"' state/check_artifacts/momentum_cost_sensitivity_results.json | head -80
+45:        "median_cost_drag": {
+46-          "realistic": 0.0024,
+47-          "stress_2x": 0.0064,
+48-          "zero": 0.0
+49-        },
+50-        "n_edge_cells": {
+51-          "realistic": 0,
+52-          "stress_2x": 0,
+--
+75:        "median_cost_drag": {
+76-          "realistic": 0.007,
+77-          "stress_2x": 0.0132,
+78-          "zero": 0.0
+79-        },
+80-        "n_edge_cells": {
+81-          "realistic": 0,
+82-          "stress_2x": 0,
+--
+105:        "median_cost_drag": {
+106-          "realistic": 0.0004,
+107-          "stress_2x": 0.0009,
+108-          "zero": 0.0
+109-        },
+110-        "n_edge_cells": {
+111-          "realistic": 0,
+112-          "stress_2x": 0,
+--
+135:        "median_cost_drag": {
+136-          "realistic": 0.0006,
+137-          "stress_2x": 0.0018,
+138-          "zero": 0.0
+139-        },
+140-        "n_edge_cells": {
+141-          "realistic": 0,
+142-          "stress_2x": 0,
+--
+165:        "median_cost_drag": {
+166-          "realistic": 0.0024,
+167-          "stress_2x": 0.0048,
+168-          "zero": 0.0
+169-        },
+170-        "n_edge_cells": {
+171-          "realistic": 0,
+172-          "stress_2x": 0,
+--
+195:        "median_cost_drag": {
+196-          "realistic": 0.0019,
+197-          "stress_2x": 0.0039,
+198-          "zero": 0.0
+199-        },
+200-        "n_edge_cells": {
+201-          "realistic": 0,
+202-          "stress_2x": 0,
+--
+225:        "median_cost_drag": {
+226-          "realistic": 0.0029,
+227-          "stress_2x": 0.0051,
+228-          "zero": 0.0
+229-        },
+230-        "n_edge_cells": {
+231-          "realistic": 0,
+232-          "stress_2x": 0,
+--
+255:        "median_cost_drag": {
+256-          "realistic": 0.0856,
+257-          "stress_2x": 0.0069,
+258-          "zero": 0.0
+259-        },
+260-        "n_edge_cells": {
+261-          "realistic": 0,
+262-          "stress_2x": 0,
+--
+285:        "median_cost_drag": {
+286-          "realistic": -0.0008,
+287-          "stress_2x": -0.0017,
+288-          "zero": 0.0
+289-        },
+290-        "n_edge_cells": {
+291-          "realistic": 0,
+292-          "stress_2x": 0,
+[0m
+[0m$ [0mgrep -n '"median_cost_drag"' state/check_artifacts/momentum_cost_sensitivity_results.json
+45:        "median_cost_drag": {
+75:        "median_cost_drag": {
+105:        "median_cost_drag": {
+135:        "median_cost_drag": {
+165:        "median_cost_drag": {
+195:        "median_cost_drag": {
+225:        "median_cost_drag": {
+255:        "median_cost_drag": {
+285:        "median_cost_drag": {
+315:        "median_cost_drag": {
+2782:      "median_cost_drag": {
+2812:      "median_cost_drag": {
+2842:      "median_cost_drag": {
+2872:      "median_cost_drag": {
+2902:      "median_cost_drag": {
+2932:      "median_cost_drag": {
+2962:      "median_cost_drag": {
+2992:      "median_cost_drag": {
+3022:      "median_cost_drag": {
+3052:      "median_cost_drag": {
+[0m
+[0m$ [0msed -n 2780,3075p state/check_artifacts/momentum_cost_sensitivity_results.json
+}
+      },
+      "median_cost_drag": {
+        "realistic": -0.0,
+        "stress_2x": -0.0,
+        "zero": 0.0
+      },
+      "n_edge_cells": {
+        "realistic": 3,
+        "stress_2x": 3,
+        "zero": 2
+      }
+    },
+    "AMZN": {
+      "classification": "COST_ROBUST",
+      "cost_profiles": {
+        "10": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        },
+        "3": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        },
+        "5": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        }
+      },
+      "median_cost_drag": {
+        "realistic": -0.0,
+        "stress_2x": -0.0,
+        "zero": 0.0
+      },
+      "n_edge_cells": {
+        "realistic": 3,
+        "stress_2x": 3,
+        "zero": 3
+      }
+    },
+    "GOOGL": {
+      "classification": "COST_ROBUST",
+      "cost_profiles": {
+        "10": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        },
+        "3": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        },
+        "5": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        }
+      },
+      "median_cost_drag": {
+        "realistic": -0.0,
+        "stress_2x": -0.0,
+        "zero": 0.0
+      },
+      "n_edge_cells": {
+        "realistic": 3,
+        "stress_2x": 3,
+        "zero": 3
+      }
+    },
+    "JNJ": {
+      "classification": "NO_EDGE_ZERO_COST",
+      "cost_profiles": {
+        "10": {
+          "realistic": "NO_EDGE",
+          "stress_2x": "NO_EDGE",
+          "zero": "NO_EDGE"
+        },
+        "3": {
+          "realistic": "NO_EDGE",
+          "stress_2x": "NO_EDGE",
+          "zero": "NO_EDGE"
+        },
+        "5": {
+          "realistic": "NO_EDGE",
+          "stress_2x": "NO_EDGE",
+          "zero": "NO_EDGE"
+        }
+      },
+      "median_cost_drag": {
+        "realistic": 0.0001,
+        "stress_2x": 0.0001,
+        "zero": 0.0
+      },
+      "n_edge_cells": {
+        "realistic": 0,
+        "stress_2x": 0,
+        "zero": 0
+      }
+    },
+    "JPM": {
+      "classification": "NO_EDGE_ZERO_COST",
+      "cost_profiles": {
+        "10": {
+          "realistic": "NO_EDGE",
+          "stress_2x": "NO_EDGE",
+          "zero": "NO_EDGE"
+        },
+        "3": {
+          "realistic": "NO_EDGE",
+          "stress_2x": "NO_EDGE",
+          "zero": "NO_EDGE"
+        },
+        "5": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "NO_EDGE"
+        }
+      },
+      "median_cost_drag": {
+        "realistic": 0.0,
+        "stress_2x": 0.0,
+        "zero": 0.0
+      },
+      "n_edge_cells": {
+        "realistic": 1,
+        "stress_2x": 1,
+        "zero": 0
+      }
+    },
+    "META": {
+      "classification": "COST_ROBUST",
+      "cost_profiles": {
+        "10": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        },
+        "3": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        },
+        "5": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        }
+      },
+      "median_cost_drag": {
+        "realistic": 0.0,
+        "stress_2x": 0.0001,
+        "zero": 0.0
+      },
+      "n_edge_cells": {
+        "realistic": 3,
+        "stress_2x": 3,
+        "zero": 3
+      }
+    },
+    "MSFT": {
+      "classification": "COST_ROBUST",
+      "cost_profiles": {
+        "10": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        },
+        "3": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        },
+        "5": {
+          "realistic": "NO_EDGE",
+          "stress_2x": "NO_EDGE",
+          "zero": "EDGE"
+        }
+      },
+      "median_cost_drag": {
+        "realistic": 0.0,
+        "stress_2x": 0.0001,
+        "zero": 0.0
+      },
+      "n_edge_cells": {
+        "realistic": 2,
+        "stress_2x": 2,
+        "zero": 3
+      }
+    },
+    "NVDA": {
+      "classification": "NO_EDGE_ZERO_COST",
+      "cost_profiles": {
+        "10": {
+          "realistic": "NO_EDGE",
+          "stress_2x": "NO_EDGE",
+          "zero": "NO_EDGE"
+        },
+        "3": {
+          "realistic": "NO_EDGE",
+          "stress_2x": "NO_EDGE",
+          "zero": "NO_EDGE"
+        },
+        "5": {
+          "realistic": "NO_EDGE",
+          "stress_2x": "NO_EDGE",
+          "zero": "NO_EDGE"
+        }
+      },
+      "median_cost_drag": {
+        "realistic": 0.001,
+        "stress_2x": 0.0021,
+        "zero": 0.0
+      },
+      "n_edge_cells": {
+        "realistic": 0,
+        "stress_2x": 0,
+        "zero": 0
+      }
+    },
+    "TSLA": {
+      "classification": "COST_ROBUST",
+      "cost_profiles": {
+        "10": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        },
+        "3": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        },
+        "5": {
+          "realistic": "EDGE",
+          "stress_2x": "EDGE",
+          "zero": "EDGE"
+        }
+      },
+      "median_cost_drag": {
+        "realistic": -0.0,
+        "stress_2x": -0.0,
+        "zero": 0.0
+      },
+      "n_edge_cells": {
+        "realistic": 3,
+        "stress_2x": 3,
+        "zero": 3
+      }
+    },
+    "XOM": {
+      "classification": "NO_EDGE_ZERO_COST",
+      "cost_profiles": {
+        "10": {
+          "realistic": "NO_EDGE",
+          "stress_2x": "NO_EDGE",
+          "zero": "NO_EDGE"
+        },
+        "3": {
+          "realistic": "NO_EDGE",
+          "stress_2x": "NO_EDGE",
+          "zero": "NO_EDGE"
+        },
+        "5": {
+          "realistic": "NO_EDGE",
+          "stress_2x": "NO_EDGE",
+          "zero": "NO_EDGE"
+        }
+      },
+      "median_cost_drag": {
+        "realistic": 0.0001,
+        "stress_2x": 0.0002,
+        "zero": 0.0
+      },
+      "n_edge_cells": {
+        "realistic": 0,
+        "stress_2x": 0,
+        "zero": 0
+      }
+    }
+  },
+  "per_cost": {
+    "realistic": {
+      "AAPL": {
+        "10": {
+          "candidate_dispersion": 0.01356204052319158,
+          "medians": [
+            0.07077352211216192,
+            0.05374044834612617,
+            0.09183889638965963,
+            0.0690063539356248
+          ],
+          "n_folds": 28,
+[0m
+[0m$ [0msed -n 916,960p research/backtest/regime_stability.py
+def breakout_signals(
+    closes: NDArray,
+    lookback: int = 20,
+) -> List[Signal]:
+    """Past-only breakout-continuation signal (new signal class).
+
+    Long the previous ``lookback``-day breakout and hold for one day: a
+    breakout occurs when the current close exceeds the highest close of the
+    preceding ``lookback`` bars; at a breakout, go long for one day. Neutral
+    before the ``lookback`` window and on non-breakout bars. Daily rebalancing
+    (a fresh signal at every bar). Bars before the ``lookback`` window are
+    neutral.
+
+    Unlike ``momentum_signals``, which bets on the sign of the
+    ``lookback``-day return, the breakout filter requires the price to make a
+    new ``lookback``-day high before taking a position — a directionally
+    biased, threshold-activated momentum rule. This is the enterprise's
+    new-signal-class test candidate: 20-day breakout continuation on large-cap
+    US equities. It is judged through the same perturbation / coin-flip-null /
+    regime-stability gates before any positive claim is considered.
+
+    No look-ahead: each signal uses only closes up to and including its own
+    bar.
+    """
+    n = len(closes)
+    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+    lookback = int(lookback)
+    for i in range(lookback, n):
+        if float(closes[i]) > float(np.max(closes[i - lookback : i])):
+            out[i] = Signal(date=i + 1, weight=1.0)
+    return out
+
+
+def regime_adaptive_ma_signals(
+    closes: NDArray,
+    fast_calm: int = 20,
+    slow_calm: int = 60,
+    fast_turb: int = 10,
+    slow_turb: int = 30,
+    window: int = 60,
+    labels: Optional[List[str]] = None,
+    **kwargs: Any,
+) -> List[Signal]:
+    """Past-only MA-crossover whose windows adapt to the volatility regime.
+[0m
+[0m$ [0msed -n 1148,1200p research/backtest/regime_stability.py
+def csrs_spread_daily_returns(tickers, lookback=20, top_k=3, bottom_k=3):
+    """Cross-sectional relative-strength spread: daily P&L of a long/short
+    portfolio built from ranks across the collected universe.
+
+    At each date t >= lookback: compute each ticker's lookback return
+    (closes[i-lookback : i+1], past-only); rank tickers descending; long the
+    top_k, short the bottom_k with equal capital per leg; hold one day;
+    daily rebalance. The spread P&L at bar t equals the mean of the
+    long-legs' next-day simple returns minus the mean of the short-legs'
+    next-day simple returns. Bars before lookback, and days with fewer than
+    2*k tickers available, are neutral (P&L = 0).
+
+    No look-ahead: every input at bar t uses closes only up to and
+    including t; the realized P&L is the return realized between bar t
+    and bar t+1.
+
+    Args:
+        tickers: dict ticker -> BarSequence of adjusted closes (all tickers
+            share the same date grid).
+        lookback: lookback window in bars.
+        top_k, bottom_k: leg sizes.
+
+    Returns:
+        np.ndarray of daily spread P&L (simple returns), one entry per bar
+        (0.0 where no trade is possible).
+    """
+    min_len = min(len(tb) for tb in tickers.values())
+    daily_pnl = np.zeros(min_len, dtype=np.float64)
+    for i in range(lookback, min_len - 1):
+        # truncate all series to the fully overlapping window so the spread
+        # is computed on the same date grid for every ticker; each ticker
+        # contributes a lookback return only where it has both the lookback
+        # window and the next-day close (past-only).
+        closes = {t: tb.closes_array()[:min_len] for t, tb in tickers.items()}
+        rets = {t: float(closes[t][i] / closes[t][i - lookback] - 1)
+                for t in closes}
+        sorted_tickers = sorted(rets, key=lambda t: rets[t], reverse=True)
+        longs = sorted_tickers[:top_k]
+        shorts = sorted_tickers[-bottom_k:]
+        if len(longs) < top_k or len(shorts) < bottom_k:
+            continue
+        long_ret = float(np.mean(
+            [closes[t][i + 1] / closes[t][i] - 1 for t in longs]))
+        short_ret = float(np.mean(
+            [closes[t][i + 1] / closes[t][i] - 1 for t in shorts]))
+        daily_pnl[i] = long_ret - short_ret
+    return daily_pnl
+
+
+def csrs_null_spread_family(family, lookback, top_k, bottom_k, seed=42):
+    """Coin-flip null of the CSRS spread over a synthetic family of assets.
+
+    Ranks are computed identically (past-only) across the family; the
+[0m
+[0m$ [0msed -n 1,150p .github/scripts/validate_campaign_agent.py
+#!/usr/bin/env python3
+"""Controller-side validation, quarantine, and fallback classification for one campaign agent."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+import campaign_controller as controller  # noqa: E402
+
+
+PROTECTED_PREFIXES = (".github/workflows/", ".github/scripts/", ".kilo/")
+PROTECTED_FILES = {
+    "AGENTS.md",
+    "ENTERPRISE.md",
+    "MANUAL_SETUP.md",
+    "PERSISTENCE_POLICY.md",
+    "tests/test_campaign_architecture.py",
+    "tests/test_staged_secret_scan.py",
+}
+DECISIONS = controller.DECISIONS
+PROCESS_DECISIONS = controller.PROCESS_DECISIONS
+OBS = controller.SELECTION_OBSERVATIONS
+FAILURES = controller.FAILURE_CLASSES
+
+
+CONTROLLER_IDENTITY_FIELDS = ("agent_number", "campaign_slot", "global_agent_number")
+
+
+def bind_controller_identity(record: dict, agent: int, contract: dict) -> tuple[dict, list[str]]:
+    """Bind immutable controller-owned identity metadata without hiding agent content errors."""
+    normalized = dict(record)
+    expected = {
+        "agent_number": agent,
+        "campaign_slot": agent,
+        "global_agent_number": contract["global_agent_number"],
+    }
+    filled: list[str] = []
+    for field in CONTROLLER_IDENTITY_FIELDS:
+        if field not in normalized:
+            normalized[field] = expected[field]
+            filled.append(field)
+    return normalized, filled
+
+
+def run(cmd: list[str]) -> tuple[int, str]:
+    p = subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False)
+    return p.returncode, p.stdout
+
+
+def sha(path: Path) -> str | None:
+    if not path.exists() or not path.is_file():
+        return None
+    h = hashlib.sha256()
+    with path.open("rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def current_changed() -> list[str]:
+    _, out = run(["git", "diff", "--name-only"])
+    _, out_cached = run(["git", "diff", "--cached", "--name-only"])
+    _, out2 = run(["git", "ls-files", "--others", "--exclude-standard"])
+    paths = (
+        set(x for x in out.splitlines() if x)
+        | set(x for x in out_cached.splitlines() if x)
+        | set(x for x in out2.splitlines() if x)
+    )
+    return sorted(
+        p for p in paths
+        if "__pycache__/" not in p and not p.endswith(".pyc")
+    )
+
+
+def fallback_record(agent: int, contract: dict, runtime: dict | None, reason: str) -> dict:
+    failure = runtime.get("failure_class", "UNKNOWN") if runtime else "VALIDATION_FAILURE"
+    return {
+        "agent_number": agent,
+        "campaign_slot": agent,
+        "global_agent_number": contract["global_agent_number"],
+        "role": contract["role"],
+        "task_id": contract["task_id"],
+        "objective": contract["objective"],
+        "bottleneck": contract["bottleneck"],
+        "question": contract["primary_question"],
+        "action": "session did not produce a controller-validated durable agent record",
+        "changed": [],
+        "verified": [],
+        "unverified": [reason],
+        "observed_effect": "unverified",
+        "uncertainty_targeted": contract["primary_question"],
+        "uncertainty_reduced": "none demonstrated",
+        "process_decision": "UNVERIFIED",
+        "research_result": "UNVERIFIED",
+        "decision": "UNVERIFIED",
+        "next": "inspect the preserved runtime evidence and re-rank the unresolved task queue",
+        "candidate_tasks": [],
+        "complexity_added": "UNVERIFIED",
+        "failure_class": failure if failure in FAILURES else "UNKNOWN",
+        "task_selection_observation": "UNVERIFIED",
+    }
+
+
+def validate_record(record: dict, agent: int, contract: dict) -> list[str]:
+    required = [
+        "agent_number", "global_agent_number", "campaign_slot", "role", "task_id", "objective", "bottleneck", "question",
+        "action", "changed", "verified", "unverified", "observed_effect",
+        "uncertainty_targeted", "uncertainty_reduced", "process_decision",
+        "research_result", "decision", "next", "candidate_tasks",
+        "complexity_added", "failure_class", "task_selection_observation",
+    ]
+    failures = [x for x in required if x not in record]
+    if failures:
+        return [f"missing_record_fields:{failures}"]
+    if record["agent_number"] != agent:
+        failures.append("agent_number_mismatch")
+    if record.get("campaign_slot") != agent:
+        failures.append("campaign_slot_mismatch")
+    if record.get("global_agent_number") != contract.get("global_agent_number"):
+        failures.append("global_agent_number_mismatch")
+    if record["task_id"] != contract["task_id"]:
+        failures.append("task_id_mismatch")
+    if record["role"] != contract["role"]:
+        failures.append("role_mismatch")
+    if record["decision"] not in DECISIONS:
+        failures.append("invalid_decision")
+    if record["process_decision"] not in PROCESS_DECISIONS:
+        failures.append("invalid_process_decision")
+    if record["task_selection_observation"] not in OBS:
+        failures.append("invalid_task_selection_observation")
+    if record["failure_class"] not in FAILURES:
+        failures.append("invalid_failure_class")
+    if not isinstance(record["changed"], list) or not isinstance(record["verified"], list) or not isinstance(record["unverified"], list):
+        failures.append("list_fields_invalid")
+    if not isinstance(record["candidate_tasks"], list):
+        failures.append("candidate_tasks_not_list")
+    else:
+        for idx, task in enumerate(record["candidate_tasks"]):
+            if not isinstance(task, dict):
+                failures.append(f"candidate_task_{idx}_not_object")
+                continue
+            try:
+[0m
+[0m$ [0mgrep -n "def validate_task" -A 60 .github/scripts/campaign_controller.py
+139:def validate_task(task: dict[str, Any], *, expected_role: str | None = None) -> None:
+140-    missing = [k for k in REQUIRED_TASK_FIELDS if k not in task]
+141-    if missing:
+142-        raise SystemExit(f"task missing fields: {missing}")
+143-    if not isinstance(task["task_id"], str) or not task["task_id"].strip():
+144-        raise SystemExit("task_id must be non-empty")
+145-    if expected_role is not None and task["role"] != expected_role:
+146-        raise SystemExit(f"task {task['task_id']} has role {task['role']}, expected {expected_role}")
+147-    if task["status"] not in TASK_STATUSES:
+148-        raise SystemExit(f"task {task['task_id']} has invalid status {task['status']!r}")
+149-    if not question_is_single(str(task["primary_question"])):
+150-        raise SystemExit(f"task {task['task_id']} violates focused-question firewall")
+151-    for key in REQUIRED_TASK_FIELDS[4:14]:
+152-        if not isinstance(task[key], str) or not task[key].strip():
+153-            raise SystemExit(f"task {task['task_id']} field {key} must be non-empty text")
+154-    for key in (
+155-        "expected_information_gain",
+156-        "downstream_leverage",
+157-        "falsification_power",
+158-        "verifiability",
+159-        "effort",
+160-        "complexity",
+161-        "execution_risk",
+162-    ):
+163-        if task[key] not in SEVERITIES:
+164-            raise SystemExit(f"task {task['task_id']} field {key} must be HIGH/MEDIUM/LOW")
+165-    if not isinstance(task["tests_preceding_process"], bool):
+166-        raise SystemExit(f"task {task['task_id']} tests_preceding_process must be boolean")
+167-
+168-
+169-def load_queue() -> list[dict[str, Any]]:
+170-    if not QUEUE_PATH.exists():
+171-        raise SystemExit("durable task queue is missing")
+172-    raw = load_json(QUEUE_PATH)
+173-    tasks = raw.get("tasks")
+174-    if not isinstance(tasks, list) or not tasks:
+175-        raise SystemExit("durable task queue has no tasks")
+176-    seen = set()
+177-    for task in tasks:
+178-        if not isinstance(task, dict):
+179-            raise SystemExit("task queue contains non-object")
+180-        if task["task_id"] in seen:
+181-            raise SystemExit(f"duplicate task_id {task['task_id']}")
+182-        seen.add(task["task_id"])
+183-        validate_task(task)
+184-    return tasks
+185-
+186-
+187-def save_queue(tasks: list[dict[str, Any]]) -> None:
+188-    write_json(
+189-        QUEUE_PATH,
+190-        {
+191-            "schema_version": 1,
+192-            "selection_principle": "qualitative_evidence_backed_priority",
+193-            "tasks": tasks,
+194-        },
+195-    )
+196-
+197-
+198-def benefit_order(value: str) -> int:
+199-    return {"HIGH": 0, "MEDIUM": 1, "LOW": 2}[value]
+[0m
+[0m$ [0mgrep -n "REQUIRED_TASK_FIELDS\s*=" -A 20 .github/scripts/campaign_controller.py; grep -n "def question_is_single" -A 15 .github/scripts/campaign_controller.py
+48:REQUIRED_TASK_FIELDS = [
+49-    "task_id",
+50-    "role",
+51-    "status",
+52-    "primary_question",
+53-    "bottleneck",
+54-    "objective",
+55-    "scope",
+56-    "out_of_scope",
+57-    "deliverable",
+58-    "success_criterion",
+59-    "stop_condition",
+60-    "verification_requirement",
+61-    "evidence_basis",
+62-    "expected_information_gain",
+63-    "downstream_leverage",
+64-    "falsification_power",
+65-    "verifiability",
+66-    "effort",
+67-    "complexity",
+68-    "execution_risk",
+120:def question_is_single(question: str) -> bool:
+121-    q = question.strip()
+122-    if not q or len(q) > 500:
+123-        return False
+124-    if q.count("?") > 1:
+125-        return False
+126-    banned = (
+127-        "improve everything",
+128-        "improve the research system",
+129-        "improve the research process",
+130-        "improve the repository",
+131-        "continue research",
+132-        "find something interesting",
+133-        "advance the repository",
+134-    )
+135-    lower = q.lower()
+[0m
+[0m$ [0mpython3 -m json.tool state/campaign/task_queue.json | head -80
+{
+    "schema_version": 1,
+    "selection_principle": "qualitative_evidence_backed_priority",
+    "tasks": [
+        {
+            "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+            "complexity": "LOW",
+            "deliverable": "A durable process decision with evidence-backed examples from recent activations.",
+            "downstream_leverage": "HIGH",
+            "effort": "LOW",
+            "evidence_basis": "LEARNING_STATE documents the previous frontier-first selection gap and five recent frontier cells closed without equivalent retests.",
+            "execution_risk": "LOW",
+            "expected_information_gain": "HIGH",
+            "falsification_power": "HIGH",
+            "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+            "out_of_scope": "Do not redesign the controller architecture or add a numerical reward score.",
+            "primary_question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+            "role": "LEARNING_PROCESS",
+            "scope": "Use LEARNING_STATE, STATE, activation records, and current controller state; produce one bounded process judgment.",
+            "selected_agent": 1,
+            "status": "RESOLVED",
+            "stop_condition": "Stop once the selector decision is supported or the evidence is insufficient for a stronger conclusion.",
+            "success_criterion": "The assessment distinguishes a concrete selector advantage, no demonstrated advantage, or an unresolved result using actual durable evidence.",
+            "task_id": "P-001",
+            "tests_preceding_process": false,
+            "verifiability": "HIGH",
+            "verification_requirement": "Controller-side validation plus inspection of cited durable evidence; no reliance on agent confidence."
+        },
+        {
+            "bottleneck": "Research efficiency depends on preserving negative evidence strongly enough to redirect search.",
+            "complexity": "LOW",
+            "deliverable": "A retain/reject/unverified process decision with concrete duplicate-avoidance evidence.",
+            "downstream_leverage": "HIGH",
+            "effort": "MEDIUM",
+            "evidence_basis": "LEARNING_EFFICIENCY already calls for a novelty guard and recent research cells were closed as FALSIFIED/TESTED.",
+            "execution_risk": "LOW",
+            "expected_information_gain": "HIGH",
+            "falsification_power": "MEDIUM",
+            "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
+            "out_of_scope": "Do not rerun historical experiments or add broad metadata systems.",
+            "primary_question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+            "role": "LEARNING_PROCESS",
+            "scope": "Inspect LEARNING_STATE, STATE, research checks, and campaign queue semantics; propose at most one minimal change.",
+            "status": "OPEN",
+            "stop_condition": "Stop when the duplicate-work question is resolved or clearly unverified.",
+            "success_criterion": "At least one evidence-backed conclusion about duplicate-work prevention is established.",
+            "task_id": "P-002",
+            "tests_preceding_process": false,
+            "verifiability": "HIGH",
+            "verification_requirement": "Independent controller validation of any implementation change."
+        },
+        {
+            "bottleneck": "Negative findings are valuable only if later agents can reliably see and use them.",
+            "complexity": "LOW",
+            "deliverable": "A bounded evidence-preservation assessment and, only if necessary, one minimal durable-state repair.",
+            "downstream_leverage": "HIGH",
+            "effort": "LOW",
+            "evidence_basis": "The repository contains extensive FALSIFIED and TESTED frontier entries plus a dedicated LEARNING_STATE layer.",
+            "execution_risk": "LOW",
+            "expected_information_gain": "MEDIUM",
+            "falsification_power": "HIGH",
+            "objective": "Audit whether recent falsified frontiers and rejected process decisions are discoverable and actually reflected in the current task queue.",
+            "out_of_scope": "Do not rewrite the entire state model or duplicate the research history.",
+            "primary_question": "Does the durable evidence layer preserve useful negative evidence strongly enough to redirect future research?",
+            "role": "LEARNING_PROCESS",
+            "scope": "Use durable state only; compare a sample of falsified cells with current task candidates.",
+            "status": "OPEN",
+            "stop_condition": "Stop after the sampled evidence is sufficient to classify the preservation mechanism.",
+            "success_criterion": "The audit either verifies preservation/reuse or identifies one specific failure that can be repaired and verified.",
+            "task_id": "P-003",
+            "tests_preceding_process": false,
+            "verifiability": "HIGH",
+            "verification_requirement": "Controller-side schema validation plus inspection of the referenced durable records."
+        },
+        {
+            "bottleneck": "The ten-agent allocation is an experiment, not a success metric, so its process cost must be justified by evidence.",
+            "complexity": "MEDIUM",
+            "deliverable": "A process decision supported by campaign evidence.",
+            "downstream_leverage": "HIGH",
+            "effort": "MEDIUM",
+[0m
+[0m$ [0mpython3 -m json.tool state/campaign/task_queue.json | grep -E '"task_id"|"role"|"status"'
+"role": "LEARNING_PROCESS",
+            "status": "RESOLVED",
+            "task_id": "P-001",
+            "role": "LEARNING_PROCESS",
+            "status": "OPEN",
+            "task_id": "P-002",
+            "role": "LEARNING_PROCESS",
+            "status": "OPEN",
+            "task_id": "P-003",
+            "role": "LEARNING_PROCESS",
+            "status": "OPEN",
+            "task_id": "P-004",
+            "role": "LEARNING_PROCESS",
+            "status": "OPEN",
+            "task_id": "P-005",
+            "role": "LEARNING_PROCESS",
+            "status": "OPEN",
+            "task_id": "P-006",
+            "role": "HIGHER_ORDER_OBJECTIVE",
+            "status": "SELECTED",
+            "task_id": "R-001",
+            "role": "HIGHER_ORDER_OBJECTIVE",
+            "status": "OPEN",
+            "task_id": "R-002",
+            "role": "HIGHER_ORDER_OBJECTIVE",
+            "status": "OPEN",
+            "task_id": "R-003",
+            "role": "HIGHER_ORDER_OBJECTIVE",
+            "status": "RESOLVED",
+            "task_id": "R-004",
+            "role": "HIGHER_ORDER_OBJECTIVE",
+            "status": "OPEN",
+            "task_id": "R-005",
+            "role": "LEARNING_PROCESS",
+            "status": "OPEN",
+            "task_id": "P-007",
+[0m
+[0m$ [0mpython3 -m json.tool state/campaign/task_queue.json | sed -n '/"task_id": "R-001"/,/"task_id": "R-005"/p' | head -140
+"task_id": "R-001",
+            "tests_preceding_process": true,
+            "verifiability": "HIGH",
+            "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, and existing regression suite."
+        },
+        {
+            "bottleneck": "The current evidence is strongest for one-day holding, so temporal robustness is still partly unresolved.",
+            "complexity": "LOW",
+            "deliverable": "A reproducible robustness artifact plus independent verification.",
+            "downstream_leverage": "HIGH",
+            "effort": "MEDIUM",
+            "evidence_basis": "Momentum is candidate positive evidence at a one-day hold and has already survived lookback and horizon robustness in magnitude.",
+            "execution_risk": "LOW",
+            "expected_information_gain": "HIGH",
+            "falsification_power": "HIGH",
+            "objective": "Test a fixed lookback-5 momentum signal with a predeclared small holding-period set using the existing walk-forward/null methodology.",
+            "out_of_scope": "Do not tune the lookback or choose a holding period after inspecting results.",
+            "primary_question": "Does the qualified momentum effect survive a small predeclared holding-period variation without becoming a single-point timing artifact?",
+            "role": "HIGHER_ORDER_OBJECTIVE",
+            "scope": "Use only the existing 10-asset universe and a fixed hold-period grid declared before execution.",
+            "status": "OPEN",
+            "stop_condition": "Stop after the declared holding-period grid is complete and independently checked.",
+            "success_criterion": "The holding-period sensitivity is classified and any positive finding is reproducible.",
+            "task_id": "R-002",
+            "tests_preceding_process": true,
+            "verifiability": "HIGH",
+            "verification_requirement": "Matched null, leakage review, independent recomputation, determinism, regression suite."
+        },
+        {
+            "bottleneck": "A candidate momentum effect may depend on market regime even after horizon robustness.",
+            "complexity": "MEDIUM",
+            "deliverable": "A falsifiable regime-conditioned momentum result with independent verification.",
+            "downstream_leverage": "HIGH",
+            "effort": "MEDIUM",
+            "evidence_basis": "MA regime filters were previously falsified; whether the same class of conditioning helps the different momentum mechanism remains unresolved.",
+            "execution_risk": "MEDIUM",
+            "expected_information_gain": "MEDIUM",
+            "falsification_power": "HIGH",
+            "objective": "Test one explicitly predeclared past-only volatility gate on lookback-5 momentum through the existing regime-stability and null framework.",
+            "out_of_scope": "Do not search a threshold grid or optimize the gate after seeing results.",
+            "primary_question": "Does a single past-only volatility gate create a predeclared robustness improvement for the qualified momentum effect?",
+            "role": "HIGHER_ORDER_OBJECTIVE",
+            "scope": "One volatility feature, one threshold rule declared before execution, existing 10-asset universe.",
+            "status": "OPEN",
+            "stop_condition": "Stop after the one predeclared gate is evaluated and independently checked.",
+            "success_criterion": "The gate either demonstrates a reproducible improvement in robustness or is falsified/unsupported.",
+            "task_id": "R-003",
+            "tests_preceding_process": true,
+            "verifiability": "HIGH",
+            "verification_requirement": "Leakage gate, matched null, regime-stability, independent recomputation, determinism."
+        },
+        {
+            "bottleneck": "The research frontier needs genuinely new signal classes rather than endless momentum variants.",
+            "complexity": "MEDIUM",
+            "deliverable": "A reproducible new-signal-class artifact with independent verification and a clear verdict.",
+            "downstream_leverage": "HIGH",
+            "effort": "MEDIUM",
+            "evidence_basis": "The current frontier explicitly calls for a genuinely new signal class or new data/method frontier after momentum qualification.",
+            "execution_risk": "MEDIUM",
+            "expected_information_gain": "HIGH",
+            "falsification_power": "HIGH",
+            "objective": "Test one fixed 20-day breakout continuation rule on the collected universe through the existing robustness gate stack.",
+            "out_of_scope": "Do not sweep breakout lengths, tune after seeing results, or add new data dependencies.",
+            "primary_question": "Does a fixed 20-day breakout continuation signal produce reproducible evidence beyond the currently qualified momentum family?",
+            "role": "HIGHER_ORDER_OBJECTIVE",
+            "scope": "One predeclared breakout rule, existing data universe, existing walk-forward, regime, null, and independent-verification infrastructure.",
+            "status": "RESOLVED",
+            "stop_condition": "Stop after the fixed rule completes the declared gate stack.",
+            "success_criterion": "The hypothesis is classified as falsified, supported, or unverified by the existing evidence standard.",
+            "task_id": "R-004",
+            "tests_preceding_process": true,
+            "verifiability": "HIGH",
+            "verification_requirement": "Data preflight, leakage, regime stability, matched null, independent recomputation, determinism, regression suite."
+        },
+        {
+            "bottleneck": "A research candidate should not depend on uncontrolled sizing assumptions.",
+            "complexity": "MEDIUM",
+            "deliverable": "A bounded sizing robustness result and independent verification.",
+            "downstream_leverage": "MEDIUM",
+            "effort": "MEDIUM",
+            "evidence_basis": "The current candidate is mechanical and short-horizon; separating signal evidence from sizing effects is decision-relevant.",
+            "execution_risk": "MEDIUM",
+            "expected_information_gain": "MEDIUM",
+            "falsification_power": "MEDIUM",
+            "objective": "Evaluate one fixed volatility-normalized sizing rule for the already-qualified momentum signal without leverage and with the existing null.",
+            "out_of_scope": "Do not optimize sizing parameters or compare many variants.",
+            "primary_question": "Does a conservative volatility-normalized sizing variant preserve a positive momentum signal without creating leverage-dependent evidence?",
+            "role": "HIGHER_ORDER_OBJECTIVE",
+            "scope": "One fixed sizing rule, existing universe, existing research engine, no leverage.",
+            "status": "OPEN",
+            "stop_condition": "Stop after the fixed sizing rule is tested and independently checked.",
+            "success_criterion": "The result distinguishes signal robustness from sizing artifacts.",
+            "task_id": "R-005",
+[0m
+[0m$ [0mgrep -rn "candidate_tasks" .github/scripts/*.py | head -20
+.github/scripts/campaign_controller.py:221:def candidate_tasks_for_role(tasks: list[dict[str, Any]], role: str) -> list[dict[str, Any]]:
+.github/scripts/campaign_controller.py:287:            for candidate in previous_record.get("candidate_tasks", []):
+.github/scripts/campaign_controller.py:307:    candidates = candidate_tasks_for_role(tasks, expected_role)
+.github/scripts/campaign_controller.py:457:- Secondary ideas become candidate_tasks in the durable record; they are NOT current work.
+.github/scripts/campaign_controller.py:494:process_decision, research_result, decision, next, candidate_tasks,
+.github/scripts/campaign_controller.py:517:- candidate_tasks may contain zero or more future tasks, each with the same focused-task schema as the current contract.
+.github/scripts/synthesize_campaign.py:97:        for candidate in record.get("candidate_tasks", []):
+.github/scripts/validate_campaign_agent.py:105:        "candidate_tasks": [],
+.github/scripts/validate_campaign_agent.py:117:        "research_result", "decision", "next", "candidate_tasks",
+.github/scripts/validate_campaign_agent.py:143:    if not isinstance(record["candidate_tasks"], list):
+.github/scripts/validate_campaign_agent.py:144:        failures.append("candidate_tasks_not_list")
+.github/scripts/validate_campaign_agent.py:146:        for idx, task in enumerate(record["candidate_tasks"]):
+[0m
+[0m✗ [0msed -n 275,300p .github/scripts/campaign_controller.py; echo ---; sed -n 90,105p .github/scripts/synthesize_campaign.py failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m
+[0m$ [0msed -n 275,300p .github/scripts/campaign_controller.py
+campaign_count = int(campaign_status["agent_count"])
+    global_agent_number = campaign_status["global_agent_numbers"].get(str(agent_number))
+    if expected_role is None or agent_number > campaign_count:
+        raise SystemExit("agent number is outside campaign")
+    if global_agent_number is None:
+        raise SystemExit("global agent identity is missing for campaign slot")
+    tasks = load_queue()
+
+    if agent_number > 1:
+        prev = d / "agents" / f"agent_{agent_number-1:02d}.json"
+        if prev.exists():
+            previous_record = load_json(prev)
+            for candidate in previous_record.get("candidate_tasks", []):
+                validate_task(candidate)
+                if not any(t["task_id"] == candidate["task_id"] for t in tasks):
+                    candidate = dict(candidate)
+                    candidate["status"] = "OPEN"
+                    tasks.append(candidate)
+
+            previous_task_id = previous_record.get("task_id")
+            decision = previous_record.get("decision")
+            for task in tasks:
+                if task["task_id"] != previous_task_id:
+                    continue
+                if decision in {"USEFUL_CHANGE", "VERIFIED_NEGATIVE_RESULT", "RETAIN"}:
+                    task["status"] = "RESOLVED"
+[0m
+[0m$ [0msed -n 100,130p .github/scripts/run_campaign_agent.py
+ap.add_argument("--run-id", required=True)
+    ap.add_argument("--agent-number", required=True, type=int)
+    ap.add_argument("--model", required=True)
+    ap.add_argument("--prompt-file", required=True)
+    args = ap.parse_args()
+
+    run_root = Path("state/campaign/runs") / str(args.run_id)
+    agent_dir = run_root / "agents"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    progress = Path("state/worker_progress.md")
+    prompt = Path(args.prompt_file).read_text(encoding="utf-8")
+    contract = json.loads(
+        (agent_dir / f"agent_{args.agent_number:02d}_contract.json").read_text(encoding="utf-8")
+    )
+
+    before = snapshot_workspace(Path("."))
+    (agent_dir / f"agent_{args.agent_number:02d}_before.json").write_text(
+        json.dumps({"hashes": before, "captured_utc": utc_now()}, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+    progress.write_text(
+        "\n".join(
+            [
+                "# Worker Progress",
+                "",
+                f"activation_id: {args.run_id}",
+                f"agent_number: {args.agent_number:02d}",
+                f"task_id: {contract['task_id']}",
+                f"phase: AGENT_{args.agent_number:02d}_START",
+                "status: RUNNING",
+[0m
+[0m← [0mWrite state/worker_progress.md
+Wrote file successfully.
+[0m
+[0m← [0mWrite state/campaign/runs/43796555856/agents/agent_02.json
+Wrote file successfully.
+[0m
+[0m✗ [0mpython3 -m json.tool state/campaign/runs/43796555856/agents/agent_02.json > /dev/null && echo RECORD_JSON_OK failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m✗ [0mpython3 -m json.tool state/check_artifacts/momentum_cost_sensitivity_results.json > /dev/null && echo ARTIFACT_JSON_OK failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m
+[0m$ [0mpython3 -m json.tool state/campaign/runs/43796555856/agents/agent_02.json
+{
+    "agent_number": 2,
+    "campaign_slot": 2,
+    "global_agent_number": 2,
+    "role": "HIGHER_ORDER_OBJECTIVE",
+    "task_id": "R-001",
+    "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+    "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+    "question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+    "action": "Executed the predeclared cost grid (zero / repo-realistic / stress_2x) x lookback 3/5/10 over the existing 10-asset collected universe through the existing walk-forward regime-stability gate, each cell against a matched coin-flip null at the same cost level; the turnover accounting (3.8x capital per year for a rule documented as rebalancing a constant-dollar +/-1 position every bar) contradicted the documented construction, so I added a signal-integrity audit of the framework signal and then a predeclared diagnostic grid on a docstring-faithful log-return momentum; wrote an independent verifier and re-ran the regression suite.",
+    "changed": [
+        "research/checks/momentum_cost_sensitivity.py (new: predeclared 3x3 cost grid, signal-integrity audit, predeclared corrected-signal diagnostic, artifact writer)",
+        "research/checks/verify_momentum_cost_sensitivity.py (new: independent verifier with six gates over the artifact)",
+        "state/check_artifacts/momentum_cost_sensitivity_results.json (new: reproducible result artifact)",
+        "state/worker_progress.md (semantic milestone update)",
+        "state/campaign/runs/43796555856/agents/agent_02.json (this durable record)"
+    ],
+    "verified": [
+        "Manifest integrity 10/10 OK and research/data/preflight.py PREFLIGHT PASSED on dataset yf-ohlcv-universe-2009-to-2026-10-03 (10 tickers).",
+        "Leakage gate PASS on AMZN/JPM at the realistic cost level: bt.check_signal_integrity plus bt.check_equity_matches_fills on a full-sample run with costs.",
+        "Cost grid evaluated for all 3 predeclared cost levels x 3 lookbacks x 10 assets = 90 regime-stability cells, each with a matched coin-flip null at the same cost level; per-segment fold counts recorded.",
+        "Independent verifier research/checks/verify_momentum_cost_sensitivity.py: all six gates MATCH -- (1) fresh walk_forward + noise_benchmark recomputation of AMZN/JPM cells (medians, null medians, segment labels, verdicts, per-segment fold counts) at every level and lookback for the recorded signal; (2) the same for the corrected signal; (3) signal-integrity counts re-derived independently (27/30 constant +1.0 cells, NVDA the only sign-flipping asset); (4) per-asset classification re-derived from published medians/nulls for both grids, 10/10 MATCH each; (5) zero-cost column cross-consistent with momentum_lookback_sweep_results.json for all 10 tickers x 3 lookbacks; (6) verification-path determinism identical.",
+        "Determinism asserted inside the check for both grids: r1 == r2 at every cost level on AMZN and JPM.",
+        "Regression suite: python3 -m unittest discover -s tests -> Ran 168 tests, OK (identical to the 168-test pre-change baseline).",
+        "Recorded-implementation result: zero-cost 17/30 EDGE cells -> realistic 18/30 -> stress_2x 18/30; median of cell medians +0.0686 at all three cost levels; per-asset median cost drag <= 0.001 per 84-day fold at the realistic level (maximum 0.0021 at stress_2x, NVDA); classification 6 COST_ROBUST / 4 NO_EDGE_ZERO_COST.",
+        "Signal-integrity audit: bt.momentum_signals computes np.mean(np.log(closes[i-lookback+1:i+1])) and names it ret; that is the mean of log PRICES, not a return, so the weight is a step function of the adjusted price level (+1.0 above 1.0, -1.0 below). 27/30 (asset, lookback) cells are constant +1.0 after the lookback warmup; the only sign-flipping asset is NVDA (1850-1852 short bars, split-adjusted prices below 1.0), so the lookback parameter only delays the position start.",
+        "Corrected-signal diagnostic (predeclared in the module docstring before execution): a docstring-faithful sign-of-past-N-day-log-return momentum yields 0/30 EDGE cells at every cost level (median of cell medians +0.0069 zero-cost, +0.0010 realistic, +0.0008 stress_2x; all 10 assets NO_EDGE_ZERO_COST) with 105x capital per year turnover at the realistic level versus 3.8x per year for the recorded signal."
+    ],
+    "unverified": [
+        "The momentum hypothesis is not tested at any other construction: only one corrected implementation (sign of the past N-day log return, hold 1 day) was run, so a different horizon, holding period, or signal form could still show an edge.",
+        "The cost levels are stated assumptions (the repository's realistic model copied from examples/ma_crossover_real_data.py, and that model doubled); they are not calibrated execution forecasts, and no market-impact, borrow, capacity, or spread-instability model is present.",
+        "BacktestConfig's per-share charges (commission_per_share, slippage_cents) are not invariant to split adjustment on the adjusted series, so cost-drag magnitudes for low-priced adjusted series (NVDA) are inflated; only the proportional component is scale-free.",
+        "The independent verifier shares the backtest engine and the noise_benchmark null with the check; it is independent in signal construction, segment reconstruction, verdict logic, and classification, not in the engine.",
+        "Four prior durable artifacts rest on the defective signal and still carry their original verdicts: momentum 37318950814 (SUPPORTED), momentum lookback sweep 37361000967, momentum longer horizon 37394344201, and short-horizon reversal 37263008074 (FALSIFIED). This activation did not repair the framework function or rewrite prior verdicts; research/checks/momentum_horizon_gap_analysis.py also carries its own copy of the same expression, so its 'independent' recomputation could not detect the defect either.",
+        "Queued tasks R-002 (holding-period sensitivity), R-003 (volatility gate) and R-005 (volatility-normalized sizing) were written on the premise that momentum is qualified candidate positive evidence; that premise is invalidated here, so their results would not be interpretable until the signal is repaired."
+    ],
+    "observed_effect": "The cost test did not simply measure cost robustness; its turnover and drag accounting exposed that the campaign's only positive candidate is not a momentum signal. A rule documented as rebalancing a constant-dollar +/-1 position every bar should turn over on the order of 100x capital per year; the recorded implementation turned over 3.8x per year and showed a cost drag of at most 0.001 per 84-day fold, which is only possible if the position is essentially static. The integrity audit confirmed the cause: the weight is a function of the adjusted price level, constant +1.0 in 27/30 (asset, lookback) cells, so the lookback parameter is inert and the recorded medians (+0.0686 per fold, about 20 percent a year) are the large-cap equity risk premium of a constant long position, not a short-horizon autocorrelation effect. The predeclared corrected-signal diagnostic then showed 0/30 EDGE cells at zero cost, i.e. no REGIME_STABLE positive edge even before costs. The information gain came from the accounting audit rather than from the cost grid itself: a turnover-versus-documentation plausibility check would have caught this at the first momentum cell closure, which is the process improvement recorded as a candidate task.",
+    "uncertainty_targeted": "Whether the short-horizon momentum candidate's positive evidence survives realistic transaction-cost stress on the collected real-data universe.",
+    "uncertainty_reduced": "Reduced the uncertainty from 'momentum is a cost-robust candidate positive' to 'the recorded candidate evidence is an artifact of a price-level signal, and a docstring-faithful momentum implementation shows no REGIME_STABLE positive edge at any cost level (0/30 cells)'. The cost-robustness question is therefore answered negatively for this universe, this horizon, and this single corrected construction, and the momentum frontier cell is invalidated rather than qualified. What remains open is whether any other momentum construction produces an edge, which requires the signal repair recorded below.",
+    "process_decision": "RETAIN",
+    "research_result": "NEGATIVE / INVALIDATING. The assigned cost grid was executed as predeclared and independently verified. For the signal as recorded (bt.momentum_signals), costs are immaterial: zero-cost 17/30 EDGE cells, realistic 18/30, stress_2x 18/30, median of cell medians unchanged at +0.0686 per 84-day fold, per-asset cost drag <= 0.001 per fold, classification 6 COST_ROBUST / 4 NO_EDGE_ZERO_COST. That result is not evidence about momentum: the audited signal is a step function of the adjusted price level (constant +1.0 in 27/30 cells; NVDA flips sign once when its split-adjusted price crosses 1.0), so the tested position is constant-long large-cap equity and the measured medians are the equity risk premium, and the lookback parameter only shifts the entry by a few bars. A docstring-faithful log-return momentum, evaluated on the identical grid with the identical rule, yields 0/30 EDGE cells at every cost level (zero-cost median of cell medians +0.0069, realistic +0.0010, stress_2x +0.0008; all 10 assets NO_EDGE_ZERO_COST) and turns over about 105x capital per year at the realistic level. No claim of profitability is made for any asset; the durable contribution is that the campaign's only positive candidate is invalidated at the implementation level, that the falsified reversal cell is likewise a constant-short position, and that the cost question is closed for this construction.",
+    "decision": "VERIFIED_NEGATIVE_RESULT",
+    "next": "Repair bt.momentum_signals and bt.mean_reversion_signals to use the lookback log return (np.log(closes[i]) - np.log(closes[i-lookback])) with a unit test pinning the sign convention, then re-run the momentum cell and this cost grid and record corrected verdicts in place of the four invalidated ones.",
+    "candidate_tasks": [
+        {
+            "task_id": "R-006",
+            "role": "HIGHER_ORDER_OBJECTIVE",
+            "status": "OPEN",
+            "primary_question": "Does a docstring-faithful momentum implementation reproduce the positive evidence that the defective price-level signal produced?",
+            "bottleneck": "bt.momentum_signals and bt.mean_reversion_signals compute the mean of log prices rather than a log return, so every momentum and reversal result recorded to date measures a constant-long or constant-short position.",
+            "objective": "Repair both signal functions to use the lookback log return, add unit tests that pin the sign convention on constructed series, then re-run the momentum cell and the cost grid and record corrected verdicts that supersede the invalidated ones.",
+            "scope": "Modify only the two signal functions and their unit tests; re-run research/checks/momentum.py, momentum_lookback_sweep.py, momentum_longer_horizon.py, momentum_hold_period_sensitivity.py and momentum_cost_sensitivity.py; record corrected verdicts and mark the prior momentum and reversal verdicts invalidated.",
+            "out_of_scope": "Do not retune the lookback, holding period, universe, cost levels, or verdict machinery, and do not rewrite prior artifacts.",
+            "deliverable": "Corrected reproducible momentum and reversal artifacts with independent verification and an explicit invalidation note for the four prior artifacts.",
+            "success_criterion": "The corrected signal is unit-tested, the recomputed verdicts are reproducible and independently verified, and the invalidated verdicts are explicitly marked.",
+            "stop_condition": "Stop after the corrected momentum cell and cost grid are evaluated, independently verified, and recorded.",
+            "verification_requirement": "Unit tests for the sign convention, real-data preflight, leakage gate, matched null, independent recomputation, determinism, and the full regression suite.",
+            "evidence_basis": "state/check_artifacts/momentum_cost_sensitivity_results.json signal_integrity block, plus the duplicated expression in research/checks/momentum_horizon_gap_analysis.py and the two framework functions in research/backtest/regime_stability.py.",
+            "expected_information_gain": "HIGH",
+            "downstream_leverage": "HIGH",
+            "falsification_power": "HIGH",
+            "verifiability": "HIGH",
+            "effort": "MEDIUM",
+            "complexity": "LOW",
+            "execution_risk": "LOW",
+            "tests_preceding_process": true
+        },
+        {
+            "task_id": "R-007",
+            "role": "LEARNING_PROCESS",
+            "status": "OPEN",
+            "primary_question": "Would a standard signal-integrity assertion have caught the price-level momentum defect at the first cell closure?",
+            "bottleneck": "A signal whose weight distribution is degenerate (a single sign) or whose turnover contradicts its documented construction passes every existing gate, because the gates validate accounting, statistics and look-ahead rather than signal semantics.",
+            "objective": "Define a minimal signal-integrity assertion (weight-set cardinality, sign balance, annual turnover versus documented construction) and evaluate it retrospectively against the existing signal classes.",
+            "scope": "Design the assertion, apply it to bt.momentum_signals, bt.mean_reversion_signals, bt.breakout_signals, bt.ma_crossover_signals and the CSRS and volatility-targeting spreads, and report which classes it flags.",
+            "out_of_scope": "Do not change verdict machinery, the selector, or any research conclusion.",
+            "deliverable": "A bounded judgment on whether the assertion adds durable capability, with per-class flag counts.",
+            "success_criterion": "The assertion is applied to all five signal families and either demonstrates that it would have caught the defect or is marked insufficient.",
+            "stop_condition": "Stop once the assertion has been applied to the five existing signal families.",
+            "verification_requirement": "Controller-side schema validation plus reproduction of the flag counts from durable artifacts.",
+            "evidence_basis": "This activation's signal_integrity block plus the existing signal functions in research/backtest/regime_stability.py.",
+            "expected_information_gain": "MEDIUM",
+            "downstream_leverage": "HIGH",
+            "falsification_power": "MEDIUM",
+            "verifiability": "HIGH",
+            "effort": "LOW",
+            "complexity": "LOW",
+            "execution_risk": "LOW",
+            "tests_preceding_process": false
+        }
+    ],
+    "complexity_added": "LOW -- two research check scripts and one JSON artifact; no framework, selector, dependency, or workflow change.",
+    "failure_class": "NONE",
+    "task_selection_observation": "IMPROVED"
+}
+[0m
+[0m$ [0mgrep -c "n_folds_per_segment" state/check_artifacts/momentum_cost_sensitivity_results.json
+180
+[0m
+[0m$ [0mgrep -n "step function of the price LEVEL" state/check_artifacts/momentum_cost_sensitivity_results.json
+(no output)
+[0m
+[0m$ [0mgrep -n "diagnosis" state/check_artifacts/momentum_cost_sensitivity_results.json
+5402:    "diagnosis": "The recorded expression is the mean of log PRICES over the window, not a return. The resulting weight is therefore a function of the price LEVEL, not of the lookback: it is +1.0 for every bar whose window geometric-mean adjusted price exceeds 1.0 and -1.0 below it. Nine of ten collected assets never cross that level and are constant +1.0 after the warmup; NVDA (split-adjusted early prices below 1.0) flips sign once when its adjusted price crosses 1.0. The lookback parameter only delays the start of the position.",
+[0m
+[0m$ [0mgit diff --name-only
+state/campaign/global_agent_counter.json
+state/campaign/task_queue.json
+state/worker_progress.md
+[0m
+[0m$ [0mgit status --porcelain=v1
+M state/campaign/global_agent_counter.json
+ M state/campaign/task_queue.json
+ M state/worker_progress.md
+?? research/checks/momentum_cost_sensitivity.py
+?? research/checks/verify_momentum_cost_sensitivity.py
+?? state/campaign/current_task.json
+?? state/campaign/runs/43796555856/
+?? state/check_artifacts/momentum_cost_sensitivity_results.json
+[0m
+Activation complete.
+
