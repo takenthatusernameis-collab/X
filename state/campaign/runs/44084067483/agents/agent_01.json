@@ -1,0 +1,65 @@
+{
+  "agent_number": 1,
+  "campaign_slot": 1,
+  "global_agent_number": 1,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-001",
+  "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+  "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+  "question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+  "action": "Audited durable activation history (state/LEARNING_STATE.md, state/STATE.md, logs/ACTIVATION-2026-10-05.md, logs/ACTIVATION-2026-10-06.md), the campaign task queue and selection history (state/campaign/task_queue.json, state/campaign/runs/44084067483/campaign_status.json), and the controller selector implementation (.github/scripts/campaign_controller.py) to test whether explicit highest-value focused-task selection improves information flow over the prior opportunistic queue choice. No code or research was changed.",
+  "changed": [
+    "state/campaign/runs/44084067483/agents/agent_01.json (new: this durable process record)",
+    "state/worker_progress.md (phase/milestone update)"
+  ],
+  "verified": [
+    "Inspected state/LEARNING_STATE.md lines 7-13 (gap, strategy delta, expected effect), 27-35 (frontier table: distinct signal-class cells), and 49-59 (learning history): the frontier-first delta is operative and six subsequent activations closed distinct cells with decisive verdicts; activation 37260572520 is recorded as an UNVERIFIED process delta because its objective came from a queued receipt item rather than a frontier cell.",
+    "Inspected logs/ACTIVATION-2026-10-05.md lines 312-434: activation 37260572520 states its objective operationalized the frontier but was selected from a queued receipt item, confirming the pre-delta opportunistic baseline (n=1).",
+    "Inspected logs/ACTIVATION-2026-10-06.md: activation 37414038601 (20-day breakout) was selected frontier-first, ran the full gate stack, was independently verified (3 gates MATCH), and closed FALSIFIED.",
+    "Inspected .github/scripts/campaign_controller.py lines 198-225 (task_rank, candidate_tasks_for_role) and 269-383 (select_task): the current selector is a deterministic ordinal ranking over OPEN tasks keyed by (expected_information_gain, downstream_leverage, falsification_power, verifiability, effort, complexity, execution_risk, task_id).",
+    "Inspected state/campaign/runs/44084067483/campaign_status.json: selection_history contains exactly one entry (agent 1 -> P-001); no campaign agent has a recorded post-selection outcome yet.",
+    "Inspected state/campaign/task_queue.json: P-001..P-006 are OPEN LEARNING_PROCESS tasks; R-004 is RESOLVED; R-001/R-002/R-003/R-005 are OPEN HIGHER_ORDER_OBJECTIVE tasks.",
+    "Globbed research/checks/*.py: each check file corresponds to a distinct hypothesis (mean-reversion, cross-sectional relative strength, volatility targeting, momentum, momentum lookback sweep, momentum longer horizon, momentum hold-period sensitivity, cross-sectional momentum, breakout 20-day); no exact-duplicate check exists."
+  ],
+  "unverified": [
+    "No counterfactual or controlled comparison exists in durable state; causal attribution of any information-flow gain to the selector is not identifiable.",
+    "The current controller selector has n=1 selections in run 44084067483 (agent 1 -> P-001) and no post-selection outcome yet exists for any campaign agent; the six cited frontier-first successes predate this campaign and were agent-level self-selection, not controller selections.",
+    "The ordinal ranking order (P-001 < P-002 < P-004 < P-003 < P-006 < P-005) was derived by static reading of campaign_controller.py and task_queue.json; Python execution is denied in this environment (bash project-denied), so the ranking was not programmatically executed.",
+    "No exact per-checkpoint UTC start/finish timestamps could be captured (the date shell form is denied); activation is anchored to the environment message time 2026-11-17T12:33:22Z and event_sha 618539a4a9627acf46f68bc72b855293fd64c871."
+  ],
+  "observed_effect": "Frontier-first selection coincided with five distinct signal-class cells each closed once with a decisive verdict and independent verification and with no exact-duplicate retest (mean-reversion, cross-sectional relative strength, volatility targeting, momentum, 20-day breakout). The controller selector's own effect is not yet observable (n=1, no outcomes).",
+  "uncertainty_targeted": "Whether explicit highest-value focused-task selection produces better information flow than the repository's prior opportunistic queue choice.",
+  "uncertainty_reduced": "Partially. Established that the frontier-first selection policy is supported at the agent level and that the controller selector's specific causal advantage is not evidenced; reframed the claim from 'the selector improves efficiency' to 'the policy is supported, the selector is unverified'.",
+  "process_decision": "RETAIN",
+  "research_result": "The audit lands on 'no demonstrated advantage' for the controller selector specifically, while retaining the frontier-first policy. Evidence: (1) The frontier-first policy (agent self-selection of the highest-value unresolved frontier cell) is supported at the agent level: five distinct signal-class cells were each closed once with a decisive verdict and independent verification and no exact-duplicate retest - mean-reversion FALSIFIED (37263008074), cross-sectional relative strength FALSIFIED (37304873966), volatility targeting FALSIFIED (37314710995), momentum SUPPORTED then lookback/horizon-qualified (37318950814, 37361000967, 37394344201), and 20-day breakout FALSIFIED (37414038601); the single pre-delta comparison activation (37260572520) had an UNVERIFIED process delta because its objective came from a queued receipt item, not a frontier cell. (2) However, the current controller selector (campaign_controller.select_task) has produced exactly one selection in this run (selection_history: agent 1 -> P-001); none of the six cited frontier-first successes were produced by it - those were agent-level self-selection before this campaign. (3) No counterfactual exists: the pre-selector period (2026-10-02..05) produced the backtest infrastructure that made frontier testing possible, so the observed rise in decisive cell closures is confounded with infrastructure maturation and cannot be attributed to the selector. (4) The selector's ranking is deterministic and does discriminate (P-001 uniquely holds all-HIGH benefit and all-LOW cost, so it is not arbitrary), but its qualitative labels are coarse and pre-assigned, so the ranking encodes curator judgment rather than an independent value measurement. Conclusion: a concrete controller-selector advantage is not demonstrated by durable evidence (unresolved for the selector specifically); the frontier-first policy is retained because it is supported at the agent level and no bottleneck or harm is observed. No process change is warranted.",
+  "decision": "RETAIN",
+  "next": "Have a later HIGHER_ORDER_OBJECTIVE agent record task_selection_observation against a predeclared expectation for its own selection, so the controller selector accumulates outcome evidence across the remaining campaign slots and a within-campaign comparison becomes possible.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-007",
+      "role": "LEARNING_PROCESS",
+      "status": "OPEN",
+      "primary_question": "Once at least three campaign agents have recorded task_selection_observation, does the controller selector's ordinal ranking select tasks whose realized uncertainty reduction matches its qualitative priority ordering?",
+      "bottleneck": "The controller selector's effectiveness is unmeasured because no post-selection outcome is recorded per campaign agent.",
+      "objective": "Compare each campaign agent's controller-assigned qualitative rank against its recorded task_selection_observation and uncertainty_reduced once at least three agents have completed.",
+      "scope": "Use only campaign_status.json, the per-agent records, and task_queue.json; no new experiments.",
+      "out_of_scope": "Do not change the selector, add a numeric score, or rerun research.",
+      "deliverable": "A bounded process judgment on whether the ordinal ranking predicts realized uncertainty reduction.",
+      "success_criterion": "A RETAIN/REJECT/UNVERIFIED judgment supported by at least three paired rank/outcome observations.",
+      "stop_condition": "Stop once three paired observations exist or the campaign ends.",
+      "verification_requirement": "Controller-side inspection of the cited agent records and queue ranks.",
+      "evidence_basis": "This audit found the controller selector has n=1 and no outcome evidence yet.",
+      "expected_information_gain": "MEDIUM",
+      "downstream_leverage": "HIGH",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "effort": "LOW",
+      "complexity": "LOW",
+      "execution_risk": "LOW",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "NONE",
+  "failure_class": "NONE",
+  "task_selection_observation": "UNCHANGED"
+}

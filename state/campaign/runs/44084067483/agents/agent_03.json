@@ -1,0 +1,68 @@
+{
+  "agent_number": 3,
+  "campaign_slot": 3,
+  "global_agent_number": 3,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-002",
+  "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
+  "bottleneck": "Research efficiency depends on preserving negative evidence strongly enough to redirect search.",
+  "question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+  "action": "Audited state/LEARNING_STATE.md frontier, state/STATE.md, research/checks/*.py, state/check_artifacts/, state/campaign/task_queue.json, state/campaign/current_task.json, campaign_status.json, the agent_01/agent_02 records, and git history; identified that the frontier was stale/malformed with respect to agent 02's verified static-position defect and that an orphaned near-duplicate check exists; added one minimal operational novelty-guard section plus a duplicate-risk register to state/LEARNING_STATE.md. No research experiment was rerun and no code was changed.",
+  "changed": [
+    "state/LEARNING_STATE.md (new 'Novelty guard (operational)' section + duplicate-risk register inserted before 'Recent learning history')",
+    "state/campaign/runs/44084067483/agents/agent_03.json (new: this durable process record)",
+    "state/worker_progress.md (phase/milestone update to COMPLETE)"
+  ],
+  "verified": [
+    "Re-read state/LEARNING_STATE.md lines 36-57 after the edit: the guard section is present and well-formed and the frontier table above is unchanged.",
+    "git status --short: state/LEARNING_STATE.md modified; no research or test code files changed.",
+    "Inspected research/checks/momentum_sweep.py (lines 1-70 and 70-189): a real-data lookback-robustness check with LOOKBACKS=(3,5,10,20), the same walk-forward (train 252d/test 84d/warmup 60d/overlap 60d, min 400 bars/segment) and the same coin-flip null; ARTIFACT_PATH = state/check_artifacts/momentum_sweep_results.json.",
+    "Inspected research/checks/momentum_lookback_sweep.py (lines 1-60): the same real-data lookback-robustness hypothesis with LOOKBACKS=(3,5,10), the same walk-forward and coin-flip null; ARTIFACT_PATH = state/check_artifacts/momentum_lookback_sweep_results.json.",
+    "ls state/check_artifacts: momentum_sweep_results.json is absent while momentum_lookback_sweep_results.json is present; glob state/check_artifacts/*hold* returned no files, so momentum_hold_period_sensitivity.py has no artifact.",
+    "grep of *.md for 'momentum_sweep': only momentum_lookback_sweep references appear (logs/ACTIVATION-2026-10-05.md); research/checks/momentum_sweep.py has no activation-log reference.",
+    "git log dates: research/checks/momentum_sweep.py added 2026-10-05 14:08:58 (2dfc2df5); research/checks/momentum_lookback_sweep.py added 2026-10-05 19:23:25 (5ce6d789) -- the older, unreferenced check was superseded by the newer referenced check.",
+    "Read state/campaign/task_queue.json: R-002, R-003, R-005 and R-006 are OPEN; research/checks/momentum_hold_period_sensitivity.py docstring states 'This is the R-002 focused task'.",
+    "Read state/campaign/runs/44084067483/agents/agent_02.json and agent_02_validation.json: status VERIFIED_SESSION, failures [], quarantine null; the momentum/mean_reversion static-position defect was independently verified (5 gates)."
+  ],
+  "unverified": [
+    "Controller-side independent validation of the LEARNING_STATE.md change is pending (declared verification_requirement).",
+    "Whether a later agent will actually honor the R-006 dependency block and avoid the flagged duplicates is not yet observable (zero later agents have run in this campaign).",
+    "The malformed momentum frontier row was superseded by the guard block rather than repaired in place; a reader who consults only the table could still see the stale 'ADMITTED AS CANDIDATE POSITIVE EVIDENCE' text, mitigated by the explicit supersede note in the guard block.",
+    "No exact per-checkpoint UTC start/finish timestamps could be captured; activation is anchored to the environment message time 2026-11-17T12:44:27Z and event_sha 618539a4a9627acf46f68bc72b855293fd64c871."
+  ],
+  "observed_effect": "The audit converted a latent duplicate-work risk into a durable, operational guard. It established that the historical record contains no exact duplicate retest (so the frontier-first policy is RETAINED) but that the durable frontier was stale/malformed and the novelty guard was not operationalized, producing four concrete near-duplicate hazards now documented with file-level evidence: stale momentum frontier status, R-002/R-003/R-005 OPEN on a defective premise, an orphaned momentum_sweep.py near-duplicate, and a stale-open R-002 whose implementation already exists.",
+  "uncertainty_targeted": "Whether the durable history adequately prevents repeating equivalent experiments when a frontier cell is already resolved.",
+  "uncertainty_reduced": "Established with file-level evidence that the history alone did NOT prevent near-duplicate work: the momentum frontier was stale/malformed relative to agent 02's verified static-position defect, R-002/R-003/R-005 remained OPEN on a defective premise, and research/checks/momentum_sweep.py was an orphaned near-duplicate of momentum_lookback_sweep.py with no artifact and no log reference. The residual uncertainty is whether the added guard changes later selection behavior (unverified, n=0 later agents).",
+  "process_decision": "IMPROVE",
+  "research_result": "The minimal novelty guard already called for in LEARNING_EFFICIENCY.md section 2 and learning rule 2 is NOT sufficient on its own because it was never operationalized and the frontier drifted out of sync with verified evidence. Concrete duplicate-avoidance evidence: (1) research/checks/momentum_sweep.py (lookbacks 3/5/10/20, same real-data walk-forward and coin-flip null) and research/checks/momentum_lookback_sweep.py (lookbacks 3/5/10, same walk-forward and null) test the same lookback-robustness hypothesis; the older momentum_sweep.py (2026-10-05 14:08:58) has no artifact (momentum_sweep_results.json absent) and no activation-log reference, so it is an orphaned near-duplicate of the referenced momentum_lookback_sweep.py (2026-10-05 19:23:25) + momentum_lookback_sweep_results.json. (2) The momentum frontier row is stale and malformed: it still reads ADMITTED AS CANDIDATE POSITIVE EVIDENCE and its label is split from its status cells, while agent 02 (R-001, independently verified) showed the implemented momentum_signals thresholds mean(log(price)) -- a static long with ~0.1 sign changes/yr -- confounding every prior momentum lookback/horizon verdict. (3) OPEN tasks R-002 (hold period), R-003 (volatility gate) and R-005 (vol-normalized sizing) are momentum robustness dimensions whose shared premise is the defective signal and are therefore blocked on R-006. (4) R-002 already has an implementation (research/checks/momentum_hold_period_sensitivity.py, whose docstring says 'This is the R-002 focused task') but no artifact and is still OPEN, so a later agent could redo it. Minimal change applied: one 'Novelty guard (operational)' section in LEARNING_STATE.md that adds three pre-launch checks (frontier match, artifact match, upstream-defect dependency) and records this register, reusing existing files with no new metadata system.",
+  "decision": "USEFUL_CHANGE",
+  "next": "Execute R-006: repair momentum_signals and mean_reversion_signals to use the trailing lookback simple return, add signal-semantics unit tests, and re-run the momentum cell plus cost check; this unblocks R-002/R-003/R-005 and exercises the new novelty guard's dependency rule.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-009",
+      "role": "LEARNING_PROCESS",
+      "status": "OPEN",
+      "primary_question": "After the operational novelty guard was added, does the next campaign agent avoid the flagged duplicate-work hazards (re-running momentum_sweep.py, rewriting the existing R-002 check, or running R-002/R-003/R-005 before R-006)?",
+      "bottleneck": "The novelty guard was added as durable guidance but its effect on selection behavior is unmeasured.",
+      "objective": "Audit the next campaign agent's record and changed files against the P-002 duplicate-risk register to determine whether the guard changed behavior.",
+      "scope": "Use only state/LEARNING_STATE.md, the P-002 record, campaign_status.json, and later agent records; no new experiments.",
+      "out_of_scope": "Do not rerun historical experiments, add scoring, or modify the controller.",
+      "deliverable": "A bounded RETAIN/REJECT/UNVERIFIED judgment on the guard's observed effect.",
+      "success_criterion": "The audit finds either that no flagged duplicate was repeated (RETAIN) or a specific repeat with root cause (REJECT/UNVERIFIED).",
+      "stop_condition": "Stop once the next agent's record is classifiable.",
+      "verification_requirement": "Controller-side inspection of the cited records; no reliance on agent confidence.",
+      "evidence_basis": "P-002 established the register and the guard but not its behavioral effect.",
+      "expected_information_gain": "MEDIUM",
+      "downstream_leverage": "MEDIUM",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "effort": "LOW",
+      "complexity": "LOW",
+      "execution_risk": "LOW",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "LOW - one documentation section in state/LEARNING_STATE.md; no code, API, schema, workflow, or new metadata system.",
+  "failure_class": "NONE",
+  "task_selection_observation": "IMPROVED"
+}
