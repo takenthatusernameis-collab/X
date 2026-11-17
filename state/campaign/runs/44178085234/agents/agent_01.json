@@ -1,0 +1,73 @@
+{
+  "agent_number": 1,
+  "campaign_slot": 1,
+  "global_agent_number": 1,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-001",
+  "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow than the repository's prior opportunistic task choice, and produce one bounded process judgment.",
+  "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue (each activation's NEXT was a local follow-on of the same artifact).",
+  "question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+  "action": "Recomputed the controller's qualitative task_rank over the pre-selection queue snapshot to test selector reproducibility; compared pre-frontier and frontier-first activation records for duplicate/equivalent work; inspected the frontier table structure that the selector consumes; repaired the malformed momentum row and verified content preservation against the committed baseline.",
+  "changed": [
+    "state/LEARNING_STATE.md: frontier table repaired - the truncated 1-cell momentum row and its orphaned 3-cell continuation line were merged into one 4-cell row and the blank line that split the table was removed; table is now 17 contiguous rows, 0 malformed (cross-sectional-momentum and 20-day-breakout rows are back inside the table)",
+    "scratch/audit_selector_p001.py: new read-only audit (selector reproducibility from task_queue_initial.json + frontier table structure + activation-log topic mix)",
+    "scratch/repair_frontier_row_p001.py, scratch/repair_frontier_row_p001_cleanup.py, scratch/repair_frontier_row_p001_restore.py: scratch repair helpers (retained per PERSISTENCE_POLICY)",
+    "scratch/verify_frontier_repair_p001.py: content-preservation verifier (unified diff vs committed baseline + table integrity + no lost baseline cell; `--from-git` forces the committed baseline so the check survives /tmp cleanup)",
+    "scratch/validate_record_p001.py: read-only replication of the controller's agent-record validation",
+    "scratch/utc_now.py: UTC timestamp helper (the `date` shell form is denied in this environment)",
+    "state/worker_progress.md: milestone update to AGENT_01_RECORDED",
+    "logs/ACTIVATION-2026-11-17.md: activation record with UTC start/finish and findings",
+    "state/campaign/runs/44178085234/agents/agent_01.json: this durable record"
+  ],
+  "verified": [
+    "python3 scratch/audit_selector_p001.py (pre-repair and post-repair runs): recomputed top-ranked OPEN LEARNING_PROCESS task from state/campaign/runs/44178085234/task_queue_initial.json = P-001; compared_against = [P-001, P-002, P-004, P-003, P-006] MATCH; qualitative_priority = [HIGH, HIGH, HIGH, HIGH, LOW, LOW, LOW] MATCH; contract == state/campaign/current_task.json",
+    "python3 scratch/verify_frontier_repair_p001.py: diff vs committed baseline limited to removal of the 1-cell truncated row + the 3-cell orphan line + one blank line and addition of exactly one merged 4-cell row; frontier_table rows=17 malformed=[]; baseline_table_cells_missing_now=[]; identical result via the durable `--from-git` path (git show HEAD:state/LEARNING_STATE.md), so the check is reproducible after /tmp is discarded",
+    "python3 scratch/validate_record_p001.py: controller-equivalent validation of this record returns zero failures (decision, process_decision, task_selection_observation and failure_class all in the canonical sets; next is a single line; candidate task P-007 passes validate_task)",
+    "python3 scratch/audit_selector_p001.py post-repair: contiguous_table_lines=17 malformed_rows=0; line after table is the 'Use statuses such as ...' guidance line",
+    "python3 scratch/repair_frontier_row_p001_restore.py: committed baseline sha256 5b2d37b5c78e45eb58818ef7de2fd2db13ee1ee3da7b3c82dc8017cb8f37b04f equals the controller-captured pre-activation hash before the longer-horizon momentum row was restored (a repair-script indexing error had dropped it; restore was verified content-preserving)",
+    "git status --porcelain=v1: tracked modifications limited to state/LEARNING_STATE.md and state/worker_progress.md plus controller-owned state/campaign paths; no protected path touched",
+    "Code inspection of .github/scripts/campaign_controller.py::candidate_tasks_for_role and validate_campaign_agent.py: selection considers only status == OPEN tasks for the agent role, so RESOLVED cells (e.g. R-004) are structurally excluded from re-selection"
+  ],
+  "unverified": [
+    "Causal claim that explicit highest-value selection improves research information flow: the pre/post comparison is confounded by co-occurring independent-verifier infrastructure, gate-stack maturation, and toolkit completion, has no counterfactual, and rests on N=7 post-frontier activations vs ~13 pre-frontier activations (several of which were unavoidable toolkit work)",
+    "Semantic review of all 16 frontier cells after the repair: only structural integrity and baseline content preservation were checked, not each cell's wording",
+    "Opportunistic-era classification relies on activation-log headings/keywords in logs/ACTIVATION-2026-10-04.md and -05.md; logs/ACTIVATION-2026-10-02.md and -03.md are free-form and were not exhaustively classified",
+    "Controller-side validation of this agent record (validate_campaign_agent.py) has not run yet; it executes after this session ends",
+    "No per-checkpoint timestamps from the shell (the `date` form is denied); start 2026-11-17T21:17:35Z taken from the message time and finish from scratch/utc_now.py"
+  ],
+  "observed_effect": "Verified properties, not a causal effect: the selector is deterministic and reproducible from durable state (top-ranked OPEN task for the role, rank key and compared_against recorded in the contract), and it structurally cannot re-select RESOLVED work - both properties absent in the pre-frontier era, where each activation's NEXT was a local follow-on of the same artifact (10-04 log chain: determinism rerun -> compare_noise tolerance -> stress tests -> NVDA -> universe). Record-level evidence is consistent with the frontier-first claim: seven consecutive activations each closed a distinct cell with a verdict (mean-reversion, cross-sectional relative strength, volatility targeting, momentum, momentum lookback sweep, momentum horizon, breakout), and the three momentum activations share one admitted cell with distinct documented information objectives rather than exact re-tests. Against that, the audit found a concrete defect in the selection surface itself: the frontier table had a truncated momentum row, an orphaned continuation line, and a blank line that pushed two cells (cross-sectional momentum, 20-day breakout) outside the table - now repaired and verified. Task_selection_observation IMPROVED refers to this task's own contribution (auditable selection verified + selection surface repaired), not to proof that the selector raises research information flow; that remains UNVERIFIED because the pre/post comparison cannot separate the selector from the co-timed verifier/gate/toolkit changes.",
+  "uncertainty_targeted": "Whether explicit highest-value focused-task selection improves learning efficiency relative to the prior opportunistic queue-following choice, and whether the durable selection surface (frontier record + controller ranking) is intact and reproducible.",
+  "uncertainty_reduced": "Selector reproducibility is now verified rather than asserted (recomputed rank key, compared_against and priority tuple all MATCH; contract equals current_task.json), and a concrete defect that removed two frontier cells from the rendered table was found and repaired with content preservation proven against the committed baseline. The remaining uncertainty is narrowed to the causal attribution question, which durable evidence cannot settle without a counterfactual.",
+  "process_decision": "IMPROVE",
+  "research_result": "No market hypothesis was tested (process-only task). Durable finding: the focused-task selector is deterministic, auditable and structurally duplicate-resistant, and the frontier-first era closed seven consecutive distinct cells with decisive, independently verified verdicts, but no demonstrated causal advantage over opportunistic selection exists in the durable record because the comparison is confounded and uncontrolled. The selection surface itself had degraded (1 truncated row, 1 orphan line, 2 cells rendered outside the table) and is now repaired.",
+  "decision": "USEFUL_CHANGE",
+  "next": "Execute task P-002 (duplicate / near-duplicate audit) against the now-repaired frontier table to decide whether a minimal novelty guard is warranted.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-007",
+      "role": "LEARNING_PROCESS",
+      "status": "OPEN",
+      "primary_question": "Does a cheap read-only structural check detect silent corruption of the durable frontier record before it degrades task selection?",
+      "bottleneck": "The frontier record that drives task selection can silently lose or split rows during cumulative edits; activation P-001 found 1 truncated row, 1 orphaned continuation line, and 2 cells rendered outside the table, detectable only by ad-hoc inspection.",
+      "objective": "Add one minimal read-only structural check for the LEARNING_STATE frontier table and confirm it fails on the pre-repair baseline and passes on the repaired record.",
+      "scope": "One read-only checker over the state/LEARNING_STATE.md frontier table plus one recorded two-case verification.",
+      "out_of_scope": "Do not change task_rank, the selection algorithm, controller architecture, or add any reward score.",
+      "deliverable": "A deterministic checker with a recorded baseline-fails / repaired-passes verification and no selection-semantics change.",
+      "success_criterion": "The checker exits non-zero on the committed pre-repair baseline and zero on the repaired record, with both exit codes recorded.",
+      "stop_condition": "Stop after the two-case verification completes.",
+      "verification_requirement": "Run the checker against the committed baseline revision and the repaired working tree; record both exit codes.",
+      "evidence_basis": "Activation P-001 (2026-11-17) found and repaired a malformed frontier row; the defect was found only because the audit script happened to parse the table structure.",
+      "expected_information_gain": "MEDIUM",
+      "downstream_leverage": "HIGH",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "effort": "LOW",
+      "complexity": "LOW",
+      "execution_risk": "LOW",
+      "tests_preceding_process": true
+    }
+  ],
+  "complexity_added": "LOW - one repaired markdown row plus five small read-only scratch audit/repair helpers; no new framework API, no controller change, no new dependency.",
+  "failure_class": "NONE",
+  "task_selection_observation": "IMPROVED"
+}

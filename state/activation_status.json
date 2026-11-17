@@ -1,44 +1,51 @@
 {
-  "activation_id": "37414038601",
-  "run_attempt": "1",
-  "sha": "a29ba2245a0e97007a63f3814bae9b5263204d63",
-  "ref_name": "main",
-  "repository": "takenthatusernameis-collab/X",
-  "status": "COMPLETE",
-  "phase": "COMPLETE",
-  "objective": "Execute task R-004 from the campaign queue: test whether a fixed 20-day breakout continuation signal (long when the close exceeds the highest close of the preceding 20 trading days; hold 1 day; daily rebalance) produces reproducible evidence beyond the currently qualified momentum family, on the collected 10-asset adjusted-close universe through the existing gate stack (manifest, preflight, leakage review, walk-forward regime-stability gate with matched coin-flip null, bounded lookback sensitivity, determinism, independent verifier), and record the verdict in the frontier.",
-  "start_time": null,
-  "finish_time": null,
+  "activation_id": "44178085234",
+  "campaign_outcome": "QUARANTINED",
   "changed": [
-    "research/backtest/regime_stability.py (new: breakout_signals() — past-only 20-day breakout continuation signal; exported)",
-    "research/backtest/__init__.py (export of breakout_signals added)",
-    "research/checks/breakout_20day_cont.py (new: breakout continuation check, lookbacks 5/10/20, 10-asset regime-stability gate, sensitivity verdicts, artifact)",
-    "research/checks/verify_breakout_20day_cont.py (new: independent verifier, 3 gates)",
-    "research/checks/smoke_breakout_signals.py (scratch: representative smoke test; retained as a useful diagnostic)",
-    "tests/test_regime_stability.py (5 new unit tests for breakout_signals: contract, past-only, determinism, edge case, regime-stress integration)",
-    "state/check_artifacts/breakout_20day_cont_results.json (new artifact)",
-    "state/STATE.md (new section documenting the breakout frontier cell, method, results, independent verification, and verdict)",
-    "state/LEARNING_STATE.md (frontier table entry, learning-history row, Next action updated)",
-    "state/activation_status.json (updated for activation 37414038601)",
-    "state/worker_progress.md (updated phase/milestone)",
-    "logs/ACTIVATION-2026-10-06.md (new activation record)"
+    "logs/ACTIVATION-2026-11-17.md: activation record with UTC start/finish and findings",
+    "scratch/audit_selector_p001.py: new read-only audit (selector reproducibility from task_queue_initial.json + frontier table structure + activation-log topic mix)",
+    "scratch/repair_frontier_row_p001.py, scratch/repair_frontier_row_p001_cleanup.py, scratch/repair_frontier_row_p001_restore.py: scratch repair helpers (retained per PERSISTENCE_POLICY)",
+    "scratch/utc_now.py: UTC timestamp helper (the `date` shell form is denied in this environment)",
+    "scratch/validate_record_p001.py: read-only replication of the controller's agent-record validation",
+    "scratch/verify_frontier_repair_p001.py: content-preservation verifier (unified diff vs committed baseline + table integrity + no lost baseline cell; `--from-git` forces the committed baseline so the check survives /tmp cleanup)",
+    "state/LEARNING_STATE.md: frontier table repaired - the truncated 1-cell momentum row and its orphaned 3-cell continuation line were merged into one 4-cell row and the blank line that split the table was removed; table is now 17 contiguous rows, 0 malformed (cross-sectional-momentum and 20-day-breakout rows are back inside the table)",
+    "state/campaign/runs/44178085234/agents/agent_01.json: this durable record",
+    "state/worker_progress.md: milestone update to AGENT_01_RECORDED"
+  ],
+  "next": "P-001",
+  "objective": "Sequential focused-task campaign to improve validated learning efficiency and higher-order quantitative-research capability.",
+  "persistence_decision": "RECOVERY_BRANCH",
+  "phase": "COMPLETE",
+  "process_conclusion": [
+    "Verified properties, not a causal effect: the selector is deterministic and reproducible from durable state (top-ranked OPEN task for the role, rank key and compared_against recorded in the contract), and it structurally cannot re-select RESOLVED work - both properties absent in the pre-frontier era, where each activation's NEXT was a local follow-on of the same artifact (10-04 log chain: determinism rerun -> compare_noise tolerance -> stress tests -> NVDA -> universe). Record-level evidence is consistent with the frontier-first claim: seven consecutive activations each closed a distinct cell with a verdict (mean-reversion, cross-sectional relative strength, volatility targeting, momentum, momentum lookback sweep, momentum horizon, breakout), and the three momentum activations share one admitted cell with distinct documented information objectives rather than exact re-tests. Against that, the audit found a concrete defect in the selection surface itself: the frontier table had a truncated momentum row, an orphaned continuation line, and a blank line that pushed two cells (cross-sectional momentum, 20-day breakout) outside the table - now repaired and verified. Task_selection_observation IMPROVED refers to this task's own contribution (auditable selection verified + selection surface repaired), not to proof that the selector raises research information flow; that remains UNVERIFIED because the pre/post comparison cannot separate the selector from the co-timed verifier/gate/toolkit changes.",
+    "unverified",
+    "unverified",
+    "unverified",
+    "unverified"
+  ],
+  "research_conclusion": [
+    "UNVERIFIED",
+    "UNVERIFIED",
+    "UNVERIFIED",
+    "UNVERIFIED",
+    "UNVERIFIED"
+  ],
+  "status": "QUARANTINED",
+  "unverified": [
+    "Causal claim that explicit highest-value selection improves research information flow: the pre/post comparison is confounded by co-occurring independent-verifier infrastructure, gate-stack maturation, and toolkit completion, has no counterfactual, and rests on N=7 post-frontier activations vs ~13 pre-frontier activations (several of which were unavoidable toolkit work)",
+    "Controller-side validation of this agent record (validate_campaign_agent.py) has not run yet; it executes after this session ends",
+    "No per-checkpoint timestamps from the shell (the `date` form is denied); start 2026-11-17T21:17:35Z taken from the message time and finish from scratch/utc_now.py",
+    "Opportunistic-era classification relies on activation-log headings/keywords in logs/ACTIVATION-2026-10-04.md and -05.md; logs/ACTIVATION-2026-10-02.md and -03.md are free-form and were not exhaustively classified",
+    "Semantic review of all 16 frontier cells after the repair: only structural integrity and baseline content preservation were checked, not each cell's wording",
+    "required agent record missing or unreadable"
   ],
   "verified": [
-    "python3 research/checks/smoke_breakout_signals.py: exits 0; AAPL breakout signals generated for lookbacks 5/10/20; one-regime-segment stress_segments run returns CONSISTENT_WITH_NOISE with 28 folds",
-    "python3 research/checks/breakout_20day_cont.py: exits 0; manifest 10/10 OK; PREFLIGHT PASSED (data-quality and survivorship checks); leakage PASS on AMZN/JPM (signals integrity + equity-fill audit); lookback-5 REGIME_STABLE=3 / CONSISTENT_WITH_NOISE=7 / REGIME_DEPENDENT=0; lookback-10 REGIME_STABLE=1 / CONSISTENT_WITH_NOISE=8 / REGIME_DEPENDENT=1; lookback-20 REGIME_STABLE=1 / CONSISTENT_WITH_NOISE=9; sensitivity ROBUST=1 (TSLA) / SENSITIVE=2 (AAPL, NVDA) / NO_EDGE=7; determinism r1==r2; artifact written",
-    "python3 research/checks/verify_breakout_20day_cont.py: GATE 1 PASS — fresh walk_forward + noise_benchmark recomputation of AMZN/JPM medians/nulls/segments MATCH on lookbacks 5/10/20; GATE 2 PASS — fresh medians/nulls for all 10 assets MATCH artifact; regenerated regime/sensitivity verdicts from unrounded values MATCH; GATE 3 PASS — determinism identical",
-    "python3 -m unittest discover -s tests -v: 161 tests, all passing (156 existing + 5 new breakout_signals unit tests), no regressions",
-    "py_compile check of research/checks/breakout_20day_cont.py, verify_breakout_20day_cont.py, research/backtest/regime_stability.py, research/backtest/__init__.py, tests/test_regime_stability.py — all compile",
-    "git diff HEAD verified: tracked changes limited to the expected files; untracked files are the new check/verifier/artifact/scratch log"
-  ],
-  "unverified": [
-    "No per-checkpoint UTC timestamps captured (the `date` shell form is denied in this environment); run identity anchored to GITHUB_RUN_ID=37414038601, SHA a29ba2245a0e97007a63f3814bae9b5263204d63",
-    "The borderline REGIME_STABLE verdicts for AAPL @5, TSLA @5/@20, NVDA @10 sit just above the framework's 0.05 noise band; their sensitivity to the threshold machinery is not independently quantified (flagged as a caveat in STATE.md)",
-    "The runner does not expose KILO_RECOVERY_BRANCH, so no outstanding recovery branch was inspected this activation"
-  ],
-  "next": "Run task R-001: test whether the qualified momentum edge (lookback 3-5) survives conservative transaction-cost stress on the collected universe (fixed cost model, lookback 3/5/10, matched coin-flip null) through the full gate stack, with an a-priori cost-robustness prediction; report RETAIN/REVERT/UNVERIFIED for whether costs erase the edge.",
-  "acceptance": "COMPLETE — the breakout continuation cell ran end-to-end through the complete gate stack (manifest 10/10, preflight PASSED, leakage PASS, regime-stability gate across all 10 tickers with matched null, bounded lookback sensitivity, determinism), was independently verified by a fresh walk_forward path (all 3 gates MATCH), and the regression suite remains green (161/161 tests pass after adding 5 new unit tests); the verdict is FALSIFIED: the breakout filter adds no robust evidence beyond the momentum family (9/10 CONSISTENT_WITH_NOISE at the canonical 20-day lookback; small, non-lookback-robust positive verdicts only for AAPL, TSLA, NVDA, which are absent from the momentum-asset list). Verdict recorded in state/STATE.md and state/LEARNING_STATE.md; the frontier-first delta remains RETAIN (demonstrated a sixth time: right cell selected, decisive verdict, independent verification).",
-  "research_conclusion": "FALSIFIED — the 20-day breakout continuation rule (long when close > max(close of prior 20 days), hold 1 day) does not produce a reproducible robust edge on the collected large-cap universe. At the canonical 20-day lookback: 9/10 assets CONSISTENT_WITH_NOISE, 1/10 (TSLA) REGIME_STABLE with small positive medians; across {5,10,20} sensitivity: ROBUST=1 (TSLA, edges at lookbacks 5 and 20), SENSITIVE=2 (AAPL @5, NVDA @10), NO_EDGE=7 (MSFT, GOOGL, AMZN, META, JPM, JNJ, XOM). The three positive verdicts are small in magnitude and, except for TSLA, do not survive across lookbacks; the assets showing the momentum edge (MSFT, GOOGL, AMZN, META) show NO_EDGE for breakout. The result matches the a-priori prediction (noise-like in most assets; small positive verdicts only where momentum already had an edge), and the frontier cell closes FALSIFIED. Durable negative finding: the threshold-activated entry filter adds no robust edge beyond raw momentum. Caveat: three borderline REGIME_STABLE assets have medians just above the 0.05 noise band; the verdict machinery is borderline-sensitive for those, so they are recorded as small-effect findings, not as a robust edge.",
-  "verdict": "FALSIFIED",
-  "frontier_cell": "20-day breakout continuation (long when close exceeds the highest close of the prior 20 trading days; hold 1 day) on collected data"
+    "Code inspection of .github/scripts/campaign_controller.py::candidate_tasks_for_role and validate_campaign_agent.py: selection considers only status == OPEN tasks for the agent role, so RESOLVED cells (e.g. R-004) are structurally excluded from re-selection",
+    "git status --porcelain=v1: tracked modifications limited to state/LEARNING_STATE.md and state/worker_progress.md plus controller-owned state/campaign paths; no protected path touched",
+    "python3 scratch/audit_selector_p001.py (pre-repair and post-repair runs): recomputed top-ranked OPEN LEARNING_PROCESS task from state/campaign/runs/44178085234/task_queue_initial.json = P-001; compared_against = [P-001, P-002, P-004, P-003, P-006] MATCH; qualitative_priority = [HIGH, HIGH, HIGH, HIGH, LOW, LOW, LOW] MATCH; contract == state/campaign/current_task.json",
+    "python3 scratch/audit_selector_p001.py post-repair: contiguous_table_lines=17 malformed_rows=0; line after table is the 'Use statuses such as ...' guidance line",
+    "python3 scratch/repair_frontier_row_p001_restore.py: committed baseline sha256 5b2d37b5c78e45eb58818ef7de2fd2db13ee1ee3da7b3c82dc8017cb8f37b04f equals the controller-captured pre-activation hash before the longer-horizon momentum row was restored (a repair-script indexing error had dropped it; restore was verified content-preserving)",
+    "python3 scratch/validate_record_p001.py: controller-equivalent validation of this record returns zero failures (decision, process_decision, task_selection_observation and failure_class all in the canonical sets; next is a single line; candidate task P-007 passes validate_task)",
+    "python3 scratch/verify_frontier_repair_p001.py: diff vs committed baseline limited to removal of the 1-cell truncated row + the 3-cell orphan line + one blank line and addition of exactly one merged 4-cell row; frontier_table rows=17 malformed=[]; baseline_table_cells_missing_now=[]; identical result via the durable `--from-git` path (git show HEAD:state/LEARNING_STATE.md), so the check is reproducible after /tmp is discarded"
+  ]
 }
