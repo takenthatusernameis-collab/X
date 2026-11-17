@@ -1,0 +1,79 @@
+{
+  "action": "Audited the focused-task selector against durable evidence only: read state/LEARNING_STATE.md, state/STATE.md, logs/ACTIVATION-2026-10-05.md, logs/ACTIVATION-2026-10-06.md, state/campaign/current_task.json, state/campaign/task_queue.json, state/campaign/global_agent_counter.json, runs/44012458416/campaign_status.json, runs/44012458416/agents/agent_01_contract.json, runs/44012458416/agents/agent_01_before.json; enumerated research/checks (30 files) and state/check_artifacts (11 artifacts) to test the evidence_basis claim of five frontier cells closed without equivalent retests; and cross-checked the selector's own selection_basis for internal consistency. No code, controller, workflow, or research files were modified.",
+  "agent_number": 1,
+  "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+  "campaign_slot": 1,
+  "candidate_tasks": [
+    {
+      "agent_number": null,
+      "bottleneck": "The focused-task selector's ranking rationale is not reconstructable from durable evidence: selection_basis.qualitative_priority has 7 entries while compared_against has 5 task IDs, and OPEN task P-005 is omitted from the comparison set.",
+      "campaign_slot": null,
+      "deliverable": "A reconciled selection_basis with aligned priority/compared vectors and a recorded rationale.",
+      "evidence_basis": "agent_01 (P-001) audit found a 7-vs-5 priority/compared mismatch and P-005 omission in the current run's selection_basis.",
+      "global_agent_number": null,
+      "objective": "Reconcile the selector's selection_basis so the priority vector aligns one-to-one with the compared task IDs and covers every OPEN same-role task, then record the reconciled ranking durably.",
+      "out_of_scope": "Do not redesign the controller or add a numerical reward score.",
+      "preceding_agent": null,
+      "primary_question": "Can the selector's choice be reconstructed from durable evidence alone after reconciliation?",
+      "role": "LEARNING_PROCESS",
+      "scope": "Inspect state/campaign/current_task.json, task_queue.json, and the run selection_history; produce a reconciled, documented selection_basis. Do not change controller code.",
+      "stop_condition": "Stop once the priority vector is aligned with compared_against and covers all OPEN same-role tasks, or the misalignment is shown to be intentional and documented.",
+      "success_criterion": "A future activation can reconstruct why each task was or was not selected from durable evidence alone.",
+      "task_id": "P-007",
+      "tests_preceding_process": false,
+      "verification_requirement": "Controller-side schema validation plus inspection of the reconciled record."
+    },
+    {
+      "agent_number": null,
+      "bottleneck": "Duplicate-work avoidance is incomplete: research/checks/momentum_sweep.py is an unrun near-duplicate of the executed momentum_lookback_sweep.py (its momentum_sweep_results.json artifact is absent; no log or STATE.md reference), so the durable history did not prevent a redundant check from persisting.",
+      "campaign_slot": null,
+      "deliverable": "A recorded disposition (execute for its distinct t-statistic lens, or retire) for research/checks/momentum_sweep.py.",
+      "evidence_basis": "agent_01 (P-001) audit: momentum_sweep.py exists with artifact path momentum_sweep_results.json but no artifact and no log/STATE reference.",
+      "global_agent_number": null,
+      "objective": "Determine whether research/checks/momentum_sweep.py adds a distinct information objective (fold-level t-statistics) not covered by the executed lookback sweep, and either execute it to produce that distinct lens or retire it with a recorded reason.",
+      "out_of_scope": "Do not rerun historical experiments or build a broad metadata system.",
+      "preceding_agent": null,
+      "primary_question": "Does the persisted momentum check set contain a redundant, unrun check, and what minimal disposition preserves its distinct information (if any)?",
+      "role": "LEARNING_PROCESS",
+      "scope": "Inspect research/checks/momentum_sweep.py, momentum_lookback_sweep.py, momentum_longer_horizon.py, momentum_horizon_gap_analysis.py and their artifacts; propose one disposition.",
+      "stop_condition": "Stop once the disposition is recorded and, if executed, independently verified.",
+      "success_criterion": "Either the distinct t-statistic lens is produced and verified, or the redundant file is retired with a recorded reason.",
+      "task_id": "P-008",
+      "tests_preceding_process": true,
+      "verification_requirement": "Independent inspection of the resulting artifact or the retirement record."
+    }
+  ],
+  "changed": [
+    "state/campaign/runs/44012458416/agents/agent_01.json (this durable process-decision record)",
+    "state/worker_progress.md (milestone checkpoint: P-001 selector audit complete)"
+  ],
+  "complexity_added": "NONE - no code, controller, workflow, or research files changed; the only durable additions are this record and a worker_progress milestone checkpoint.",
+  "decision": "RETAIN",
+  "failure_class": "NONE",
+  "global_agent_number": 1,
+  "next": "Controller-side, bounded: reconcile selection_basis so qualitative_priority length equals compared_against length and every OPEN same-role task (including P-005) is compared, then persist the reconciled ranking in the run selection_history so a future activation can test whether a reconstructable ranking changes the selected task.",
+  "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+  "observed_effect": "The audit converts an assumed selector advantage into a bounded evidence judgment. It supports an auditability advantage (the selector now emits durable selection_history and selection_basis records that the prior opportunistic queue did not) and confirms a real breadth increase (5 distinct signal classes after vs ~1 before). It does not support a causal learning-efficiency advantage: the breadth is confounded by MA-class exhaustion and the campaign scaffold, the selector's own rationale is only partially auditable (7-entry priority vector vs 5 compared IDs; P-005 omitted), and duplicate-work avoidance is incomplete (orphan momentum_sweep.py). Net effect: uncertainty about the selector's efficiency is reduced and two concrete auditability defects plus one duplicate-work instance are now durable and actionable.",
+  "process_decision": "RETAIN",
+  "question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+  "research_result": "Process result (no market/financial result). No causal selector-efficiency advantage is demonstrated; a selection-auditability advantage is demonstrated. The qualitative frontier-first selector is RETAINED unchanged because it is low-cost, non-harmful, and improves transparency, not because a learning-efficiency gain was proven. The evidence_basis claim that five recent frontier cells closed without equivalent retests holds at the cross-class level (5 distinct classes) but is imprecise: the pre-selector MA work tested distinct rescue hypotheses rather than literal duplicates, and the post-selector period contains a near-duplicate momentum lookback-sweep cluster with one unrun orphan (research/checks/momentum_sweep.py).",
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-001",
+  "task_selection_observation": "UNVERIFIED",
+  "uncertainty_reduced": "Partially reduced. Established: the selector produces durable, reconstructable selection records and coincided with a real breadth increase across signal classes; two selection-metadata defects and one unrun duplicate check were identified with durable evidence. Not reduced: the causal efficiency comparison remains unresolved because the breadth shift is confounded (MA-class exhaustion plus campaign scaffold), n=1 per regime, no counterfactual, and the selector's ranking is not fully reconstructable.",
+  "uncertainty_targeted": "Whether explicit highest-value focused-task selection improves learning efficiency (validated information flow per activation) relative to the repository's prior opportunistic queue-based task choice.",
+  "unverified": [
+    "Causal attribution: the shift from single-class depth to cross-class breadth coincides with explicit MA-class exhaustion (STATE.md: 'the MA-crossover hypothesis space ... is exhausted') and with introduction of the campaign scaffold, so a queue-based selector may have produced the same breadth. There is n=1 per regime and no counterfactual; whether the selector itself causes better information flow is UNVERIFIED.",
+    "The intent behind research/checks/momentum_sweep.py is unrecorded (no log or STATE.md reference); whether it was deferred, superseded, or abandoned cannot be determined from durable state.",
+    "No code, tests, or computations were executed this activation (bash is project-denied at this layer); the research verdicts cited above are taken from durable records and were not recomputed here.",
+    "Precise activation finish timestamp was not captured (the date shell form is denied); the activation is anchored to the observed environment message time 2026-11-17T03:47:00Z and the controller pre-snapshot captured_utc 2026-11-17T03:46:55Z."
+  ],
+  "verified": [
+    "Read state/LEARNING_STATE.md: the active strategy delta documents the frontier-first selection gap and a RETAIN decision; the frontier table lists MA crossover, short-horizon reversal, cross-sectional relative strength, volatility targeting, momentum (admitted candidate positive), cross-sectional momentum, and 20-day breakout cells.",
+    "Read state/STATE.md: the pre-selector period is a consecutive MA-crossover-centred sequence (base walk-forward, per-asset perturbation, AAPL/NVDA/universe regime stability, per-asset t-statistics, AMZN/JPM regime deep-dive, turbulent-only filter, regime-adaptive MA, richer cross-sectional-regime diagnostic) all ending in rejection; the post-selector period contains 5 distinct signal-class cells each with its own check + artifact + independent verifier: mean-reversion 37263008074 FALSIFIED, cross-sectional relative strength 37304873966 FALSIFIED, volatility targeting 37314710995 FALSIFIED, momentum 37318950814 SUPPORTED, 20-day breakout 37414038601 FALSIFIED.",
+    "Read state/campaign/task_queue.json: selection_principle=qualitative_evidence_backed_priority; P-001 SELECTED; P-002/P-003/P-004/P-005/P-006 OPEN; no per-task priority field exists in the queue schema.",
+    "Read state/campaign/current_task.json and runs/44012458416/agents/agent_01_contract.json: selection_basis.compared_against contains 5 IDs [P-001,P-002,P-004,P-003,P-006] while selection_basis.qualitative_priority contains 7 entries, and OPEN same-role task P-005 is absent from compared_against. The selector rationale is therefore internally inconsistent and not reconstructable from durable evidence.",
+    "Enumerated research/checks and state/check_artifacts: 5 distinct signal-class check/artifact/verifier pairs exist (mean_reversion, cross_sectional_relative_strength, volatility_targeting, momentum, breakout_20day_cont). research/checks/momentum_sweep.py declares artifact path state/check_artifacts/momentum_sweep_results.json, but no momentum_sweep_results.json artifact exists and no activation log or STATE.md section references momentum_sweep. It is an unrun near-duplicate of the executed research/checks/momentum_lookback_sweep.py (artifact present), so duplicate-work avoidance is incomplete.",
+    "Read logs/ACTIVATION-2026-10-05.md and logs/ACTIVATION-2026-10-06.md: the activation records independently corroborate the frontier-first selection basis and the decisive, independently verified verdicts for the post-selector cells."
+  ]
+}
