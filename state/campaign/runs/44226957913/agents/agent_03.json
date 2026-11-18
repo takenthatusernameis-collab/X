@@ -1,0 +1,66 @@
+{
+  "agent_number": 3,
+  "campaign_slot": 3,
+  "global_agent_number": 3,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-002",
+  "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
+  "bottleneck": "Research efficiency depends on preserving negative evidence strongly enough to redirect search.",
+  "question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+  "action": "Audited the resolved frontier cells and task history for duplicate/near-duplicate work. Inspected state/LEARNING_STATE.md (frontier table + learning rules), state/STATE.md (activation records incl. 37361000967), state/campaign/task_queue.json and campaign_status.json (selection history), .github/scripts/campaign_controller.py (candidate_tasks_for_role / task_rank), the research/checks inventory, and the state/check_artifacts inventory. Traced the git provenance (git log/show) of every momentum-family check and compared research/checks/momentum_sweep.py against research/checks/momentum_lookback_sweep.py for experiment equivalence.",
+  "changed": [
+    "state/campaign/runs/44226957913/agents/agent_03.json (this durable process-decision record)",
+    "state/worker_progress.md (semantic milestone: P-002 audit complete, RETAIN recorded)"
+  ],
+  "verified": [
+    "Resolved-cell protection is real and operative at the QUEUE level: .github/scripts/campaign_controller.py:221-225 candidate_tasks_for_role() filters t['status']=='OPEN', so RESOLVED/SELECTED/REJECTED/DEFERRED tasks are excluded from selection; a resolved queue task cannot be re-selected.",
+    "state/campaign/task_queue.json marks P-001 (line 21), R-001 (~line 160) and R-004 (line 230) status=RESOLVED; state/campaign/runs/44226957913/campaign_status.json records an auditable selection_history for agents 1/2/3.",
+    "Every resolved frontier cell in state/LEARNING_STATE.md (lines 19-35) carries a decisive status (FALSIFIED/TESTED/SUPPORTED) plus a 'None' next action; each resolved signal class was executed exactly once and never re-run: reversal (37263008074), cross-sectional relative strength (37304873966), volatility targeting (37314710995), momentum (37318950814), longer-horizon momentum (37394344201), cross-sectional momentum, 20-day breakout (37414038601), and the MA-crossover family.",
+    "CONCRETE NEAR-DUPLICATE (git): research/checks/momentum_sweep.py was added in commit 2dfc2df5 (2026-10-05T14:08:58Z), 313 lines, LOOKBACKS=(3,5,10,20), with fold-level t-statistic/Bonferroni diagnostics and ARTIFACT_PATH momentum_sweep_results.json (line 47).",
+    "research/checks/momentum_lookback_sweep.py was added in commit 5ce6d789 (2026-10-05T19:23:25Z), LOOKBACKS=(3,5,10), ARTIFACT_PATH momentum_lookback_sweep_results.json (line 52); it is recorded as activation 37361000967 in state/STATE.md:1390.",
+    "Both sweeps share the same DATASET_ID 'yf-ohlcv-universe-2009-to-2026-10-03', walk-forward windows 252/84/60/60, 4 contiguous volatility blocks, a coin-flip null, and the same 10-asset universe (momentum_sweep.py:37-47 vs momentum_lookback_sweep.py:44-52) — i.e. the same core real-data lookback sweep, with the later file adding only the robustness-classification framing.",
+    "momentum_sweep.py is ORPHANED: a repo-wide grep for 'momentum_sweep' finds it only in its own file, the agent_*_before.json hash snapshots, and this session's log; no state/activation record references it, and state/check_artifacts contains no momentum_sweep_results.json. So the later activation re-implemented an existing-but-unrecorded check ~5h after it was written.",
+    "No research code was changed by this activation (audit only), so the regression suite was not re-run; every cited fact is a read-only inspection of durable files and git history."
+  ],
+  "unverified": [
+    "Whether momentum_sweep.py was deliberately superseded or abandoned mid-debug is not recorded anywhere in the durable history; there is no supersession note, so a future agent cannot distinguish 'redundant, do not re-derive' from 'unfinished, needs work'.",
+    "No exhaustive all-history census of near-duplicate pairs was produced (out of scope: no broad metadata audit). The momentum_sweep.py vs momentum_lookback_sweep.py pair is the concrete example found by targeted inspection, not a complete enumeration.",
+    "Finish timestamp not independently observed (the `date` shell command is denied in this environment); start taken from the session message time 2026-11-18T03:13:52Z.",
+    "Exploratory process audit only; no market research result and no claim about live trading or profitability."
+  ],
+  "observed_effect": "The durable history ADEQUATELY prevents repeating equivalent experiments for RESOLVED frontier cells: the controller excludes non-OPEN tasks from selection (campaign_controller.py:221-225) and every resolved frontier cell carries a decisive status plus a 'None' next action, with each resolved class executed exactly once. However, the broader duplicate-work audit surfaced one concrete residual gap OUTSIDE the resolved-cell scope: research/checks/momentum_sweep.py (2026-10-05T14:08:58Z; lookbacks 3/5/10/20 with fold t-stats; no artifact; never referenced in any state/activation record) and research/checks/momentum_lookback_sweep.py (2026-10-05T19:23:25Z; lookbacks 3/5/10; produced momentum_lookback_sweep_results.json; recorded as activation 37361000967) implement the same core real-data lookback sweep over the same universe, walk-forward, and coin-flip null. The frontier did not surface the earlier orphaned check, so the later activation re-implemented it. This shows the written novelty guard (LEARNING_EFFICIENCY.md section 2; LEARNING_STATE.md Learning rule 2) is declarative, not operative: nothing forces a pre-launch equivalence check against existing research/checks files and artifacts. Net: resolved-cell protection is real and RETAINED; a MINIMAL operative novelty guard is SUFFICIENT to close the residual near-duplicate class (a pre-launch search of research/checks/ + state/check_artifacts/ + the durable record, recorded as one line naming the closest existing work and why the new work is not equivalent). No broad metadata system is warranted.",
+  "uncertainty_targeted": "Whether the durable history adequately prevents repeating equivalent experiments when a frontier cell is already resolved, and whether a minimal novelty guard is sufficient.",
+  "uncertainty_reduced": "Reduced: established with file/line evidence that RESOLVED queue tasks are excluded from selection and resolved frontier cells are marked with a decisive status + 'None' next action (adequate for resolved cells), and identified one concrete near-duplicate re-implementation (momentum_sweep.py vs momentum_lookback_sweep.py) that the declarative-only novelty guard did not prevent. Not fully resolved: the residual gap is documented, not fixed (fix handed off as candidate task P-008); an exhaustive all-history duplicate census was not performed (out of scope).",
+  "process_decision": "RETAIN",
+  "research_result": "No new market research result (learning-process audit); research frontier unchanged. Process finding: the durable history adequately prevents repeating RESOLVED frontier cells (controller excludes non-OPEN tasks; frontier marks cells with a decisive status + 'None' next action; each resolved class executed once). A concrete residual near-duplicate class exists at the research-check level: momentum_sweep.py (2026-10-05T14:08:58Z, lookbacks 3/5/10/20, no artifact, unrecorded) vs momentum_lookback_sweep.py (2026-10-05T19:23:25Z, lookbacks 3/5/10, artifact + activation 37361000967) implement the same core lookback sweep. Determination: a MINIMAL operative novelty guard (pre-launch equivalence check recorded in the agent record) is sufficient to close this class; a broad metadata system is not warranted.",
+  "decision": "RETAIN",
+  "next": "Implement the minimal operative novelty guard with one bounded change: before launching a new research/check, require a one-line 'closest existing work' note (search research/checks/ + state/check_artifacts/ + the durable record for the same signal/universe/gate) recorded in the agent record, so near-duplicate checks like momentum_sweep.py are surfaced before re-implementation.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-008",
+      "role": "LEARNING_PROCESS",
+      "status": "OPEN",
+      "primary_question": "Does a recorded pre-launch novelty check prevent near-duplicate research checks from being re-implemented?",
+      "bottleneck": "The written novelty guard is declarative only; a near-duplicate check (momentum_sweep.py vs momentum_lookback_sweep.py) was re-implemented because no operative pre-launch equivalence check exists.",
+      "objective": "Make the existing novelty guard operative with one minimal change: require a one-line 'closest existing work' note before the evidence gate, and record that research/checks/momentum_sweep.py is superseded by momentum_lookback_sweep.py so it is not re-derived.",
+      "scope": "LEARNING_STATE.md learning rules plus the agent durable-record convention; documentation only. No new metadata system, no controller redesign, no rerun of historical experiments.",
+      "out_of_scope": "Do not add a broad metadata system, a numeric score, or rerun historical backtests.",
+      "deliverable": "A documented operative novelty-guard step and a one-line supersession note for momentum_sweep.py, verified by controller-side inspection.",
+      "success_criterion": "The novelty-guard step is documented and the momentum_sweep.py supersession is recorded, or the result is recorded as unverified with the exact blocker.",
+      "stop_condition": "Stop after the novelty-guard step and the supersession note are recorded.",
+      "verification_requirement": "Controller-side inspection of the cited durable records; no reliance on agent confidence.",
+      "evidence_basis": "This audit's concrete near-duplicate finding (momentum_sweep.py vs momentum_lookback_sweep.py) and the declarative-only state of the current guard.",
+      "expected_information_gain": "MEDIUM",
+      "downstream_leverage": "MEDIUM",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "effort": "LOW",
+      "complexity": "LOW",
+      "execution_risk": "LOW",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "None. No research code, controller, or process-artifact change; only this durable record and a worker-progress milestone. A minimal-change proposal (operative novelty guard) is documented as candidate task P-008.",
+  "failure_class": "NONE",
+  "task_selection_observation": "IMPROVED"
+}
