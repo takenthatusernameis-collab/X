@@ -1,0 +1,69 @@
+{
+  "agent_number": 1,
+  "campaign_slot": 1,
+  "global_agent_number": 1,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-001",
+  "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+  "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+  "question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+  "action": "Audited both selection layers against durable evidence: (a) the controller focused-task selector (campaign_controller.py task_rank/select_task) and (b) the worker frontier-first selection delta (LEARNING_STATE). Tested the 'RETAIN (verified)' advantage claim for confounds and a matched counterfactual using LEARNING_STATE, STATE.md, activation logs 2026-10-02..06, campaign task_queue.json, campaign_status.json, current_task.json, activation_status.json and the agent contract; then corrected the overstated durable label without erasing the original.",
+  "changed": [
+    "state/campaign/runs/44380791198/agents/agent_01.json (this durable process record)",
+    "state/LEARNING_STATE.md (additive correction under 'Active strategy delta': the 'RETAIN (verified)' advantage is downgraded to 'not demonstrated'; original text preserved; selection mechanism unchanged)",
+    "state/worker_progress.md (milestone update: decision reached)",
+    "scratch/validate_agent01.py (scratch diagnostic: ran controller-side validate_record on this record)",
+    "scratch/check_touched.py (scratch diagnostic: replicated controller touched/protected/unexpected-path computation)",
+    "logs/ACTIVATION-2026-11-18.md (human-readable activation record with observed UTC timestamps)"
+  ],
+  "verified": [
+    "Read durable evidence: state/LEARNING_STATE.md, state/STATE.md, logs/ACTIVATION-2026-10-02.md..ACTIVATION-2026-10-06.md, state/campaign/task_queue.json, state/campaign/runs/44380791198/campaign_status.json, state/campaign/current_task.json, state/activation_status.json, state/worker_progress.md, agent_01_contract.json, agent_01_before.json",
+    "Read .github/scripts/campaign_controller.py selection logic (task_rank lines 206-218; select_task lines 269-383): the controller selector is a deterministic ordinal ranking of a hand-authored OPEN task queue (benefit/cost ordinals, no learning from outcomes, no duplicate-experiment check, no numeric score)",
+    "python3 read_env.py: GITHUB_RUN_ID=44380791198, GITHUB_SHA=618539a4a9627acf46f68bc72b855293fd64c871, GITHUB_REF_NAME=main, UTC NOW 2026-11-18T19:30:35Z (run identity confirmed)",
+    "campaign_status.json: selected_tasks=[{agent 1 -> P-001}], completed_agents=[] — the controller ordinal selector has exactly n=1 selection and 0 completions, so no outcome evidence exists yet",
+    "Cross-checked the 'five recent frontier cells closed without equivalent retests' basis: mean-reversion (37263008074), cross-sectional relative strength (37304873966), volatility-targeting (37314710995), cross-sectional momentum, and 20-day breakout (37414038601) are all FALSIFIED and are five DISTINCT signal classes, each selected from the frontier's Next action",
+    "Confirmed the pre-frontier 'opportunistic' baseline: logs/ACTIVATION-2026-10-05.md lines 428-434 and LEARNING_STATE record that activation 37260572520's objective came from a queued receipt item rather than a frontier cell; earlier activations (2026-10-02..04) were capability building (toolkit, per-asset null, sample-calibrated tolerance, loader verification, CI preflight, accounting integrity), not signal-class hypothesis tests",
+    "Validated this record against .github/scripts/validate_campaign_agent.py::validate_record with the agent_01 contract via scratch/validate_agent01.py (result: validate_record failures = []; identity, decision, process_decision, task_selection_observation, failure_class all valid; next is a single line; 1 candidate task accepted)",
+    "Replicated the controller's touched/protected/unexpected-path computation via scratch/check_touched.py: protected = [] and unexpected_campaign_paths = [] (only agent_01.json under state/campaign/ is the expected record); no protected control-plane file touched"
+  ],
+  "unverified": [
+    "The causal claim that frontier-first selection improves information flow: no matched opportunistic hypothesis-testing counterfactual exists; the pre-frontier baseline is capability building, so the comparison is confounded by a work-type shift and 'no equivalent re-tests' is partly definitional (distinct signal classes cannot repeat by construction)",
+    "The controller ordinal focused-task selector's effect on learning efficiency: only one selection has occurred (agent 1 -> P-001) and zero agents have completed, so this campaign is itself the first test with no outcome data",
+    "Whether the absence of duplicate momentum follow-ups is attributable to the selection mechanism or to the separate novelty-guard rule (single case: lookback sweep 37361000967, longer-horizon 37394344201)"
+  ],
+  "observed_effect": "Durable evidence does not support the 'RETAIN (verified)' advantage claim. The demonstrable value of frontier-first selection is qualitative: an explicit auditable cell ordering and correct prioritization of the single positive candidate (momentum) for follow-up. The comparative advantage over opportunistic choice is not demonstrated (confounded baseline, no matched counterfactual). The controller ordinal selector is UNVERIFIED (n=1, 0 completions). Corrected the overstated label in LEARNING_STATE additively, preserving the original.",
+  "uncertainty_targeted": "Whether explicit highest-value focused-task selection (worker frontier-first / controller ordinal) improves learning efficiency relative to the repository's prior opportunistic task choice.",
+  "uncertainty_reduced": "Partially. Reduced uncertainty about the strength of evidence: the 'verified advantage' is reclassified to 'not demonstrated (confounded comparison, no matched counterfactual)'. The underlying causal question remains open pending per-activation selection-basis capture; the controller-selector layer is still wholly unverified.",
+  "process_decision": "RETAIN",
+  "research_result": "NO DEMONSTRATED ADVANTAGE — explicit highest-value focused-task selection is retained as the operative mechanism (no evidence of harm; low cost; qualitative value in explicit ordering and prioritizing the one positive candidate), but its superiority over opportunistic task choice is NOT established by durable evidence. The pre-frontier baseline was capability building rather than matched hypothesis tests, and no matched opportunistic hypothesis-testing counterfactual exists, so the observed clean ordering and absence of duplicate retests are confounded. The controller ordinal selector (task_rank/select_task) is a separate, hand-authored-queue layer that is UNVERIFIED at n=1 selection / 0 completions.",
+  "decision": "RETAIN",
+  "next": "In a future LEARNING_PROCESS activation, add a minimal per-activation selection-basis record (selection layer, chosen frontier cell id, equivalent-experiment y/n) to the LEARNING_STATE learning-history schema so a matched frontier-versus-opportunistic information-flow comparison becomes testable, without changing the selection mechanism.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-007",
+      "role": "LEARNING_PROCESS",
+      "status": "OPEN",
+      "primary_question": "Can a minimal per-activation selection-basis record make a frontier-versus-opportunistic information-flow comparison testable?",
+      "bottleneck": "The comparative learning-efficiency advantage of frontier-first selection is not identifiable from durable state because no selection-basis or equivalent-experiment flag is recorded per activation.",
+      "objective": "Define and persist a minimal per-activation selection-basis record (selection layer, chosen frontier cell id, equivalent-experiment y/n) so a future matched comparison is possible.",
+      "scope": "Add one compact selection-basis block to the LEARNING_STATE learning-history schema with one worked example from an existing activation; do not change the selection mechanism or controller ranking.",
+      "out_of_scope": "Do not alter the controller, add a numeric score, or re-run experiments.",
+      "deliverable": "A durable selection-basis schema addition with one worked example from an existing activation.",
+      "success_criterion": "The schema addition is present, documented, and a future activation can populate it without ambiguity.",
+      "stop_condition": "Stop once the selection-basis record is defined and one example is recorded.",
+      "verification_requirement": "Controller-side schema inspection plus confirmation that no existing durable record is erased.",
+      "evidence_basis": "Agent 01 task P-001 (campaign 44380791198) found the frontier-first advantage not demonstrated for lack of a matched counterfactual.",
+      "expected_information_gain": "HIGH",
+      "downstream_leverage": "HIGH",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "effort": "LOW",
+      "complexity": "LOW",
+      "execution_risk": "LOW",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "LOW — no new machinery; one documentation correction in LEARNING_STATE plus one well-formed candidate task.",
+  "failure_class": "NONE",
+  "task_selection_observation": "IMPROVED"
+}
