@@ -1,0 +1,65 @@
+{
+  "agent_number": 1,
+  "campaign_slot": 1,
+  "global_agent_number": 1,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-001",
+  "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+  "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+  "question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+  "action": "Audited the durable record without changing any research code or controller: read state/LEARNING_STATE.md (frontier table + recent-learning-history + strategy-delta decision), state/STATE.md activation sections, logs/ACTIVATION-2026-10-05.md and logs/ACTIVATION-2026-10-06.md, state/campaign/task_queue.json, campaign_status.json, and the controller selection logic in .github/scripts/campaign_controller.py (task_rank lines 206-218; select_task lines 269-359). Independently inspected two primary artifacts (state/check_artifacts/momentum_results.json and breakout_20day_cont_results.json) to confirm the cited verdicts are real rather than inferred from prose.",
+  "changed": [
+    "state/campaign/runs/44436578418/agents/agent_01.json (this durable process-decision record)",
+    "state/worker_progress.md (semantic milestone: P-001 audit complete, phase advanced)",
+    "scratch/validate_agent01.py (scratch helper that runs the controller's own validate_record/validate_task against this record; retained as a diagnostic per PERSISTENCE_POLICY.md)",
+    "scratch/check_controller_validation.py (scratch read-only replica of the controller touched/protected/unexpected-path checks; confirmed no protected path and no unexpected campaign path)"
+  ],
+  "verified": [
+    "Evidence is real and independently inspectable: state/check_artifacts/momentum_results.json shows AMZN momentum verdict REGIME_STABLE with positive medians [0.065, 0.076, 0.077]; breakout_20day_cont_results.json exists with per-asset verdicts; 8 frontier-cell artifacts are present (mean_reversion, cross_sectional_relative_strength, volatility_targeting, momentum, momentum_lookback_sweep, momentum_longer_horizon, cross_sectional_momentum, breakout_20day_cont).",
+    "Documented opportunistic baseline exists: LEARNING_STATE.md line 7 and logs/ACTIVATION-2026-10-05.md lines 424-434 record that activation 37260572520 objective came from a queued receipt item rather than a frontier cell.",
+    "Frontier-first regime closed five signal-class cells each exactly once with independent verification and no equivalent re-tests: LEARNING_STATE frontier rows + recent-learning-history (37263008074 reversal FALSIFIED, 37304873966 CSRS FALSIFIED, 37314710995 volatility-targeting FALSIFIED, 37318950814 momentum SUPPORTED, 37414038601 breakout FALSIFIED).",
+    "Controller selector characterized: campaign_controller.py task_rank is an ordinal qualitative ordering (maximize expected_information_gain, downstream_leverage, falsification_power, verifiability; minimize effort, complexity, execution_risk) explicitly not a fabricated score; select_task picks candidates[0] among OPEN tasks for the role.",
+    "Record schema: this record passes the controller's own validate_record and validate_task checks (confirmed by running scratch/validate_agent01.py; 0 failures)."
+  ],
+  "unverified": [
+    "Causal attribution is UNVERIFIED: no controlled counterfactual exists. The opportunistic and frontier-first regimes ran at different times with different tooling maturity, so a before/after comparison cannot isolate the selector as the cause of any efficiency gain.",
+    "The prior opportunistic baseline is effectively n=1 for hypothesis selection (37260572520) and was confounded with immature tooling; earlier activations (2026-10-02..04) were infrastructure-building, not signal-class hypothesis tests.",
+    "The no-equivalent-re-tests property is partly tautological: the frontier table marks each cell closed with Next action None, so absence of re-tests is partly enforced by bookkeeping rather than independent evidence of selection quality.",
+    "The momentum SUPPORTED result is the strongest positive signal but is a single positive candidate; per the repository anti-gaming rules it cannot by itself prove a process-efficiency improvement."
+  ],
+  "observed_effect": "Concrete behavioral advantage in selection, causal magnitude unresolved. The frontier-first qualitative-priority selector produced a directed, non-redundant, decisively closed sequence of five signal-class cells (reversal, CSRS, volatility-targeting, momentum, breakout), each tested once with independent verification, and surfaced a genuine positive candidate (momentum, 7/10 REGIME_STABLE). The single documented opportunistic selection (37260572520) was reactive: its objective arrived from a queued receipt item and the frontier was only operationalized as a side-effect. This audit also corrects the prior durable framing: LEARNING_STATE recorded the delta as RETAIN (verified), but the causal claim is not verified by controlled comparison, so the calibrated judgment is RETAIN (behaviorally supported; causally unverified).",
+  "uncertainty_targeted": "Whether the current focused-task selector (frontier-first qualitative priority) causally improves learning efficiency relative to the repository's prior opportunistic queue-based task choice.",
+  "uncertainty_reduced": "Partial. Reduced uncertainty about the nature and strength of the evidence (a concrete behavioral advantage is confirmed; the causal magnitude is shown to be unresolvable with existing before/after data). The core causal-attribution uncertainty is NOT resolved and requires a controlled comparison.",
+  "process_decision": "RETAIN",
+  "research_result": "CONCRETE_SELECTOR_BEHAVIORAL_ADVANTAGE; CAUSAL_EFFICIENCY_GAIN_UNVERIFIED. The frontier-first qualitative-priority selector is retained: it demonstrably produces directed, non-redundant, decisive cell closure and is structurally inspectable (ordinal priority, no fabricated score), with no evidence it worsens learning. It is NOT claimed as a verified efficiency gain, because there is no controlled counterfactual, the prior opportunistic baseline is n~1 and confounded with tooling maturity, and the no-re-test property is partly tautological.",
+  "decision": "RETAIN",
+  "next": "Add one bounded candidate task (P-007): a selection-replay audit that reconstructs, at each resolved frontier decision point, the next action the prior opportunistic queue rule would have chosen versus the action the qualitative-priority selector actually produced, then classifies each pair as equal, higher, or lower information, to convert the selector causal attribution from UNVERIFIED to a controlled before/after classification.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-007",
+      "role": "LEARNING_PROCESS",
+      "status": "OPEN",
+      "primary_question": "Does reconstructing the prior opportunistic queue's next choice at each resolved frontier decision point show the qualitative-priority selector chose higher-information actions than the queue rule would have?",
+      "bottleneck": "The selector's causal advantage over opportunistic selection is asserted from before/after history but not demonstrated by a controlled comparison at the actual decision points.",
+      "objective": "Reconstruct, for each already-resolved frontier decision point, the action the prior opportunistic queue rule would have selected next and compare it to the action the qualitative-priority selector actually produced, using only existing durable records and no new experiments.",
+      "scope": "Use LEARNING_STATE, STATE, activation logs, and task_queue.json only; reconstruct candidate next-actions at 3 to 5 resolved decision points; classify whether the selected action was equal, higher, or lower information than the queue-rule alternative.",
+      "out_of_scope": "Do not run new backtests, modify the controller, add a numeric reward score, or alter historical records.",
+      "deliverable": "A bounded qualitative classification (selector-higher, selector-equal, selector-lower, or indeterminate) with per-decision-point evidence and a RETAIN, REJECT, or UNVERIFIED process decision.",
+      "success_criterion": "At least three reconstructed decision points are classified with cited durable evidence, or the comparison is explicitly marked UNVERIFIED with the specific missing evidence named.",
+      "stop_condition": "Stop after the sampled decision points are classified or the reconstruction is shown to lack the necessary durable evidence.",
+      "verification_requirement": "Controller-side schema validation plus inspection of the cited durable records; no reliance on agent confidence.",
+      "evidence_basis": "LEARNING_STATE frontier table and recent-learning-history rows; logs/ACTIVATION-2026-10-05.md and 2026-10-06.md; task_queue.json.",
+      "expected_information_gain": "HIGH",
+      "downstream_leverage": "HIGH",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "effort": "LOW",
+      "complexity": "LOW",
+      "execution_risk": "LOW",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "none (audit plus one durable record and a worker_progress milestone; no controller or architecture change, no numeric reward score)",
+  "failure_class": "NONE",
+  "task_selection_observation": "IMPROVED"
+}
