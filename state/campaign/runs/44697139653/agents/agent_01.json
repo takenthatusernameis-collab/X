@@ -1,0 +1,64 @@
+{
+  "agent_number": 1,
+  "campaign_slot": 1,
+  "global_agent_number": 1,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-001",
+  "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+  "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+  "question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+  "action": "Audited durable evidence: state/LEARNING_STATE.md (frontier table + learning history), state/STATE.md, logs/ACTIVATION-2026-10-05.md and logs/ACTIVATION-2026-10-06.md, state/campaign/task_queue.json, state/campaign/runs/44697139653/campaign_status.json, and .github/scripts/campaign_controller.py (task_rank / select_task). Compared the pre-campaign opportunistic activations (37260572520 queued-receipt objective; 37261348530 half-operationalized frontier) against the frontier-first activation sequence (37263008074, 37304873966, 37314710995, 37318950814, 37361000967, 37394344201, 37414038601). Independently checked that the selector picked the top-ranked OPEN LEARNING_PROCESS task (P-001) under the declared ordinal rule. Produced this one bounded process judgment; made no controller, queue, or research-code changes.",
+  "changed": [
+    "state/campaign/runs/44697139653/agents/agent_01.json (new durable agent record; this deliverable)",
+    "state/worker_progress.md (semantic milestone update: AGENT_01 decision recorded)",
+    "logs/ACTIVATION-2026-11-20.md (new concise human-readable activation record)",
+    "scratch/validate_agent01.py (new read-only helper that checks this record against campaign_controller schema; prints PASS; retained as a reproducible check because rm is denied in this environment)"
+  ],
+  "verified": [
+    "Inspected .github/scripts/campaign_controller.py::task_rank (lines 206-218): the selector is a deterministic ordinal tuple (expected_information_gain, downstream_leverage, falsification_power, verifiability, then cost-ascending effort/complexity/execution_risk, task_id tiebreak); it is not a numeric reward score, consistent with the contract out_of_scope.",
+    "Inspected state/campaign/task_queue.json + state/campaign/runs/44697139653/campaign_status.json: the selected task P-001 has attributes HIGH/HIGH/HIGH/HIGH (info gain/leverage/falsification/verifiability) and LOW/LOW/LOW (effort/complexity/execution_risk), which dominate every other OPEN LEARNING_PROCESS task (P-002 effort MEDIUM; P-003 info gain MEDIUM; P-004 effort MEDIUM; P-005 info gain MEDIUM/falsification MEDIUM; P-006 info gain MEDIUM), so P-001 is genuinely the top-ranked OPEN task under task_rank.",
+    "Read state/LEARNING_STATE.md: the frontier-first era closed seven distinct cells, each once and independently verified, with no equivalent re-tests: 37263008074 (reversal, FALSIFIED), 37304873966 (cross-sectional relative strength, FALSIFIED), 37314710995 (volatility targeting, FALSIFIED), 37318950814 (momentum, SUPPORTED), 37361000967 (momentum lookback sweep), 37394344201 (momentum longer horizon), 37414038601 (breakout, FALSIFIED).",
+    "Read state/LEARNING_STATE.md line 51 and logs/ACTIVATION-2026-10-05.md (03:45 UTC section): the pre-frontier activation 37260572520 is explicitly recorded as UNVERIFIED at the process level because its objective came from a queued receipt item rather than a frontier cell; 37261348530 was only half-operationalized (test written, execution blocked)."
+  ],
+  "unverified": [
+    "Comparative efficiency of the controller focused-task selector versus the pre-campaign opportunistic baseline: no completed controller cohort exists (this is the first campaign and the first agent of ten), so there is no selector-era outcome to compare.",
+    "The evidence cited in the contract's evidence_basis (LEARNING_STATE frontier cells closed without equivalent retests) documents the AGENT-LEVEL frontier table, not the CONTROLLER-LEVEL task_rank ordinal selector; attributing the frontier-era information flow to the controller selector would conflate two distinct selection layers.",
+    "The pre-selector baseline is thin (essentially activations 37260572520 and 37261348530) and confounded with concurrent improvements (bash availability, the independent-verification gate, REGIME_STABLE_LOSS verdict repair, framework maturity), so a causal attribution of any efficiency gain to task selection is not isolated.",
+    "No controller-side execution of a selector comparison was run in this audit; the judgment is observational over durable records, not a controlled A/B."
+  ],
+  "observed_effect": "The controller selector is operationally correct: campaign_status.json selection_history and task_queue.json confirm it picked P-001, the highest-ranked OPEN LEARNING_PROCESS task, with a fully evidence-backed contract (evidence_basis, success_criterion, stop_condition). The frontier-first agent-level process produced seven consecutive distinct, independently-verified, non-duplicated cell closures, consistent with reduced duplicate work. However, no controller outcome cohort exists yet and the cited evidence pertains to the agent-level frontier table rather than the controller ordinal ranker, so a comparative efficiency gain over opportunistic selection is not demonstrated.",
+  "uncertainty_targeted": "Whether explicit highest-value focused-task selection improves information flow relative to the repository's prior opportunistic task choice.",
+  "uncertainty_reduced": "Partially reduced: (a) controller-selector operational correctness is now verified (top-ranked, evidence-backed selection); (b) the comparative-efficiency claim is narrowed to UNVERIFIED with a specific, named confound (agent-level frontier table versus controller task_rank; no completed cohort; thin confounded pre-selector baseline).",
+  "process_decision": "RETAIN",
+  "research_result": "Bounded judgment: RETAIN the explicit focused-task selector. It is operationally correct and evidence-backed, and the frontier-first concept it mirrors demonstrably produced distinct, non-duplicated, independently-verified cell closures, with no evidence of harm. The strict comparative-efficiency claim (selector superior to opportunistic choice) is UNVERIFIED at the controller level: this is the first campaign with no outcome cohort, and the cited LEARNING_STATE evidence documents the agent-level frontier table rather than the controller's ordinal ranker. Recommended refinement (not executed, out of current scope): evaluate comparative efficiency only after a full 10-agent cohort and keep the two selection layers separate in the evidence.",
+  "decision": "RETAIN",
+  "next": "After this campaign's 10-agent cohort completes, compare the controller focused-task selector's distinct-cell yield and duplicate-work rate against the pre-campaign opportunistic baseline, keeping the frontier-table and controller-rank selection layers separate in the evidence.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-007",
+      "role": "LEARNING_PROCESS",
+      "status": "OPEN",
+      "primary_question": "Does recording the distinction between agent-level frontier-table selection and controller-level task-rank selection in durable state prevent future audits from conflating the two selection layers?",
+      "bottleneck": "Selection evidence may conflate the agent-level frontier table with the controller-level ordinal ranker, risking misattributed efficiency claims.",
+      "objective": "Add a short durable note in state/LEARNING_STATE.md that separates the two selection layers and states what evidence each can support.",
+      "scope": "Edit only state/LEARNING_STATE.md to add a brief selection-layer distinction note.",
+      "out_of_scope": "Do not change the controller, the task-queue schema, or any research result.",
+      "deliverable": "A durable note in LEARNING_STATE distinguishing the two selection layers and their evidence scope.",
+      "success_criterion": "The note is present and clearly states that frontier-table evidence cannot be attributed to the controller selector.",
+      "stop_condition": "Stop once the note is written and reviewed by inspection.",
+      "verification_requirement": "Controller-side inspection of the LEARNING_STATE diff.",
+      "evidence_basis": "This audit found the P-001 evidence basis cites frontier-table outcomes for a controller-selector question.",
+      "expected_information_gain": "MEDIUM",
+      "downstream_leverage": "HIGH",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "effort": "LOW",
+      "complexity": "LOW",
+      "execution_risk": "LOW",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "NONE",
+  "failure_class": "NONE",
+  "task_selection_observation": "IMPROVED"
+}
