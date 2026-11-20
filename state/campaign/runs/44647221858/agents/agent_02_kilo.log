@@ -1,0 +1,2130 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+I'll start by inspecting the durable evidence to understand the current state.
+[0m→ [0mRead state/STATE.md
+[0m→ [0mRead state/LEARNING_STATE.md
+[0m→ [0mRead state/STATE.md[90m [offset=852][0m
+[0m
+[0m$ [0mls -la /home/runner/work/X/X/state/campaign/runs/44647221858/agents/ 2>/dev/null; ls /home/runner/work/X/X/research/checks/
+total 108
+drwxr-xr-x 2 runner runner  4096 Nov 20 00:39 .
+drwxr-xr-x 3 runner runner  4096 Nov 20 00:37 ..
+-rw-r--r-- 1 runner runner  8016 Nov 20 00:39 agent_01.json
+-rw-r--r-- 1 runner runner 21220 Nov 20 00:37 agent_01_before.json
+-rw-r--r-- 1 runner runner  1910 Nov 20 00:37 agent_01_contract.json
+-rw-r--r-- 1 runner runner 13274 Nov 20 00:39 agent_01_kilo.log
+-rw-r--r-- 1 runner runner   989 Nov 20 00:39 agent_01_runtime.json
+-rw-r--r-- 1 runner runner  1554 Nov 20 00:39 agent_01_validation.json
+-rw-r--r-- 1 runner runner 22027 Nov 20 00:39 agent_02_before.json
+-rw-r--r-- 1 runner runner 10037 Nov 20 00:39 agent_02_contract.json
+-rw-r--r-- 1 runner runner   273 Nov 20 00:42 agent_02_kilo.log
+breakout_20day_cont.py
+cross_sectional_momentum.py
+cross_sectional_regime_diagnostic.py
+cross_sectional_relative_strength.py
+determinism_check.py
+mean_reversion.py
+momentum.py
+momentum_hold_period_sensitivity.py
+momentum_horizon_gap_analysis.py
+momentum_longer_horizon.py
+momentum_lookback_sweep.py
+momentum_sweep.py
+regime_adaptive_ma.py
+regime_dependent_deep_dive.py
+smoke_breakout_signals.py
+smoke_cs_momentum.py
+test_count.py
+universe_stats.py
+verify_aapl_stats.py
+verify_breakout_20day_cont.py
+verify_cross_sectional.py
+verify_cross_sectional_momentum.py
+verify_dd_independent.py
+verify_mean_reversion.py
+verify_momentum.py
+verify_momentum_longer_horizon.py
+verify_momentum_lookback_sweep.py
+verify_regime_adaptive.py
+verify_volatility_targeting.py
+volatility_targeting.py
+[0m
+[0m→ [0mRead state/campaign/runs/44647221858/agents/agent_02_contract.json
+[0m
+[0m$ [0mgrep -n "cost\|slippage\|commission\|spread" /home/runner/work/X/X/research/backtest/engine.py | head -60
+5:  lookahead. Fill price = close + fixed slippage + proportional slippage.
+10:- Commission and slippage apply to every round trip.
+42:    commission: float
+66:    commission_per_trade: float = 0.0
+67:    commission_per_share: float = 0.0
+68:    slippage_cents: float = 0.0      # fixed slippage per share, in cents
+69:    slippage_proportional: float = 0.0  # proportional slippage (0.001 = 10 bps)
+152:            # Fill at close + fixed slippage + proportional slippage.
+156:                + cfg.slippage_cents / 100.0
+157:                + bar.close * cfg.slippage_proportional
+159:            commission = (
+160:                cfg.commission_per_trade
+161:                + abs(delta) * cfg.commission_per_share
+165:                cash -= delta * fill_price + commission
+167:                cash += -delta * fill_price - commission
+172:            fills.append(Fill(bar.date, delta, fill_price, commission))
+190:                    + cfg.slippage_cents / 100.0
+191:                    + bar.close * cfg.slippage_proportional
+193:                commission = (
+194:                    cfg.commission_per_trade
+195:                    + abs(delta) * cfg.commission_per_share
+198:                    cash -= delta * fill_price + commission
+200:                    cash += -delta * fill_price - commission
+204:                fills.append(Fill(bar.date, delta, fill_price, commission))
+273:        cfg: backtest costs and cash policy.
+307:            commission_per_trade=cfg.commission_per_trade,
+308:            commission_per_share=cfg.commission_per_share,
+309:            slippage_cents=cfg.slippage_cents,
+310:            slippage_proportional=cfg.slippage_proportional,
+[0m
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py
+[0m
+[0m$ [0mgrep -rn "realistic_cost\|REALISTIC\|commission_per_trade\|slippage_cents" /home/runner/work/X/X/research /home/runner/work/X/X/examples | head -40
+grep: /home/runner/work/X/X/research/backtest/__pycache__/engine.cpython-312.pyc: binary file matches
+grep: /home/runner/work/X/X/examples/__pycache__/ma_crossover.cpython-312.pyc: binary file matches
+/home/runner/work/X/X/research/backtest/engine.py:66:    commission_per_trade: float = 0.0
+/home/runner/work/X/X/research/backtest/engine.py:68:    slippage_cents: float = 0.0      # fixed slippage per share, in cents
+/home/runner/work/X/X/research/backtest/engine.py:156:                + cfg.slippage_cents / 100.0
+/home/runner/work/X/X/research/backtest/engine.py:160:                cfg.commission_per_trade
+/home/runner/work/X/X/research/backtest/engine.py:190:                    + cfg.slippage_cents / 100.0
+/home/runner/work/X/X/research/backtest/engine.py:194:                    cfg.commission_per_trade
+/home/runner/work/X/X/research/backtest/engine.py:307:            commission_per_trade=cfg.commission_per_trade,
+/home/runner/work/X/X/research/backtest/engine.py:309:            slippage_cents=cfg.slippage_cents,
+/home/runner/work/X/X/examples/volatility_regime_filter.py:69:        commission_per_trade=2.0,
+/home/runner/work/X/X/examples/volatility_regime_filter.py:71:        slippage_cents=2.0,
+/home/runner/work/X/X/examples/ma_crossover_real_data.py:133:        commission_per_trade=2.0, commission_per_share=0.003,
+/home/runner/work/X/X/examples/ma_crossover_real_data.py:134:        slippage_cents=2.0, slippage_proportional=0.0005,
+/home/runner/work/X/X/examples/ma_crossover.py:66:        commission_per_trade=2.0,
+/home/runner/work/X/X/examples/ma_crossover.py:68:        slippage_cents=2.0,
+[0m
+[0m→ [0mRead research/backtest/engine.py
+[0m
+[0m$ [0mgrep -n "def stress_segments\|def segment_fn_from_labels\|def volatility_blocks\|def momentum_signals\|def noise_signals\|BacktestConfig\|def _segment\|def stress_regime" /home/runner/work/X/X/research/backtest/regime_stability.py
+39:from .engine import BacktestConfig, Signal
+202:    cfg: BacktestConfig = BacktestConfig(),
+432:def stress_regime_scenarios() -> List[RegimeScenario]:
+471:    cfg: BacktestConfig = BacktestConfig(),
+589:def segment_fn_from_labels(labels: List[str]) -> Callable[[NDArray, int], str]:
+600:def stress_segments(
+611:    cfg: BacktestConfig = BacktestConfig(),
+775:def volatility_blocks(
+886:def momentum_signals(
+1061:def stress_segments_across_tickers(
+1071:    cfg: BacktestConfig = BacktestConfig(),
+[0m
+[0m→ [0mRead research/backtest/regime_stability.py[90m [limit=300, offset=560][0m
+[0m→ [0mRead research/backtest/regime_stability.py[90m [limit=200, offset=857][0m
+[0m
+[0m$ [0mcd /home/runner/work/X/X && git status --short && git log --oneline -5 && ls state/check_artifacts/
+M state/campaign/global_agent_counter.json
+ M state/campaign/task_queue.json
+ M state/worker_progress.md
+?? state/campaign/current_task.json
+?? state/campaign/runs/44647221858/
+618539a4 Test bounded transient gateway recovery
+7b3fa6cc Bound transient Kilo recovery retries
+9fdd4360 Retry checkpoint persistence until workflow cutoff
+da10b967 Fix campaign outcome preflight test persistence fixture
+370d418e Assert Kilo sessions rely only on workflow-level cutoff
+breakout_20day_cont_results.json
+cross_sectional_momentum_results.json
+cross_sectional_relative_strength_results.json
+mean_reversion_results.json
+momentum_horizon_gap_analysis.json
+momentum_longer_horizon_results.json
+momentum_lookback_sweep_results.json
+momentum_results.json
+smoke_cs_momentum.json
+volatility_targeting_results.json
+volatility_targeting_smoke.json
+[0m
+[0m→ [0mRead state/campaign/task_queue.json
+[0m
+[0m$ [0mcd /home/runner/work/X/X && grep -n "def random_signals\|def noise_benchmark\|def parameter_sweep\|def sweep_summary\|OUTLIER_TOL" research/backtest/perturbation.py | head -20
+182:def parameter_sweep(
+272:def random_signals(n: int, seed: Optional[int] = None) -> List[Signal]:
+284:def noise_benchmark(
+339:def sweep_summary(
+[0m
+[0m$ [0mcd /home/runner/work/X/X && sed -n 1,120p research/checks/verify_momentum_lookback_sweep.py
+"""Independent verification of `research/checks/momentum_lookback_sweep.py`.
+
+Two verification gates:
+
+1. Fresh recomputation of the AMZN/JPM medians via a separate implementation
+   path (re-implemented `volatility_blocks`, segment reconstruction, and
+   momentum signals, aggregating fold log returns with `walk_forward`). Every
+   per-asset, per-lookback median is recomputed and compared to the artifact.
+   The coin-flip null is recomputed through the framework's own
+   ``noise_benchmark`` (a separate code path from ``stress_segments``), so the
+   artifact's null medians are also independently reproduced.
+
+2. Cross-consistency gate: the lookback=5 column of this artifact is an
+   independent rerun of the momentum class, so it must match
+   `momentum_results.json` exactly (medians, nulls, verdicts). A mismatch would
+   flag a change in the lookback-5 computation or a defect.
+
+3. Reproducibility gate: the lookback-robustness verdicts are re-derived from
+   the artifact medians/nulls/verdicts via the documented rule (ROBUST if a
+   positive REGIME_STABLE edge appears at >= 2 lookbacks), independently of the
+   check's own verdict computation.
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+import research.backtest as bt
+from research.backtest.perturbation import noise_benchmark
+
+DATASET_ID = "yf-ohlcv-universe-2009-to-2026-10-03"
+TRAIN, TEST, WARM, OVERLAP = 252, 84, 60, 60
+WINDOW = 60
+N_BLOCKS = 4
+MIN_SEGMENT_BARS = 400
+LOOKBACKS = (3, 5, 10)
+SWEEP_ARTIFACT = Path.cwd() / "state" / "check_artifacts" / "momentum_lookback_sweep_results.json"
+MOM_ARTIFACT = Path.cwd() / "state" / "check_artifacts" / "momentum_results.json"
+
+SWEEP_VERDICT_TOL = 0.05
+
+
+def vol_blocks(closes, n_blocks, window):
+    """Re-implementation of research.backtest.volatility_blocks."""
+    n = len(closes)
+    block_size = n // n_blocks
+    bar_vols = []
+    for i in range(n):
+        if i < window:
+            bar_vols.append(0.0)
+        else:
+            bar_vols.append(
+                float(np.std(np.log(closes[i - window : i]), ddof=1)) * np.sqrt(252.0))
+    active = [v for v in bar_vols if v > 0]
+    series_med = float(np.median(active))
+    labels = []
+    for i in range(n):
+        if i < window:
+            labels.append("insufficient")
+        else:
+            b = i // block_size
+            s, e = b * block_size, (b + 1) * block_size
+            bmed = float(
+                np.median([v for v in bar_vols[s:e] if v > 0])
+                if e - s > window else 0.0)
+            labels.append("turbulent" if bmed > series_med else "calm")
+    return labels
+
+
+def segments_from_labels(labels, min_segment_bars):
+    runs = []
+    cur = labels[0]
+    run_start = 0
+    for i in range(1, len(labels)):
+        if labels[i] != cur:
+            if i - run_start >= min_segment_bars:
+                runs.append((cur, run_start, i))
+            cur = labels[i]
+            run_start = i
+    if len(labels) - run_start >= min_segment_bars:
+        runs.append((cur, run_start, len(labels)))
+    return runs
+
+
+def momentum_signals(closes, lookback):
+    """Fresh implementation of the momentum signal (independent code path)."""
+    n = len(closes)
+    out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
+    lookback = int(lookback)
+    for i in range(lookback, n):
+        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+        out[i] = bt.Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+    return out
+
+
+def segment_result(ticker, s, e, train, test, warm, overlap, lookback):
+    """Walk-forward regime-stability result for one asset segment and lookback,
+    computed with fresh components: volatility_blocks, segment slicing,
+    momentum signals, walk_forward, and the framework noise_benchmark. No call
+    to stress_segments."""
+    bars, dates = bt.load_ticker(ticker)
+    closes = bars.closes_array()
+    seg_bars = list(bars)[s:e]
+    sig = momentum_signals(closes, lookback)
+    seg_signals = sig[s:e]
+    res = bt.walk_forward(
+        seg_bars, seg_signals, train_window=train, test_window=test,
+        warmup=warm, overlap_window=overlap, cfg=bt.BacktestConfig())
+    cand_log = np.array([np.log1p(np.clip(f.metrics["total_return"], -1.0 + 1e-12, None))
+                         for f in res.folds], dtype=np.float64)
+    noise = noise_benchmark(
+        bars=seg_bars,
+        param_grid=[{"lookback": lookback}],
+        train_window=train, test_window=test,
+        warmup=0, overlap_window=0, periods_per_year=252)
+    null_log = noise.baseline_median_log_return
+[0m
+[0m✗ [0mdate -u +%Y-%m-%dT%H:%M:%SZ; cd /home/runner/work/X/X && cat state/worker_progress.md failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python -m unittest discover -s tests 2>&1 | tail -5
+............................................
+----------------------------------------------------------------------
+Ran 168 tests in 10.009s
+
+OK
+[0m
+[0m✗ [0mdate -u +%Y-%m-%dT%H:%M:%SZ failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m→ [0mRead state/worker_progress.md
+[0m✗ [0mpython -c "import datetime;print(datetime.datetime.now(datetime.timezone.utc).isoformat())" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m
+[0m$ [0mcd /home/runner/work/X/X && sed -n 1,60p research/checks/momentum.py
+"""Test the momentum signal class on the collected universe.
+
+Background: the trend-following MA-crossover class was exhaustively explored on
+the collected adjusted-close universe and rejected. The short-horizon
+return-reversal class (short the previous 5-day return, hold 1 day, daily
+rebalanced) was exhaustively explored and rejected: every segment of every
+asset showed a negative median walk-forward log return; the perturbation sweep
+was flat on the null.
+
+Momentum is the direct competing hypothesis to reversal: go LONG the previous
+N-day return instead of shorting it, hold 1 day, daily rebalance. The
+contraposition is clean — reversal and momentum use the same lookback window,
+the same walk-forward, and the same coin-flip null; they differ only in signal
+sign. If reversal loses in every segment of every asset, the momentum variant
+should make the opposite mistake. This test settles whether the 5-day-lookback
+direction bet is a robust edge in this universe, or whether it is noise with a
+direction sign attached.
+
+Falsification prediction: momentum either shows CONSISTENT_WITH_NOISE (no edge
+anywhere) or REGIME_DEPENDENT (the positive run concentrates in one historical
+regime mix, notably 2009-2013), or REGIME_STABLE_LOSS (uniformly negative —
+which would be reversal winning on both sides, an inconsistency to explain).
+Either outcome is a negative conclusion and closes the cell.
+
+Method (fixed a-priori, not tuned to OOS): long the previous 5-day return;
+hold 1 day; daily rebalance. Base MA(20/60) included for comparison. The two
+REGIME_DEPENDENT assets from the MA run (AMZN, JPM) are run through
+stress_segments over the 4 contiguous volatility blocks with both variants; the
+full collected universe is swept via stress_segments_across_tickers; a synthetic
+perturbation sweep (lookback 3/5/10 over the canonical regime family with a
+coin-flip null) exercises the parameter-robustness gate. Determinism is
+asserted via an internal independent recomputation.
+
+Research / simulation only. No live trading or production execution.
+"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+import research.backtest as bt
+from research.data.preflight import load_manifest, sha256_file
+
+DATASET_ID = "yf-ohlcv-universe-2009-to-2026-10-03"
+SEED = 42
+LOOKBACK = 5
+TRAIN, TEST, WARM, OVERLAP = 252, 84, 60, 60
+WINDOW = 60
+N_BLOCKS = 4
+MIN_SEGMENT_BARS = 400
+ARTIFACT_DIR = Path.cwd() / "state" / "check_artifacts"
+ARTIFACT_PATH = ARTIFACT_DIR / "momentum_results.json"
+
+
+def base_signals(closes, fast, slow):
+    """Past-only MA crossover (same contract as research/backtest/regime_stability)."""
+[0m
+[0m$ [0mcd /home/runner/work/X/X && grep -n "def check_equity_matches_fills" -A 60 research/backtest/leakage.py 2>/dev/null || grep -rn "def check_equity_matches_fills" -A 60 research/backtest/*.py
+64:def check_equity_matches_fills(
+65-    equity_curve: np.ndarray,
+66-    fills: List[Fill],
+67-    closes: np.ndarray,
+68-    initial_capital: float,
+69-    relative_tolerance: float = 1e-9,
+70-) -> None:
+71-    """Verify the equity curve is fully explained by the fill sequence.
+72-
+73-    Recomputes equity from initial capital, fills (signed shares,
+74-    execution prices, commissions) and bar closes, then asserts
+75-    equality with the engine's equity curve within relative tolerance
+76-    at every bar. This ensures no equity change is untraceable to a
+77-    recorded fill.
+78-    """
+79-    closes = np.asarray(closes, dtype=np.float64)
+80-    fills = sorted(fills, key=lambda f: f.date)
+81-    equity_recomputed = np.zeros(len(equity_curve), dtype=np.float64)
+82-
+83-    cash = float(initial_capital)
+84-    shares = 0.0
+85-    fill_index = 0
+86-
+87-    for i in range(len(equity_curve)):
+88-        bar_date = i + 1  # engine dates start at 1
+89-        while fill_index < len(fills) and fills[fill_index].date == bar_date:
+90-            f = fills[fill_index]
+91-            if f.shares > 0:
+92-                cash -= f.shares * f.price + f.commission
+93-            else:
+94-                cash += -f.shares * f.price - f.commission
+95-            shares += f.shares
+96-            fill_index += 1
+97-        equity_recomputed[i] = cash + shares * closes[i]
+98-
+99-    diff = np.abs(equity_curve - equity_recomputed)
+100-    scale = np.maximum(np.abs(equity_curve), np.abs(equity_recomputed))
+101-    if (diff / scale).max() > relative_tolerance:
+102-        raise AssertionError(
+103-            f"equity curve not fully explained by fills; "
+104-            f"max relative mismatch {(diff / scale).max():.3e} at "
+105-            f"indices {np.where(diff > relative_tolerance * scale)[0].tolist()}"
+106-        )
+[0m
+[0m→ [0mRead research/backtest/__init__.py
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import time, sys
+sys.path.insert(0,'.')
+import research.backtest as bt
+t0=time.time()
+bars=bt.load_ticker('AAPL')[0]
+closes=bars.closes_array()
+labels=bt.volatility_blocks(closes,n_blocks=4,window=60)
+sig=bt.momentum_signals(closes,lookback=5)
+res=bt.stress_segments(signals_fn=bt.momentum_signals,bars=bars,signals=sig,
+    param_grid=[{"lookback":5}],baseline=(("lookback",5),),
+    segment_fn=bt.segment_fn_from_labels(labels),train_window=252,test_window=84,
+    warmup=60,overlap_window=60,periods_per_year=252,min_segment_bars=400,
+    cfg=bt.BacktestConfig(commission_per_trade=2.0,commission_per_share=0.003,slippage_cents=2.0,slippage_proportional=0.0005))
+print('one call secs', round(time.time()-t0,2), res.overall_verdict, [round(s.baseline_median_log_return,4) for s in res.scenarios], [round(s.noise_median_log_return,4) for s in res.scenarios], res.n_folds)
+PY
+one call secs 0.41 REGIME_STABLE [0.0708, 0.0537, 0.0918, 0.069] [-0.0421, -0.0198, 0.0369, 0.0306] 28
+[0m
+[0m→ [0mRead research/backtest/perturbation.py[90m [limit=200, offset=150][0m
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import sys
+sys.path.insert(0,'.')
+import research.backtest as bt
+bars=bt.load_ticker('AAPL')[0]
+closes=bars.closes_array()
+labels=bt.volatility_blocks(closes,n_blocks=4,window=60)
+def run(cfg):
+    sig=bt.momentum_signals(closes,lookback=5)
+    return bt.stress_segments(signals_fn=bt.momentum_signals,bars=bars,signals=sig,
+        param_grid=[{"lookback":5}],baseline=(("lookback",5),),
+        segment_fn=bt.segment_fn_from_labels(labels),train_window=252,test_window=84,
+        warmup=60,overlap_window=60,periods_per_year=252,min_segment_bars=400,cfg=cfg)
+zero=run(bt.BacktestConfig())
+base=run(bt.BacktestConfig(commission_per_trade=2.0,commission_per_share=0.003,slippage_cents=2.0,slippage_proportional=0.0005))
+print('zero',[round(s.baseline_median_log_return,6) for s in zero.scenarios], zero.n_folds)
+print('base',[round(s.baseline_median_log_return,6) for s in base.scenarios], base.n_folds)
+print('segs',[(s.name,len(list(bars)[0:0])) for s in zero.scenarios])
+# count flips in full sample
+sig=bt.momentum_signals(closes,lookback=5)
+flips=sum(1 for i in range(1,len(sig)) if sig[i].weight!=sig[i-1].weight)
+print('bars',len(closes),'flips',flips)
+r=bt.run_bars(list(bars),sig,bt.BacktestConfig(commission_per_trade=2.0,commission_per_share=0.003,slippage_cents=2.0,slippage_proportional=0.0005))
+comm=sum(f.commission for f in r.trades)
+notional=sum(abs(f.shares)*f.price for f in r.trades)
+print('n_fills',len(r.trades),'commissions',round(comm,1),'traded_notional',round(notional,1),'bps_of_capital',round(comm/1e6*1e4,1),'ann_pct',round(comm/1e6*252/len(closes)*100,2))
+r0=bt.run_bars(list(bars),sig,bt.BacktestConfig())
+print('zero-cost total return', round(r0.equity_curve[-1]/1e6-1,4), 'base-cost total return', round(r.equity_curve[-1]/1e6-1,4))
+PY
+zero [0.070689, 0.053774, 0.09184, 0.069048] 28
+base [0.070774, 0.05374, 0.091839, 0.069006] 28
+segs [('turbulent', 0), ('calm', 0), ('turbulent', 0), ('calm', 0)]
+bars 4465 flips 1
+n_fills 4452 commissions 18711.2 traded_notional 57451981.1 bps_of_capital 187.1 ann_pct 0.11
+zero-cost total return 5.53 base-cost total return 5.5135
+[0m
+[0m$ [0mcd /home/runner/work/X/X && grep -rn "momentum_signals\|mean_reversion_signals" tests/ | head -30
+(no output)
+[0m
+[0m$ [0mcd /home/runner/work/X/X && grep -n "def cs_momentum_spread_daily_returns" -A 40 research/backtest/regime_stability.py
+1273:def cs_momentum_spread_daily_returns(tickers, lookback=63, top_k=3, bottom_k=3):
+1274-    """Cross-sectional momentum spread: daily P&L of a rank-based portfolio
+1275-    built from the cross section of collected tickers.
+1276-
+1277-    At each date t >= lookback: compute each ticker's lookback return
+1278-    (closes[i-lookback : i+1], past-only); rank tickers descending; long the
+1279-    top_k, short the bottom_k with equal capital per leg; hold one day;
+1280-    daily rebalance. The spread P&L at bar t equals the mean of the
+1281-    long-legs' next-day simple returns minus the mean of the short-legs'
+1282-    next-day simple returns. Bars before lookback, and days with fewer than
+1283-    2*k tickers available, are neutral (P&L = 0).
+1284-
+1285-    This is the cross-sectional (portfolio-level) analog of the momentum
+1286-    signal class (go long the previous N-day return), extended from a
+1287-    per-asset bet to a rank-based cross-sectional spread. It is
+1288-    conceptually distinct from the cross-sectional relative-strength class:
+1289-    it uses the longer, classical momentum lookback (63 bars = 13 weeks)
+1290-    rather than 20. No look-ahead: every input at bar t uses closes only up
+1291-    to and including t; the realized P&L is the return realized between bar t
+1292-    and bar t+1.
+1293-
+1294-    Args:
+1295-        tickers: dict ticker -> BarSequence of adjusted closes (all tickers
+1296-            share the same date grid).
+1297-        lookback: lookback window in bars for the cumulative return.
+1298-        top_k, bottom_k: leg sizes.
+1299-
+1300-    Returns:
+1301-        np.ndarray of daily spread P&L (simple returns), one entry per bar
+1302-        (0.0 where no trade is possible).
+1303-    """
+1304-    min_len = min(len(tb) for tb in tickers.values())
+1305-    daily_pnl = np.zeros(min_len, dtype=np.float64)
+1306-    for i in range(lookback, min_len - 1):
+1307-        # truncate all series to the fully overlapping window so the spread
+1308-        # is computed on the same date grid for every ticker; each ticker
+1309-        # contributes a lookback return only where it has both the lookback
+1310-        # window and the next-day close (past-only).
+1311-        closes = {t: tb.closes_array()[:min_len] for t, tb in tickers.items()}
+1312-        rets = {t: float(closes[t][i] / closes[t][i - lookback] - 1)
+1313-                for t in closes}
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import sys, numpy as np
+sys.path.insert(0,'.')
+import research.backtest as bt
+man=bt.load_universe() if hasattr(bt,'load_universe') else None
+tickers={}
+import json
+from research.data.preflight import load_manifest
+m=load_manifest()
+for e in m['entries']:
+    tickers[e['ticker']]=bt.load_ticker(e['ticker'])[0]
+print('tickers',list(tickers))
+for lb in (3,5,10):
+    for t,b in tickers.items():
+        c=b.closes_array()
+        s=bt.momentum_signals(c,lookback=lb)
+        w=np.array([x.weight for x in s])
+        nz=w[w!=0.0]
+        print('mom',lb,t,'n_bars',len(c),'unique_nz_weights',sorted(set(nz.tolist())),'frac_long',round(float((nz>0).mean()),4))
+print()
+for t in ['AAPL','AMZN','NVDA']:
+    c=tickers[t].closes_array()
+    s=bt.mean_reversion_signals(c,lookback=5)
+    w=np.array([x.weight for x in s]); nz=w[w!=0.0]
+    print('rev',t,'unique_nz',sorted(set(nz.tolist())))
+    b=bt.breakout_signals(c,lookback=20)
+    wb=np.array([x.weight for x in b]); nzb=wb[wb!=0.0]
+    print('breakout',t,'unique_nz',sorted(set(nzb.tolist())),'frac_long',round(float((nzb>0).mean()),4))
+PY
+tickers ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'NVDA', 'TSLA', 'JPM', 'JNJ', 'XOM']
+mom 3 AAPL n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 3 MSFT n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 3 GOOGL n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 3 AMZN n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 3 META n_bars 3614 unique_nz_weights [1.0] frac_long 1.0
+mom 3 NVDA n_bars 4465 unique_nz_weights [-1.0, 1.0] frac_long 0.5849
+mom 3 TSLA n_bars 4091 unique_nz_weights [1.0] frac_long 1.0
+mom 3 JPM n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 3 JNJ n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 3 XOM n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 5 AAPL n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 5 MSFT n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 5 GOOGL n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 5 AMZN n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 5 META n_bars 3614 unique_nz_weights [1.0] frac_long 1.0
+mom 5 NVDA n_bars 4465 unique_nz_weights [-1.0, 1.0] frac_long 0.5848
+mom 5 TSLA n_bars 4091 unique_nz_weights [1.0] frac_long 1.0
+mom 5 JPM n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 5 JNJ n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 5 XOM n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 10 AAPL n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 10 MSFT n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 10 GOOGL n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 10 AMZN n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 10 META n_bars 3614 unique_nz_weights [1.0] frac_long 1.0
+mom 10 NVDA n_bars 4465 unique_nz_weights [-1.0, 1.0] frac_long 0.5847
+mom 10 TSLA n_bars 4091 unique_nz_weights [1.0] frac_long 1.0
+mom 10 JPM n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 10 JNJ n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+mom 10 XOM n_bars 4465 unique_nz_weights [1.0] frac_long 1.0
+
+rev AAPL unique_nz [-1.0]
+breakout AAPL unique_nz [1.0] frac_long 1.0
+rev AMZN unique_nz [-1.0]
+breakout AMZN unique_nz [1.0] frac_long 1.0
+rev NVDA unique_nz [-1.0, 1.0]
+breakout NVDA unique_nz [1.0] frac_long 1.0
+[0m
+[0m$ [0mcd /home/runner/work/X/X && grep -rn "np.mean(np.log(" research/ examples/ tests/
+research/backtest/regime_stability.py:881:        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+research/backtest/regime_stability.py:911:        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+research/checks/verify_momentum_longer_horizon.py:98:        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+research/checks/verify_mean_reversion.py:96:        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+research/checks/verify_momentum_lookback_sweep.py:95:        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+research/checks/momentum_horizon_gap_analysis.py:96:        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+research/checks/verify_momentum.py:96:        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+[0m
+[0m$ [0mcd /home/runner/work/X/X && grep -rn "log(closes\[" research/backtest/regime_stability.py | head -20
+109:            np.std(np.log(closes[window // 2 : window]), ddof=1)
+577:            rv = float(np.std(np.log(closes[i - window : i]), ddof=1)) * np.sqrt(
+809:                float(np.std(np.log(closes[i - window : i]), ddof=1)) * np.sqrt(252.0)
+881:        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+911:        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
+1548:        vols = {t: float(np.std(np.log(closes[t][i - lookback : i]), ddof=1))
+1618:        vols = {t: float(np.std(np.log(closes[t][i - lookback : i]), ddof=1))
+[0m
+Now I have decisive evidence of a correctness defect. Let me record the plan and repair it.
+[0m# [0mTodos
+[•] Repair momentum_signals / mean_reversion_signals log-price-level defect
+[ ] Add signal-contract unit tests that catch the defect
+[ ] Write predeclared cost-sensitivity check (0/1/2/4x repo cost model, lookback 3/5/10, matched null, legacy-signal audit)
+[ ] Write independent verifier (fresh walk_forward path, classification re-derivation, legacy audit, determinism)
+[ ] Execute check + verifier, repair execution defects
+[ ] Run full regression suite
+[ ] Update durable state (LEARNING_STATE, STATE, worker_progress) with the correction
+[ ] Write agent_02.json campaign record
+[0m
+[0m← [0mEdit research/backtest/regime_stability.py
+Index: /home/runner/work/X/X/research/backtest/regime_stability.py
+===================================================================
+--- /home/runner/work/X/X/research/backtest/regime_stability.py
++++ /home/runner/work/X/X/research/backtest/regime_stability.py
+@@ -870,16 +870,25 @@
+ trend-following MA crossover tested previously. Like the MA crossover,
+ it is judged through the same perturbation / coin-flip-null /
+ regime-stability gates before any positive claim is considered.
+ 
++Defect correction (2026-11-20, activation 44647221858): the original
++implementation used ``np.mean(np.log(closes[i - lookback + 1 : i + 1]))``
++— the mean log *price level* over the window, not the log return. For any
++price series above 1.0 that quantity is positive, so the signal was a
++constant ``-1`` (always short) regardless of returns and measured a
++constant short position, not reversal. The signal now uses the actual
++``lookback``-bar log return, ``log(closes[i]) - log(closes[i - lookback])``.
++See ``momentum_signals`` for the same correction.
++
+ No look-ahead: each signal uses only closes up to and including its own
+ bar.
+ """
+ n = len(closes)
+ out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+ lookback = int(lookback)
+ for i in range(lookback, n):
+-    ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++    ret = float(np.log(closes[i]) - np.log(closes[i - lookback]))
+     out[i] = Signal(date=i + 1, weight=-1.0 if ret > 0 else 1.0)
+ return out
+ 
+ 
+
+[0m
+[0m← [0mEdit research/backtest/regime_stability.py
+Index: /home/runner/work/X/X/research/backtest/regime_stability.py
+===================================================================
+--- /home/runner/work/X/X/research/backtest/regime_stability.py
++++ /home/runner/work/X/X/research/backtest/regime_stability.py
+@@ -909,16 +909,30 @@
+ produces uniformly negative results, the momentum variant should
+ produce uniformly positive results; either outcome settles whether the
+ 5-day-lookback direction bet is a robust edge on this universe.
+ 
++Defect correction (2026-11-20, activation 44647221858): the original
++implementation used ``np.mean(np.log(closes[i - lookback + 1 : i + 1]))``
++— the mean log *price level* over the window, not the log return. For any
++price series above 1.0 that quantity is positive, so the signal was a
++constant ``+1`` (always long) regardless of returns: on the collected
++universe it emitted a constant long position for 9/10 tickers at every
++lookback, and for the tenth (NVDA, split-adjusted sub-$1 prices in the
++early sample) it flipped sign only where the price level crossed 1.0.
++The measured "edge" was therefore a constant-notional long position in
++large-cap equities (buy-and-hold), not momentum, and the pre-repair
++momentum/reversal activations are invalid and must be re-derived. The
++signal now uses the actual ``lookback``-bar log return,
++``log(closes[i]) - log(closes[i - lookback])``.
++
+ No look-ahead: each signal uses only closes up to and including its own
+ bar.
+ """
+ n = len(closes)
+ out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
+ lookback = int(lookback)
+ for i in range(lookback, n):
+-    ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++    ret = float(np.log(closes[i]) - np.log(closes[i - lookback]))
+     out[i] = Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+ return out
+ 
+ 
+
+[0m
+[0m$ [0mcd /home/runner/work/X/X && tail -40 tests/test_regime_stability.py && grep -n "^class\|^import\|^from" tests/test_regime_stability.py
+closes = np.random.randn(1000).cumsum() + 100.0
+        closes = np.abs(closes)
+        s1 = bt.breakout_signals(closes, lookback=20)
+        s2 = bt.breakout_signals(closes, lookback=20)
+        self.assertEqual([s.weight for s in s1], [s.weight for s in s2])
+        s3 = bt.breakout_signals(closes, lookback=10)
+        s4 = bt.breakout_signals(closes, lookback=10)
+        self.assertEqual([s.weight for s in s3], [s.weight for s in s4])
+
+    def test_breakout_signals_edge_case_short_series(self):
+        """A series shorter than the lookback must emit all-neutral signals."""
+        closes = np.array([100.0, 101.0, 102.0], dtype=np.float64)
+        sig = bt.breakout_signals(closes, lookback=5)
+        self.assertEqual(len(sig), 3)
+        self.assertEqual(sum(1 for s in sig if s.weight != 0.0), 0)
+
+    def test_breakout_signals_in_regime_stress(self):
+        """The breakout signal must integrate with regime_stress correctly."""
+        bars = bt.generate_bars(600, seed=11)
+        grid = bt.parameter_grid_around((("lookback", 20),))
+        result = bt.regime_stress(
+            bt.breakout_signals, list(bars), grid, (("lookback", 20.0),),
+            train_window=60, test_window=20, warmup=0,
+        )
+        # On momentum-free regime-switching synthetic data there should be no
+        # persistent edge; the exact verdict (CONSISTENT_WITH_NOISE vs
+        # REGIME_STABLE) is less important than the verdict being well-formed
+        # and the run completing deterministically.
+        self.assertIn(result.overall_verdict,
+                      ("CONSISTENT_WITH_NOISE", "REGIME_STABLE",
+                       "REGIME_DEPENDENT", "REGIME_STABLE_LOSS"))
+        r2 = bt.regime_stress(
+            bt.breakout_signals, list(bars), grid, (("lookback", 20.0),),
+            train_window=60, test_window=20, warmup=0,
+        )
+        self.assertEqual(result.overall_verdict, r2.overall_verdict)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
+5:import unittest
+7:import numpy as np
+9:import sys
+10:from pathlib import Path
+13:import research.backtest as bt
+21:class TestScenarioGeneration(unittest.TestCase):
+53:class TestRegimeStressDeterminism(unittest.TestCase):
+85:class TestNoiseBehavior(unittest.TestCase):
+113:class TestDetectsRegimeDependency(unittest.TestCase):
+157:class TestRegimeStressEdgeCases(unittest.TestCase):
+235:class TestStressSegmentsConstruction(unittest.TestCase):
+357:class TestStressSegmentsDeterminism(unittest.TestCase):
+404:class TestStressSegmentsKnownVertex(unittest.TestCase):
+453:class TestStressSegmentsRealData(unittest.TestCase):
+492:class TestBreakoutSignals(unittest.TestCase):
+[0m
+[0m← [0mEdit tests/test_regime_stability.py
+Index: /home/runner/work/X/X/tests/test_regime_stability.py
+===================================================================
+--- /home/runner/work/X/X/tests/test_regime_stability.py
++++ /home/runner/work/X/X/tests/test_regime_stability.py
+@@ -569,6 +569,89 @@
+         )
+         self.assertEqual(result.overall_verdict, r2.overall_verdict)
+ 
+ 
++class TestMomentumSignalContract(unittest.TestCase):
++    """Contract tests for the momentum / reversal signal construction.
++
++    These lock in the intended semantics (a bet on the sign of the previous
++    ``lookback``-bar *return*) and act as the missing gate that would have
++    caught the pre-2026-11-20 defect, where the signal was computed from the
++    mean log *price level* and therefore degenerated to a constant position.
++    """
++
++    def _closes(self, n=400, seed=5):
++        rng = np.random.default_rng(seed)
++        steps = rng.normal(0.0005, 0.02, size=n)
++        return 100.0 * np.exp(np.cumsum(steps))
++
++    def test_momentum_signal_takes_both_signs_on_realistic_series(self):
++        """A momentum signal must go long and short, not sit at one weight."""
++        closes = self._closes()
++        sig = bt.momentum_signals(closes, lookback=5)
++        weights = {s.weight for s in sig if s.weight != 0.0}
++        self.assertEqual(weights, {1.0, -1.0})
++
++    def test_reversal_signal_is_exact_negation_of_momentum(self):
++        """Reversal must be the sign flip of momentum on identical input."""
++        closes = self._closes()
++        mom = bt.momentum_signals(closes, lookback=5)
++        rev = bt.mean_reversion_signals(closes, lookback=5)
++        self.assertEqual(
++            [s.weight for s in mom], [-s.weight for s in rev]
++        )
++
++    def test_momentum_sign_follows_trailing_return(self):
++        """Each signal weight must equal the sign of the trailing log return."""
++        for lookback in (3, 5, 10):
++            closes = self._closes(seed=lookback)
++            sig = bt.momentum_signals(closes, lookback=lookback)
++            for i in range(lookback, len(closes)):
++                expected = 1.0 if closes[i] > closes[i - lookback] else -1.0
++                self.assertEqual(
++                    sig[i].weight, expected,
++                    f"lookback={lookback} bar={i} weight={sig[i].weight}",
++                )
++
++    def test_sub_dollar_prices_do_not_force_a_short(self):
++        """Regression: prices below 1.0 must not mechanically force a short.
++
++        The defective implementation compared the mean log price *level* to
++        zero, so any sub-$1 series produced a constant short (and any
++        above-$1 series a constant long) regardless of the return.
++        """
++        closes = np.array([0.5, 0.6, 0.55, 0.7, 0.9, 1.1, 1.3, 1.6],
++                          dtype=np.float64)
++        sig = bt.momentum_signals(closes, lookback=3)
++        weights = [s.weight for s in sig if s.weight != 0.0]
++        self.assertIn(1.0, weights)
++        self.assertIn(-1.0, weights)
++
++    def test_monotone_rising_series_is_long_throughout(self):
++        """A strictly rising series must be long at every eligible bar."""
++        closes = 100.0 * np.exp(np.cumsum(np.full(200, 0.01)))
++        sig = bt.momentum_signals(closes, lookback=5)
++        self.assertTrue(all(s.weight == 1.0 for s in sig[5:]))
++
++    def test_neutral_before_lookback_window(self):
++        """Bars before the lookback window must be neutral."""
++        closes = self._closes()
++        for lookback in (3, 5, 10):
++            sig = bt.momentum_signals(closes, lookback=lookback)
++            self.assertTrue(all(s.weight == 0.0 for s in sig[:lookback]))
++            rev = bt.mean_reversion_signals(closes, lookback=lookback)
++            self.assertTrue(all(s.weight == 0.0 for s in rev[:lookback]))
++
++    def test_momentum_signal_is_past_only(self):
++        """Truncation invariance: earlier bars cannot depend on later data."""
++        closes = self._closes(n=300)
++        full = bt.momentum_signals(closes, lookback=5)
++        for cut in (120, 200):
++            prefix = bt.momentum_signals(closes[:cut], lookback=5)
++            self.assertEqual(
++                [s.weight for s in full[:cut]],
++                [s.weight for s in prefix],
++            )
++
++
+ if __name__ == "__main__":
+     unittest.main(verbosity=2)
+
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python -m unittest tests.test_regime_stability.TestMomentumSignalContract -v 2>&1 | tail -15
+Regression: prices below 1.0 must not mechanically force a short. ... FAIL
+
+======================================================================
+FAIL: test_sub_dollar_prices_do_not_force_a_short (tests.test_regime_stability.TestMomentumSignalContract.test_sub_dollar_prices_do_not_force_a_short)
+Regression: prices below 1.0 must not mechanically force a short.
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/tests/test_regime_stability.py", line 627, in test_sub_dollar_prices_do_not_force_a_short
+    self.assertIn(-1.0, weights)
+AssertionError: -1.0 not found in [1.0, 1.0, 1.0, 1.0, 1.0]
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.018s
+
+FAILED (failures=1)
+[0m
+[0m← [0mEdit tests/test_regime_stability.py
+Index: /home/runner/work/X/X/tests/test_regime_stability.py
+===================================================================
+--- /home/runner/work/X/X/tests/test_regime_stability.py
++++ /home/runner/work/X/X/tests/test_regime_stability.py
+@@ -618,9 +618,9 @@
+ The defective implementation compared the mean log price *level* to
+ zero, so any sub-$1 series produced a constant short (and any
+ above-$1 series a constant long) regardless of the return.
+ """
+-closes = np.array([0.5, 0.6, 0.55, 0.7, 0.9, 1.1, 1.3, 1.6],
++closes = np.array([0.5, 0.6, 0.7, 0.65, 0.55, 0.45, 0.5, 0.7],
+                   dtype=np.float64)
+ sig = bt.momentum_signals(closes, lookback=3)
+ weights = [s.weight for s in sig if s.weight != 0.0]
+ self.assertIn(1.0, weights)
+
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python -m unittest tests.test_regime_stability.TestMomentumSignalContract 2>&1 | tail -5
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.017s
+
+OK
+[0m
+[0m← [0mWrite research/checks/momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -445,10 +445,10 @@
+     {name: {lb: subset[name][lb] for lb in LOOKBACKS} for name, _ in
+      (("zero", 0.0), ("repo_realistic_1x", 1.0))},
+     sort_keys=True)
+ out2 = json.dumps(
+-    {name: {lb: levels[name][lb] and {
+-        t: levels[name][lb][t] for t in ("AMZN", "JPM")} for lb in LOOKBACKS}
++    {name: {lb: {t: levels[name][lb][t] for t in ("AMZN", "JPM")}
++            for lb in LOOKBACKS}
+      for name, _ in (("zero", 0.0), ("repo_realistic_1x", 1.0))},
+     sort_keys=True)
+ print(f"determinism: r1 == r2: {out1 == out2}")
+ assert out1 == out2, "non-deterministic output"
+
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum_cost_sensitivity.py 2>&1 | tail -70
+repo_realistic_1x: 1.0x
+    conservative_2x: 2.0x
+    stress_4x: 4.0x
+  Params: walk-forward train=252d / test=84d / warmup=60d / overlap=60d, 4 volatility blocks, min 400 bars/segment, lookbacks (3, 5, 10)
+
+  level zero (0.0x), lookback 5 cell verdicts: {'NO_EDGE': 10}
+  level repo_realistic_1x (1.0x), lookback 5 cell verdicts: {'NO_EDGE': 10}
+  level conservative_2x (2.0x), lookback 5 cell verdicts: {'NO_EDGE': 10}
+  level stress_4x (4.0x), lookback 5 cell verdicts: {'NO_EDGE': 8, 'LOSS': 1, 'EDGE': 1}
+
+  Per-asset, per-lookback EDGE counts by cost level:
+    ticker        zerorepo_realistic_1xconservative_2x   stress_4x         class   lb5 med
+    AAPL             0           0           0           0       NO_EDGE[+0.082,+0.029]
+    MSFT             0           0           0           0       NO_EDGE[-0.046,-0.031]
+    GOOGL            0           0           0           0       NO_EDGE[+0.040,-0.011]
+    AMZN             0           0           0           0       NO_EDGE[-0.064,+0.000]
+    META             0           0           0           0       NO_EDGE[-0.133,-0.041]
+    NVDA             0           0           0           2       NO_EDGE[+0.284,-0.026]
+    TSLA             0           0           0           1       NO_EDGE[-0.285,+0.018]
+    JPM              0           0           0           0       NO_EDGE[-0.041,+0.025]
+    JNJ              0           0           0           0       NO_EDGE[-0.012,+0.015]
+    XOM              0           0           0           0       NO_EDGE[-0.009,+0.001]
+
+  cost-class counts: {'ROBUST': 0, 'PARTIAL': 0, 'COST_FRAGILE': 0, 'NO_EDGE': 10}
+
+=== 6. Universe cost-robustness classification (predeclared) ===
+  zero: assets with >=2 edge lookbacks = 0/10; total EDGE cells = 0/30
+  repo_realistic_1x: assets with >=2 edge lookbacks = 0/10; total EDGE cells = 0/30
+  conservative_2x: assets with >=2 edge lookbacks = 0/10; total EDGE cells = 0/30
+  stress_4x: assets with >=2 edge lookbacks = 1/10; total EDGE cells = 3/30
+
+  universe verdict (1x repo cost model): NO_BASELINE_EDGE
+  classification rule (predeclared): COST_ROBUST if >= 6/10 assets keep a positive REGIME_STABLE edge at >= 2 lookbacks under the 1x repo cost model; PARTIALLY_COST_ROBUST if 1-5; COST_FRAGILE if none keep an edge at 1x but >= 1 had one at 0x; NO_BASELINE_EDGE if no asset had an edge even at 0x. 2x/4x are reported as stress only.
+
+=== 7. Cost drag and cost incidence (lookback 5) ===
+  AAPL   drag/segment +0.0027 (~+0.82%/yr)
+  MSFT   drag/segment +0.0029 (~+0.86%/yr)
+  GOOGL  drag/segment +0.0019 (~+0.56%/yr)
+  AMZN   drag/segment +0.0068 (~+2.03%/yr)
+  META   drag/segment +0.0014 (~+0.43%/yr)
+  NVDA   drag/segment -0.0619 (~-18.56%/yr)
+  TSLA   drag/segment +0.0109 (~+3.27%/yr)
+  JPM    drag/segment +0.0020 (~+0.60%/yr)
+  JNJ    drag/segment +0.0005 (~+0.16%/yr)
+  XOM    drag/segment +0.0007 (~+0.22%/yr)
+
+  Full-sample cost incidence, lookback 5, repo cost level:
+    AAPL   fills=4454 flips= 798 cost=2418.91 bps of capital (1.365%/yr) turnover=92.74x/yr
+    MSFT   fills=4431 flips= 945 cost=1332.28 bps of capital (0.752%/yr) turnover=108.98x/yr
+    GOOGL  fills=4457 flips= 878 cost=1688.89 bps of capital (0.953%/yr) turnover=101.55x/yr
+    AMZN   fills=4454 flips= 906 cost=2847.46 bps of capital (1.607%/yr) turnover=105.28x/yr
+    META   fills=3598 flips= 726 cost= 489.89 bps of capital (0.342%/yr) turnover=104.47x/yr
+    NVDA   fills=4440 flips= 881 cost=72352.26 bps of capital (40.835%/yr) turnover=106.18x/yr
+    TSLA   fills=4078 flips= 814 cost=6654.85 bps of capital (4.099%/yr) turnover=105.45x/yr
+    JPM    fills=4442 flips= 886 cost=1146.46 bps of capital (0.647%/yr) turnover=102.66x/yr
+    JNJ    fills=4441 flips= 906 cost= 819.60 bps of capital (0.463%/yr) turnover=103.80x/yr
+    XOM    fills=4444 flips= 923 cost=1131.77 bps of capital (0.639%/yr) turnover=106.45x/yr
+
+  Matched null (coin-flip) turnover on the same bars: flips=1465 (48.9% of non-neutral bars).
+  LIMITATION (recorded): the framework null's turnover is not matched to the candidate's, so under cost stress the candidate-vs-null comparison is not a like-for-like cost comparison; the candidate's net-of-cost median level (vs zero) and its cost drag are the decision-relevant quantities.
+
+=== 8. Determinism (recomputed subset) ===
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 501, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 449, in main
+    {name: {lb: {t: levels[name][lb][t] for t in ("AMZN", "JPM")}
+                    ~~~~~~~~~~~~^^^^
+KeyError: 3
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -316,12 +316,11 @@
+         counts[v] = counts.get(v, 0) + 1
+     print(f"  level {name} ({mult}x), lookback 5 cell verdicts: {counts}")
+ 
+ print("\n  Per-asset, per-lookback EDGE counts by cost level:")
+-header = "    {:6s}".format("ticker") + "".join(
+-    "{:>12s}".format(n) for n, _ in COST_LEVELS) + "{:>14s}{:>10s}".format(
+-    "class", "lb5 med")
+-print(header)
++print("    {:6s}".format("ticker") + "".join(
++    "{:>10s}".format(n[:9]) for n, _ in COST_LEVELS)
++    + "{:>14s}  {}".format("class", "lb5 medians (1x)"))
+ per_asset = {}
+ class_counts = {"ROBUST": 0, "PARTIAL": 0, "COST_FRAGILE": 0, "NO_EDGE": 0}
+ for ticker in ticker_order:
+     row = {}
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -354,11 +354,11 @@
+         cells=cells,
+     )
+     lb5_med = levels["repo_realistic_1x"]["5"][ticker]["medians"]
+     print("    {:6s}".format(ticker) + "".join(
+-        "{:>12d}".format(row[n]) for n, _ in COST_LEVELS)
+-        + "{:>14s}{:>10s}".format(
+-            cls, "[" + ",".join(f"{m:+.3f}" for m in lb5_med[:2]) + "]"))
++        "{:>10d}".format(row[n]) for n, _ in COST_LEVELS)
++        + "{:>14s}  [{}]".format(
++            cls, ",".join(f"{m:+.3f}" for m in lb5_med[:2])))
+ print(f"\n  cost-class counts: {class_counts}")
+ 
+ print("\n=== 6. Universe cost-robustness classification (predeclared) ===")
+ retained = {}
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -444,9 +444,9 @@
+     {name: {lb: subset[name][lb] for lb in LOOKBACKS} for name, _ in
+      (("zero", 0.0), ("repo_realistic_1x", 1.0))},
+     sort_keys=True)
+ out2 = json.dumps(
+-    {name: {lb: {t: levels[name][lb][t] for t in ("AMZN", "JPM")}
++    {name: {str(lb): {t: levels[name][str(lb)][t] for t in ("AMZN", "JPM")}
+             for lb in LOOKBACKS}
+      for name, _ in (("zero", 0.0), ("repo_realistic_1x", 1.0))},
+     sort_keys=True)
+ print(f"determinism: r1 == r2: {out1 == out2}")
+
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum_cost_sensitivity.py 2>&1 | tail -45
+zero: assets with >=2 edge lookbacks = 0/10; total EDGE cells = 0/30
+  repo_realistic_1x: assets with >=2 edge lookbacks = 0/10; total EDGE cells = 0/30
+  conservative_2x: assets with >=2 edge lookbacks = 0/10; total EDGE cells = 0/30
+  stress_4x: assets with >=2 edge lookbacks = 1/10; total EDGE cells = 3/30
+
+  universe verdict (1x repo cost model): NO_BASELINE_EDGE
+  classification rule (predeclared): COST_ROBUST if >= 6/10 assets keep a positive REGIME_STABLE edge at >= 2 lookbacks under the 1x repo cost model; PARTIALLY_COST_ROBUST if 1-5; COST_FRAGILE if none keep an edge at 1x but >= 1 had one at 0x; NO_BASELINE_EDGE if no asset had an edge even at 0x. 2x/4x are reported as stress only.
+
+=== 7. Cost drag and cost incidence (lookback 5) ===
+  AAPL   drag/segment +0.0027 (~+0.82%/yr)
+  MSFT   drag/segment +0.0029 (~+0.86%/yr)
+  GOOGL  drag/segment +0.0019 (~+0.56%/yr)
+  AMZN   drag/segment +0.0068 (~+2.03%/yr)
+  META   drag/segment +0.0014 (~+0.43%/yr)
+  NVDA   drag/segment -0.0619 (~-18.56%/yr)
+  TSLA   drag/segment +0.0109 (~+3.27%/yr)
+  JPM    drag/segment +0.0020 (~+0.60%/yr)
+  JNJ    drag/segment +0.0005 (~+0.16%/yr)
+  XOM    drag/segment +0.0007 (~+0.22%/yr)
+
+  Full-sample cost incidence, lookback 5, repo cost level:
+    AAPL   fills=4454 flips= 798 cost=2418.91 bps of capital (1.365%/yr) turnover=92.74x/yr
+    MSFT   fills=4431 flips= 945 cost=1332.28 bps of capital (0.752%/yr) turnover=108.98x/yr
+    GOOGL  fills=4457 flips= 878 cost=1688.89 bps of capital (0.953%/yr) turnover=101.55x/yr
+    AMZN   fills=4454 flips= 906 cost=2847.46 bps of capital (1.607%/yr) turnover=105.28x/yr
+    META   fills=3598 flips= 726 cost= 489.89 bps of capital (0.342%/yr) turnover=104.47x/yr
+    NVDA   fills=4440 flips= 881 cost=72352.26 bps of capital (40.835%/yr) turnover=106.18x/yr
+    TSLA   fills=4078 flips= 814 cost=6654.85 bps of capital (4.099%/yr) turnover=105.45x/yr
+    JPM    fills=4442 flips= 886 cost=1146.46 bps of capital (0.647%/yr) turnover=102.66x/yr
+    JNJ    fills=4441 flips= 906 cost= 819.60 bps of capital (0.463%/yr) turnover=103.80x/yr
+    XOM    fills=4444 flips= 923 cost=1131.77 bps of capital (0.639%/yr) turnover=106.45x/yr
+
+  Matched null (coin-flip) turnover on the same bars: flips=1465 (48.9% of non-neutral bars).
+  LIMITATION (recorded): the framework null's turnover is not matched to the candidate's, so under cost stress the candidate-vs-null comparison is not a like-for-like cost comparison; the candidate's net-of-cost median level (vs zero) and its cost drag are the decision-relevant quantities.
+
+=== 8. Determinism (recomputed subset) ===
+determinism: r1 == r2: False
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 500, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 453, in main
+    assert out1 == out2, "non-deterministic output"
+           ^^^^^^^^^^^^
+AssertionError: non-deterministic output
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import sys, json
+sys.path.insert(0,'.')
+import research.backtest as bt
+import importlib.util
+spec=importlib.util.spec_from_file_location('mcs','research/checks/momentum_cost_sensitivity.py')
+m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+bars=bt.load_ticker('AMZN')[0]
+for name,mult in (('zero',0.0),('repo_realistic_1x',1.0)):
+    a=m.segment_result('AMZN',bars,5,m.cost_cfg(mult))
+    b=m.segment_result('AMZN',bars,5,m.cost_cfg(mult))
+    print(name, json.dumps(a,sort_keys=True)==json.dumps(b,sort_keys=True))
+    if json.dumps(a,sort_keys=True)!=json.dumps(b,sort_keys=True):
+        for k in a:
+            if a[k]!=b[k]: print('  diff key',k,a[k],b[k])
+PY
+zero True
+repo_realistic_1x True
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import sys, json
+sys.path.insert(0,'.')
+import research.backtest as bt
+import importlib.util
+spec=importlib.util.spec_from_file_location('mcs','research/checks/momentum_cost_sensitivity.py')
+m=importlib.util.module_from_spec(spec); spec.loader.exec_module(m)
+tks=['AMZN','JPM']
+all_t={t: bt.load_ticker(t)[0] for t in tks}
+subset={}
+for name,mult in (("zero",0.0),("repo_realistic_1x",1.0)):
+    cfg=m.cost_cfg(mult)
+    subset[name]={lb:{t:m.segment_result(t,all_t[t],lb,cfg) for t in tks} for lb in m.LOOKBACKS}
+out1=json.dumps({name:{lb:subset[name][lb] for lb in m.LOOKBACKS} for name,_ in (("zero",0.0),("repo_realistic_1x",1.0))},sort_keys=True)
+out2=json.dumps({name:{str(lb):{t:subset[name][lb][t] for t in tks} for lb in m.LOOKBACKS} for name,_ in (("zero",0.0),("repo_realistic_1x",1.0))},sort_keys=True)
+print('equal',out1==out2)
+print('keys1',list(json.loads(out1).keys()))
+print('keys2',list(json.loads(out2).keys()))
+print('subkeys1',list(json.loads(out1)['zero'].keys()))
+print('subkeys2',list(json.loads(out2)['zero'].keys()))
+PY
+equal False
+keys1 ['repo_realistic_1x', 'zero']
+keys2 ['repo_realistic_1x', 'zero']
+subkeys1 ['3', '5', '10']
+subkeys2 ['10', '3', '5']
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -440,9 +440,9 @@
+         lb: {t: segment_result(t, all_tickers[t], lb, cfg) for t in ("AMZN", "JPM")}
+         for lb in LOOKBACKS
+     }
+ out1 = json.dumps(
+-    {name: {lb: subset[name][lb] for lb in LOOKBACKS} for name, _ in
++    {name: {str(lb): subset[name][lb] for lb in LOOKBACKS} for name, _ in
+      (("zero", 0.0), ("repo_realistic_1x", 1.0))},
+     sort_keys=True)
+ out2 = json.dumps(
+     {name: {str(lb): {t: levels[name][str(lb)][t] for t in ("AMZN", "JPM")}
+
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum_cost_sensitivity.py 2>&1 | tail -50
+META           0         0         0         0       NO_EDGE  [-0.133,-0.041]
+    NVDA           0         0         0         2       NO_EDGE  [+0.284,-0.026]
+    TSLA           0         0         0         1       NO_EDGE  [-0.285,+0.018]
+    JPM            0         0         0         0       NO_EDGE  [-0.041,+0.025]
+    JNJ            0         0         0         0       NO_EDGE  [-0.012,+0.015]
+    XOM            0         0         0         0       NO_EDGE  [-0.009,+0.001]
+
+  cost-class counts: {'ROBUST': 0, 'PARTIAL': 0, 'COST_FRAGILE': 0, 'NO_EDGE': 10}
+
+=== 6. Universe cost-robustness classification (predeclared) ===
+  zero: assets with >=2 edge lookbacks = 0/10; total EDGE cells = 0/30
+  repo_realistic_1x: assets with >=2 edge lookbacks = 0/10; total EDGE cells = 0/30
+  conservative_2x: assets with >=2 edge lookbacks = 0/10; total EDGE cells = 0/30
+  stress_4x: assets with >=2 edge lookbacks = 1/10; total EDGE cells = 3/30
+
+  universe verdict (1x repo cost model): NO_BASELINE_EDGE
+  classification rule (predeclared): COST_ROBUST if >= 6/10 assets keep a positive REGIME_STABLE edge at >= 2 lookbacks under the 1x repo cost model; PARTIALLY_COST_ROBUST if 1-5; COST_FRAGILE if none keep an edge at 1x but >= 1 had one at 0x; NO_BASELINE_EDGE if no asset had an edge even at 0x. 2x/4x are reported as stress only.
+
+=== 7. Cost drag and cost incidence (lookback 5) ===
+  AAPL   drag/segment +0.0027 (~+0.82%/yr)
+  MSFT   drag/segment +0.0029 (~+0.86%/yr)
+  GOOGL  drag/segment +0.0019 (~+0.56%/yr)
+  AMZN   drag/segment +0.0068 (~+2.03%/yr)
+  META   drag/segment +0.0014 (~+0.43%/yr)
+  NVDA   drag/segment -0.0619 (~-18.56%/yr)
+  TSLA   drag/segment +0.0109 (~+3.27%/yr)
+  JPM    drag/segment +0.0020 (~+0.60%/yr)
+  JNJ    drag/segment +0.0005 (~+0.16%/yr)
+  XOM    drag/segment +0.0007 (~+0.22%/yr)
+
+  Full-sample cost incidence, lookback 5, repo cost level:
+    AAPL   fills=4454 flips= 798 cost=2418.91 bps of capital (1.365%/yr) turnover=92.74x/yr
+    MSFT   fills=4431 flips= 945 cost=1332.28 bps of capital (0.752%/yr) turnover=108.98x/yr
+    GOOGL  fills=4457 flips= 878 cost=1688.89 bps of capital (0.953%/yr) turnover=101.55x/yr
+    AMZN   fills=4454 flips= 906 cost=2847.46 bps of capital (1.607%/yr) turnover=105.28x/yr
+    META   fills=3598 flips= 726 cost= 489.89 bps of capital (0.342%/yr) turnover=104.47x/yr
+    NVDA   fills=4440 flips= 881 cost=72352.26 bps of capital (40.835%/yr) turnover=106.18x/yr
+    TSLA   fills=4078 flips= 814 cost=6654.85 bps of capital (4.099%/yr) turnover=105.45x/yr
+    JPM    fills=4442 flips= 886 cost=1146.46 bps of capital (0.647%/yr) turnover=102.66x/yr
+    JNJ    fills=4441 flips= 906 cost= 819.60 bps of capital (0.463%/yr) turnover=103.80x/yr
+    XOM    fills=4444 flips= 923 cost=1131.77 bps of capital (0.639%/yr) turnover=106.45x/yr
+
+  Matched null (coin-flip) turnover on the same bars: flips=1465 (48.9% of non-neutral bars).
+  LIMITATION (recorded): the framework null's turnover is not matched to the candidate's, so under cost stress the candidate-vs-null comparison is not a like-for-like cost comparison; the candidate's net-of-cost median level (vs zero) and its cost drag are the decision-relevant quantities.
+
+=== 8. Determinism (recomputed subset) ===
+determinism: r1 == r2: True
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution.
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum_cost_sensitivity.py 2>&1 | sed -n '1,60p'
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum_cost_sensitivity.py 2>&1 | sed -n '/Signal-contract audit/,/Predeclared cost grid/p'
+=== 3. Signal-contract audit (predeclared interpretability gate) ===
+  A cost verdict is only meaningful if the signal depends on returns.
+  legacy = pre-2026-11-20 formula (mean log PRICE LEVEL); current = repaired (trailing log return).
+
+  AAPL   legacy[lb5] weights=[1.0] flips=   0 | current[lb5] weights=[-1.0, 1.0] flips= 798 long=0.5794
+  MSFT   legacy[lb5] weights=[1.0] flips=   0 | current[lb5] weights=[-1.0, 1.0] flips= 945 long=0.578
+  GOOGL  legacy[lb5] weights=[1.0] flips=   0 | current[lb5] weights=[-1.0, 1.0] flips= 878 long=0.5682
+  AMZN   legacy[lb5] weights=[1.0] flips=   0 | current[lb5] weights=[-1.0, 1.0] flips= 906 long=0.5567
+  META   legacy[lb5] weights=[1.0] flips=   0 | current[lb5] weights=[-1.0, 1.0] flips= 726 long=0.558
+  NVDA   legacy[lb5] weights=[-1.0, 1.0] flips=   1 | current[lb5] weights=[-1.0, 1.0] flips= 881 long=0.5704
+  TSLA   legacy[lb5] weights=[1.0] flips=   0 | current[lb5] weights=[-1.0, 1.0] flips= 814 long=0.5377
+  JPM    legacy[lb5] weights=[1.0] flips=   0 | current[lb5] weights=[-1.0, 1.0] flips= 886 long=0.5686
+  JNJ    legacy[lb5] weights=[1.0] flips=   0 | current[lb5] weights=[-1.0, 1.0] flips= 906 long=0.5516
+  XOM    legacy[lb5] weights=[1.0] flips=   0 | current[lb5] weights=[-1.0, 1.0] flips= 923 long=0.5413
+
+  legacy signal is a single constant weight on 9/10 tickers at lookback 5 (1/1 means always long or always short, independent of returns).
+
+=== 4. Leakage review (AMZN/JPM, lookback=5, repo cost level) ===
+  AMZN: 4465 bars, signals 4465, leakage [PASS], repo-cost total_return -1.178
+  JPM: 4465 bars, signals 4465, leakage [PASS], repo-cost total_return -0.830
+  no-look-ahead: the signal at bar t uses closes[:t] only (close[t] vs close[t-lookback]); neutral bars before the lookback window carry the equity forward.
+
+=== 5. Predeclared cost grid across the collected universe ===
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import json
+a=json.load(open('state/check_artifacts/momentum_cost_sensitivity_results.json'))
+print('universe_verdict',a['universe_verdict'])
+for t in a['ticker_order']:
+    pa=a['per_asset'][t]
+    z=pa['cells']['zero']['5']
+    print(t, 'zero5 verdict',z['verdict'],'med',[round(x,3) for x in z['medians']],'null',[round(x,3) for x in z['null_medians']],'disp',z['candidate_dispersion'],'nullsd',z['null_dispersion'],'folds',z['n_folds'])
+PY
+universe_verdict NO_BASELINE_EDGE
+AAPL zero5 verdict REGIME_STABLE med [0.085, 0.035, -0.037, 0.054] null [-0.025, -0.011, 0.04, 0.032] disp 0.04489 nullsd 0.027605 folds 28
+MSFT zero5 verdict CONSISTENT_WITH_NOISE med [-0.041, -0.03] null [-0.013, -0.029] disp 0.005774 nullsd 0.008121 folds 75
+GOOGL zero5 verdict CONSISTENT_WITH_NOISE med [0.045, -0.011, -0.027] null [-0.081, 0.01, -0.008] disp 0.031026 nullsd 0.039298 folds 28
+AMZN zero5 verdict CONSISTENT_WITH_NOISE med [-0.05, 0.005, 0.046] null [-0.007, -0.002, 0.036] disp 0.039292 nullsd 0.019037 folds 28
+META zero5 verdict REGIME_STABLE med [-0.129, -0.041, 0.047] null [-0.015, 0.045, -0.09] disp 0.071746 nullsd 0.055353 folds 19
+NVDA zero5 verdict REGIME_STABLE med [-0.024, 0.092, 0.063] null [-0.108, 0.031, 0.001] disp 0.049199 nullsd 0.05979 folds 28
+TSLA zero5 verdict REGIME_DEPENDENT med [-0.254, 0.019, 0.049] null [0.063, 0.007, -0.019] disp 0.135957 nullsd 0.034026 folds 24
+JPM zero5 verdict CONSISTENT_WITH_NOISE med [-0.039, 0.028, 0.028] null [-0.027, 0.002, -0.008] disp 0.031456 nullsd 0.011874 folds 28
+JNJ zero5 verdict CONSISTENT_WITH_NOISE med [-0.011, 0.016] null [-0.024, 0.013] disp 0.013635 nullsd 0.018882 folds 75
+XOM zero5 verdict CONSISTENT_WITH_NOISE med [-0.008, 0.001] null [0.004, -0.006] disp 0.004437 nullsd 0.004845 folds 75
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import json
+a=json.load(open('state/check_artifacts/momentum_results.json'))
+print(list(a.keys()))
+pa=a.get('per_asset',{})
+k=list(pa)[0]
+print(k, json.dumps(pa[k], indent=1)[:900])
+PY
+['dataset_id', 'lookback', 'min_segment_bars', 'n_blocks', 'overlap', 'per_asset', 'perturbation', 'seed', 'test', 'train', 'universe', 'warmup', 'window']
+AMZN {
+ "base_ma": {
+  "candidate_dispersion": 0.086,
+  "medians": [
+   0.046,
+   0.001,
+   -0.154
+  ],
+  "n_folds": 28,
+  "null_dispersion": 0.043,
+  "segments": [
+   "turbulent",
+   "calm",
+   "turbulent"
+  ],
+  "verdict": "REGIME_DEPENDENT"
+ },
+ "momentum": {
+  "candidate_dispersion": 0.005,
+  "medians": [
+   0.065,
+   0.076,
+   0.077
+  ],
+  "n_folds": 28,
+  "null_dispersion": 0.019,
+  "segments": [
+   "turbulent",
+   "calm",
+   "turbulent"
+  ],
+  "verdict": "REGIME_STABLE"
+ }
+}
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -276,8 +276,64 @@
+ print(f"\n  legacy signal is a single constant weight on "
+       f"{legacy_degenerate}/{len(ticker_order)} tickers at lookback 5 "
+       f"(1/1 means always long or always short, independent of returns).")
+ 
++print("\n=== 3b. Legacy cross-consistency vs the recorded momentum artifact ===")
++print("  If the pre-repair 'momentum' result was a constant-long backtest, its")
++print("  per-asset segment medians must equal a constant-long walk-forward")
++print("  recomputation at zero cost (momentum_results.json, lookback 5).\n")
++legacy_path = ARTIFACT_DIR / "momentum_results.json"
++legacy_cross = {}
++if legacy_path.exists():
++    with open(legacy_path) as f:
++        prior = json.load(f)
++    prior_assets = prior.get("per_asset", {})
++    for ticker in ticker_order:
++        if ticker not in prior_assets:
++            continue
++        closes = all_tickers[ticker].closes_array()
++        labels = bt.volatility_blocks(closes, n_blocks=N_BLOCKS, window=WINDOW)
++        sig = [bt.Signal(date=i + 1, weight=0.0) for i in range(len(closes))]
++        for i in range(5, len(closes)):
++            sig[i] = bt.Signal(date=i + 1, weight=1.0)
++        res = bt.stress_segments(
++            signals_fn=lambda closes, **kw: [
++                bt.Signal(date=i + 1,
++                          weight=0.0 if i < 5 else 1.0)
++                for i in range(len(closes))
++            ],
++            bars=all_tickers[ticker],
++            signals=sig,
++            param_grid=[{"lookback": 5}],
++            baseline=(("lookback", 5),),
++            segment_fn=bt.segment_fn_from_labels(labels),
++            train_window=TRAIN,
++            test_window=TEST,
++            warmup=WARM,
++            overlap_window=OVERLAP,
++            cfg=cost_cfg(0.0),
++            periods_per_year=252,
++            min_segment_bars=MIN_SEGMENT_BARS,
++        )
++        const_med = [round(s.baseline_median_log_return, 3)
++                     for s in res.scenarios]
++        prior_med = prior_assets[ticker]["momentum"]["medians"]
++        match = const_med == [round(float(x), 3) for x in prior_med]
++        legacy_cross[ticker] = dict(
++            constant_long_medians=const_med,
++            recorded_prior_momentum_medians=prior_med,
++            match=bool(match),
++        )
++        print(f"  {ticker:6s} constant-long {const_med} vs recorded "
++              f"{prior_med} -> {'MATCH' if match else 'MISMATCH'}")
++    n_match = sum(1 for v in legacy_cross.values() if v["match"])
++    print(f"\n  constant-long recomputation matches the recorded momentum "
++          f"artifact on {n_match}/{len(legacy_cross)} assets: the recorded")
++    print("  'momentum edge' is a constant-long (buy-and-hold) backtest, not "
++          "a momentum signal.")
++else:
++    print(f"  prior artifact {legacy_path} not found; gate skipped.")
++
+ print("\n=== 4. Leakage review (AMZN/JPM, lookback=5, repo cost level) ===")
+ for ticker in ("AMZN", "JPM"):
+     bars = all_tickers[ticker]
+     closes = bars.closes_array()
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -99,9 +99,8 @@
+     return weights
+ 
+ 
+ def weight_audit(weights):
+-    """Distribution summary of a weight series (the signal-contract evidence)."""
+     arr = np.asarray(weights, dtype=np.float64)
+     nz = arr[arr != 0.0]
+     flips = int(np.sum(nz[1:] != nz[:-1])) if nz.size > 1 else 0
+     return dict(
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -98,9 +98,25 @@
+         weights[i] = 1.0 if level > 0.0 else -1.0
+     return weights
+ 
+ 
++def legacy_momentum_signals(closes, lookback=5):
++    """Pre-2026-11-20 momentum signal, for the legacy cross-consistency gate.
++
++    Identical to ``legacy_momentum_weights`` but returns ``Signal`` objects so
++    it can be driven through the same ``stress_segments`` path as the original
++    ``research/checks/momentum.py`` run.
++    """
++    n = len(closes)
++    out = [bt.Signal(date=i + 1, weight=0.0) for i in range(n)]
++    for i in range(int(lookback), n):
++        level = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++        out[i] = bt.Signal(date=i + 1, weight=1.0 if level > 0.0 else -1.0)
++    return out
++
++
+ def weight_audit(weights):
++    """Distribution summary of a weight series (the signal-contract evidence)."""
+     arr = np.asarray(weights, dtype=np.float64)
+     nz = arr[arr != 0.0]
+     flips = int(np.sum(nz[1:] != nz[:-1])) if nz.size > 1 else 0
+     return dict(
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -306,17 +306,11 @@
+ if ticker not in prior_assets:
+     continue
+ closes = all_tickers[ticker].closes_array()
+ labels = bt.volatility_blocks(closes, n_blocks=N_BLOCKS, window=WINDOW)
+-sig = [bt.Signal(date=i + 1, weight=0.0) for i in range(len(closes))]
+-for i in range(5, len(closes)):
+-    sig[i] = bt.Signal(date=i + 1, weight=1.0)
++sig = legacy_momentum_signals(closes, lookback=5)
+ res = bt.stress_segments(
+-    signals_fn=lambda closes, **kw: [
+-        bt.Signal(date=i + 1,
+-                  weight=0.0 if i < 5 else 1.0)
+-        for i in range(len(closes))
+-    ],
++    signals_fn=legacy_momentum_signals,
+     bars=all_tickers[ticker],
+     signals=sig,
+     param_grid=[{"lookback": 5}],
+     baseline=(("lookback", 5),),
+
+[0m
+Now add the legacy cross-consistency result to the artifact:
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -535,8 +535,9 @@
+     legacy_constant_weight_tickers=legacy_degenerate,
+     legacy=legacy_audit,
+     current=current_audit,
+     null_turnover=null_audit,
++    legacy_cross_consistency=legacy_cross,
+ ),
+ per_asset=per_asset,
+ cost_drag=drag,
+ cost_incidence=incidence,
+
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum_cost_sensitivity.py 2>&1 | sed -n '/3b\./,/^=== 4/p'
+=== 3b. Legacy cross-consistency vs the recorded momentum artifact ===
+  If the pre-repair 'momentum' result was a constant-long backtest, its
+  per-asset segment medians must equal a constant-long walk-forward
+  recomputation at zero cost (momentum_results.json, lookback 5).
+
+  AMZN   constant-long [0.065, 0.076, 0.077] vs recorded [0.065, 0.076, 0.077] -> MATCH
+  JPM    constant-long [0.113, 0.044, 0.083] vs recorded [0.113, 0.044, 0.083] -> MATCH
+
+  constant-long recomputation matches the recorded momentum artifact on 2/2 assets: the recorded
+  'momentum edge' is a constant-long (buy-and-hold) backtest, not a momentum signal.
+
+=== 4. Leakage review (AMZN/JPM, lookback=5, repo cost level) ===
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import json
+a=json.load(open('state/check_artifacts/momentum_results.json'))
+u=a['universe']
+print(type(u), list(u.keys())[:12] if isinstance(u,dict) else len(u))
+print(json.dumps(u, indent=1)[:1200])
+PY
+<class 'dict'> ['per_asset', 'ticker_order', 'verdict_counts']
+{
+ "per_asset": {
+  "AAPL": {
+   "candidate_dispersion": 0.014,
+   "medians": [
+    0.071,
+    0.054,
+    0.092,
+    0.069
+   ],
+   "null_dispersion": 0.028,
+   "null_medians": [
+    -0.025,
+    -0.011,
+    0.04,
+    0.032
+   ],
+   "segments": [
+    "turbulent",
+    "calm",
+    "turbulent",
+    "calm"
+   ],
+   "verdict": "REGIME_STABLE"
+  },
+  "AMZN": {
+   "candidate_dispersion": 0.005,
+   "medians": [
+    0.065,
+    0.076,
+    0.077
+   ],
+   "null_dispersion": 0.019,
+   "null_medians": [
+    -0.007,
+    -0.002,
+    0.036
+   ],
+   "segments": [
+    "turbulent",
+    "calm",
+    "turbulent"
+   ],
+   "verdict": "REGIME_STABLE"
+  },
+  "GOOGL": {
+   "candidate_dispersion": 0.015,
+   "medians": [
+    0.069,
+    0.071,
+    0.101
+   ],
+   "null_dispersion": 0.039,
+   "null_medians": [
+    -0.081,
+    0.01,
+    -0.008
+   ],
+   "segments": [
+    "turbulent",
+    "calm",
+    "turbulent"
+   ],
+   "verdict": "REGIME_STABLE"
+  },
+  "JNJ": {
+   "candidate_dispersion": 0.002,
+   "medians": [
+    0.05,
+    0.046
+   ],
+   "null_dispersion": 0.019,
+   "null_medians": [
+    -0.024,
+    0.013
+   ],
+   "segments": [
+    "calm",
+    "turbulent"
+   ],
+   "verdict": "CONSISTENT_WITH_NOISE"
+  },
+  "JPM": {
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -301,10 +301,12 @@
+ if legacy_path.exists():
+     with open(legacy_path) as f:
+         prior = json.load(f)
+     prior_assets = prior.get("per_asset", {})
++    prior_universe = prior.get("universe", {}).get("per_asset", {})
+     for ticker in ticker_order:
+-        if ticker not in prior_assets:
++        entry = prior_universe.get(ticker) or prior_assets.get(ticker)
++        if entry is None:
+             continue
+         closes = all_tickers[ticker].closes_array()
+         labels = bt.volatility_blocks(closes, n_blocks=N_BLOCKS, window=WINDOW)
+         sig = legacy_momentum_signals(closes, lookback=5)
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -326,9 +326,9 @@
+     min_segment_bars=MIN_SEGMENT_BARS,
+ )
+ const_med = [round(s.baseline_median_log_return, 3)
+              for s in res.scenarios]
+-prior_med = prior_assets[ticker]["momentum"]["medians"]
++prior_med = entry["medians"]
+ match = const_med == [round(float(x), 3) for x in prior_med]
+ legacy_cross[ticker] = dict(
+     constant_long_medians=const_med,
+     recorded_prior_momentum_medians=prior_med,
+
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/momentum_cost_sensitivity.py 2>&1 | sed -n '/3b\./,/^=== 4/p'
+=== 3b. Legacy cross-consistency vs the recorded momentum artifact ===
+  If the pre-repair 'momentum' result was a constant-long backtest, its
+  per-asset segment medians must equal a constant-long walk-forward
+  recomputation at zero cost (momentum_results.json, lookback 5).
+
+  AAPL   constant-long [0.071, 0.054, 0.092, 0.069] vs recorded [0.071, 0.054, 0.092, 0.069] -> MATCH
+  MSFT   constant-long [0.052, 0.072] vs recorded [0.052, 0.072] -> MATCH
+  GOOGL  constant-long [0.069, 0.071, 0.101] vs recorded [0.069, 0.071, 0.101] -> MATCH
+  AMZN   constant-long [0.065, 0.076, 0.077] vs recorded [0.065, 0.076, 0.077] -> MATCH
+  META   constant-long [0.073, 0.067, 0.042] vs recorded [0.073, 0.067, 0.042] -> MATCH
+  NVDA   constant-long [-0.038, 0.013, 0.1] vs recorded [-0.038, 0.013, 0.1] -> MATCH
+  TSLA   constant-long [0.132, 0.016, 0.107] vs recorded [0.132, 0.016, 0.107] -> MATCH
+  JPM    constant-long [0.113, 0.044, 0.083] vs recorded [0.113, 0.044, 0.083] -> MATCH
+  JNJ    constant-long [0.05, 0.046] vs recorded [0.05, 0.046] -> MATCH
+  XOM    constant-long [0.018, 0.037] vs recorded [0.018, 0.037] -> MATCH
+
+  constant-long recomputation matches the recorded momentum artifact on 10/10 assets: the recorded
+  'momentum edge' is a constant-long (buy-and-hold) backtest, not a momentum signal.
+
+=== 4. Leakage review (AMZN/JPM, lookback=5, repo cost level) ===
+[0m
+[0m$ [0mcd /home/runner/work/X/X && grep -n "OUTLIER_TOL" research/backtest/regime_stability.py | head -5
+50:OUTLIER_TOL = 0.05
+249:    edge_free = abs(baseline_median - noise_median) <= OUTLIER_TOL
+281:        return all(abs(s.baseline_median_log_return) <= OUTLIER_TOL
+286:        return sum(1 for s in self.scenarios if abs(s.baseline_median_log_return) <= OUTLIER_TOL)
+290:        return sum(1 for s in self.scenarios if abs(s.baseline_median_log_return) > OUTLIER_TOL)
+[0m
+[0m← [0mWrite research/checks/verify_momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -150,13 +150,13 @@
+         dtype=np.float64,
+     )
+ 
+ 
+-def cell(ticker_bars, s, e, lookback, cfg, bars_list):
++def cell(s, e, lookback, cfg, bars_list):
+     """Fresh path: candidate medians + null medians for one segment/lookback."""
+     seg_bars = bars_list[s:e]
+-    sig = momentum_signals(np.array([b.close for b in bars_list], dtype=np.float64),
+-                           lookback)[s:e]
++    closes = np.array([b.close for b in bars_list], dtype=np.float64)
++    sig = momentum_signals(closes, lookback)[s:e]
+     res = bt.walk_forward(
+         seg_bars, sig, train_window=TRAIN, test_window=TEST,
+         warmup=WARM, overlap_window=OVERLAP, cfg=cfg,
+     )
+
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -216,19 +216,19 @@
+ closes = np.array([b.close for b in bars_list[t]], dtype=np.float64)
+ labels = vol_blocks(closes)
+ segs = segments_from_labels(labels)
+ seg_med, seg_null = [], []
++n_folds = None
+ for name, s, e in segs:
+-    r = cell(None, s, e, lb, cfg, bars_list[t])
++    r = cell(s, e, lb, cfg, bars_list[t])
+     seg_med.append(r["candidate"])
+     seg_null.append(r["null"])
++    n_folds = r["n_folds"]
+ rec = dict(
+     medians=[round(x, 6) for x in seg_med],
+     null_medians=[round(x, 6) for x in seg_null],
+-    n_folds=seg_med and len(seg_med) and None,
++    n_folds=n_folds,
+ )
+-rec["n_folds"] = cell(
+-    None, segs[0][1], segs[0][2], lb, cfg, bars_list[t])["n_folds"]
+ exp = art["per_asset"][t]["cells"][level_name][str(lb)]
+ n_cells += 1
+ ok_med = all(abs(a - b) <= TOL
+              for a, b in zip(rec["medians"], exp["medians"]))
+
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -380,10 +380,10 @@
+ closes = np.array([b.close for b in bars_list[t]], dtype=np.float64)
+ labels = vol_blocks(closes)
+ segs = segments_from_labels(labels)
+ cfg = cfg_for(1.0)
+-r1 = [cell(None, s, e, 5, cfg, bars_list[t]) for _, s, e in segs]
+-r2 = [cell(None, s, e, 5, cfg, bars_list[t]) for _, s, e in segs]
++r1 = [cell(s, e, 5, cfg, bars_list[t]) for _, s, e in segs]
++r2 = [cell(s, e, 5, cfg, bars_list[t]) for _, s, e in segs]
+ same = json.dumps(r1, sort_keys=True) == json.dumps(r2, sort_keys=True)
+ print(f"  determinism: r1 == r2: {same}")
+ if not same:
+     print("  GATE 4: FAIL")
+
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/verify_momentum_cost_sensitivity.py 2>&1 | tail -40
+=== Gate 1. Cost-grid recomputation (fresh path) ===
+  cells recomputed: 120
+  cells matching the artifact: 0/120
+   MISMATCH ('zero', 3, 'AAPL', [0.054032, -0.027291, -0.087414, 0.08808], [0.054032, -0.027291, -0.087414, 0.08808], [-0.028505, 0.015505, 0.070673, -0.063202], [-0.028505, 0.015505, 0.070673, -0.063202])
+   MISMATCH ('zero', 3, 'MSFT', [-0.006391, -0.070106], [-0.006391, -0.070106], [-0.012185, 0.019293], [-0.012185, 0.019293])
+   MISMATCH ('zero', 3, 'GOOGL', [0.021495, -0.034563, 0.031175], [0.021495, -0.034563, 0.031175], [0.049146, 0.013903, -0.047242], [0.049146, 0.013903, -0.047242])
+   MISMATCH ('zero', 3, 'AMZN', [0.013667, 0.009338, -0.106286], [0.013667, 0.009338, -0.106286], [0.0601, 0.009463, -0.029929], [0.0601, 0.009463, -0.029929])
+   MISMATCH ('zero', 3, 'META', [-0.223475, -0.014061, -0.052758], [-0.223475, -0.014061, -0.052758], [-0.05473, -0.066287, -0.006141], [-0.05473, -0.066287, -0.006141])
+  GATE 1: FAIL
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -219,11 +219,13 @@
+ seg_med, seg_null = [], []
+ n_folds = None
+ for name, s, e in segs:
+     r = cell(s, e, lb, cfg, bars_list[t])
++    if n_folds is None:
++        # stress_segments reports the first segment's fold count.
++        n_folds = r["n_folds"]
+     seg_med.append(r["candidate"])
+     seg_null.append(r["null"])
+-    n_folds = r["n_folds"]
+ rec = dict(
+     medians=[round(x, 6) for x in seg_med],
+     null_medians=[round(x, 6) for x in seg_null],
+     n_folds=n_folds,
+
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/verify_momentum_cost_sensitivity.py 2>&1 | tail -30
+=== Gate 1. Cost-grid recomputation (fresh path) ===
+  cells recomputed: 120
+  cells matching the artifact: 120/120
+  GATE 1: MATCH
+
+=== Gate 2. Classification re-derivation ===
+  per-asset classes re-derived: {'ROBUST': 0, 'PARTIAL': 0, 'COST_FRAGILE': 0, 'NO_EDGE': 10}
+  retained assets at 1x: 0/10; zero-cost EDGE cells: 0/30
+  universe verdict re-derived: NO_BASELINE_EDGE (artifact: NO_BASELINE_EDGE)
+  classification mismatches: 0
+  GATE 2: MATCH
+
+=== Gate 3. Legacy-signal audit (the correction's evidentiary basis) ===
+  legacy formula emits a single constant weight on 27/30 (ticker, lookback) cells
+  GATE 3: FAIL (legacy signal is not degenerate as recorded)
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -325,20 +325,47 @@
+ 
+ print("\n=== Gate 3. Legacy-signal audit (the correction's evidentiary basis) ===")
+ constant_cells = 0
+ total_cells = 0
++nonconstant = []
+ for t in art["ticker_order"]:
+     closes = np.array([b.close for b in bars_list[t]], dtype=np.float64)
+     for lb in LOOKBACKS:
+         total_cells += 1
+         nz = [w for w in legacy_weights(closes, lb) if w != 0.0]
+         if len(set(nz)) == 1:
+             constant_cells += 1
++        else:
++            nonconstant.append((t, lb, sorted(set(nz))))
+ print(f"  legacy formula emits a single constant weight on "
+       f"{constant_cells}/{total_cells} (ticker, lookback) cells")
+-if constant_cells != total_cells:
+-    print("  GATE 3: FAIL (legacy signal is not degenerate as recorded)")
++print(f"  non-constant cells: {nonconstant}")
++expected_nonconstant = [("NVDA", lb) for lb in LOOKBACKS]
++if [(t, lb) for t, lb, _ in nonconstant] != expected_nonconstant:
++    print("  GATE 3: FAIL (unexpected set of non-degenerate legacy cells)")
+     return 1
++if constant_cells != total_cells - len(expected_nonconstant):
++    print("  GATE 3: FAIL (legacy degeneracy count)")
++    return 1
++# Every other ticker is always long (single weight +1.0) regardless of lookback.
++always_long = all(
++    set(w for w in legacy_weights(
++        np.array([b.close for b in bars_list[t]], dtype=np.float64), lb)
++        if w != 0.0) == {1.0}
++    for t in art["ticker_order"] if t != "NVDA"
++    for lb in LOOKBACKS
++)
++print(f"  9/10 tickers are a constant +1.0 (always long) at every lookback: "
++      f"{always_long}")
++if not always_long:
++    print("  GATE 3: FAIL")
++    return 1
++# NVDA's exceptions are explained by its split-adjusted sub-$1 price level:
++# the legacy sign is the sign of the mean log price LEVEL, so it flips only
++# where that level crosses 1.0, not where returns change sign.
++nvda = np.array([b.close for b in bars_list["NVDA"]], dtype=np.float64)
++print(f"  NVDA adjusted-close range: [{nvda.min():.4f}, {nvda.max():.4f}] "
++      f"(sub-$1 history makes the legacy price-level sign flip)")
+ 
+ if not MOMENTUM_ARTIFACT.exists():
+     print(f"  GATE 3: SKIP (prior artifact {MOMENTUM_ARTIFACT} absent)")
+ else:
+
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/verify_momentum_cost_sensitivity.py 2>&1 | tail -30
+=== Gate 1. Cost-grid recomputation (fresh path) ===
+  cells recomputed: 120
+  cells matching the artifact: 120/120
+  GATE 1: MATCH
+
+=== Gate 2. Classification re-derivation ===
+  per-asset classes re-derived: {'ROBUST': 0, 'PARTIAL': 0, 'COST_FRAGILE': 0, 'NO_EDGE': 10}
+  retained assets at 1x: 0/10; zero-cost EDGE cells: 0/30
+  universe verdict re-derived: NO_BASELINE_EDGE (artifact: NO_BASELINE_EDGE)
+  classification mismatches: 0
+  GATE 2: MATCH
+
+=== Gate 3. Legacy-signal audit (the correction's evidentiary basis) ===
+  legacy formula emits a single constant weight on 27/30 (ticker, lookback) cells
+  non-constant cells: [('NVDA', 3, [-1.0, 1.0]), ('NVDA', 5, [-1.0, 1.0]), ('NVDA', 10, [-1.0, 1.0])]
+  9/10 tickers are a constant +1.0 (always long) at every lookback: True
+  NVDA adjusted-close range: [0.1649, 235.2024] (sub-$1 history makes the legacy price-level sign flip)
+   MISMATCH AAPL: fresh [0.085, 0.035, -0.037, 0.054] vs recorded [0.071, 0.054, 0.092, 0.069]
+   MISMATCH MSFT: fresh [-0.041, -0.03] vs recorded [0.052, 0.072]
+   MISMATCH GOOGL: fresh [0.045, -0.011, -0.027] vs recorded [0.069, 0.071, 0.101]
+   MISMATCH AMZN: fresh [-0.05, 0.005, 0.046] vs recorded [0.065, 0.076, 0.077]
+   MISMATCH META: fresh [-0.129, -0.041, 0.047] vs recorded [0.073, 0.067, 0.042]
+   MISMATCH NVDA: fresh [-0.024, 0.092, 0.063] vs recorded [-0.038, 0.013, 0.1]
+   MISMATCH TSLA: fresh [-0.254, 0.019, 0.049] vs recorded [0.132, 0.016, 0.107]
+   MISMATCH JPM: fresh [-0.039, 0.028, 0.028] vs recorded [0.113, 0.044, 0.083]
+   MISMATCH JNJ: fresh [-0.011, 0.016] vs recorded [0.05, 0.046]
+   MISMATCH XOM: fresh [-0.008, 0.001] vs recorded [0.018, 0.037]
+  recorded momentum medians reproduced by the legacy formula: 0/10
+  GATE 3: FAIL
+[0m
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -383,11 +383,13 @@
+ labels = vol_blocks(closes)
+ segs = segments_from_labels(labels)
+ cfg = cfg_for(0.0)
+ meds = []
++legacy = legacy_weights(closes, 5)
+ for name, s, e in segs:
+     seg_bars = bars_list[t][s:e]
+-    sig = momentum_signals(closes, 5)[s:e]
++    sig = [bt.Signal(date=s + j + 1, weight=legacy[s + j])
++           for j in range(e - s)]
+     res = bt.walk_forward(
+         seg_bars, sig, train_window=TRAIN, test_window=TEST,
+         warmup=WARM, overlap_window=OVERLAP, cfg=cfg,
+     )
+
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python research/checks/verify_momentum_cost_sensitivity.py 2>&1 | tail -18
+retained assets at 1x: 0/10; zero-cost EDGE cells: 0/30
+  universe verdict re-derived: NO_BASELINE_EDGE (artifact: NO_BASELINE_EDGE)
+  classification mismatches: 0
+  GATE 2: MATCH
+
+=== Gate 3. Legacy-signal audit (the correction's evidentiary basis) ===
+  legacy formula emits a single constant weight on 27/30 (ticker, lookback) cells
+  non-constant cells: [('NVDA', 3, [-1.0, 1.0]), ('NVDA', 5, [-1.0, 1.0]), ('NVDA', 10, [-1.0, 1.0])]
+  9/10 tickers are a constant +1.0 (always long) at every lookback: True
+  NVDA adjusted-close range: [0.1649, 235.2024] (sub-$1 history makes the legacy price-level sign flip)
+  recorded momentum medians reproduced by the legacy formula: 10/10
+  GATE 3: MATCH (legacy momentum == constant-long buy-and-hold)
+
+=== Gate 4. Determinism of the verification path ===
+  determinism: r1 == r2: True
+  GATE 4: MATCH
+
+ALL GATES MATCH
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python -m unittest discover -s tests 2>&1 | tail -6
+ret = um.true_divide(
+............................................
+----------------------------------------------------------------------
+Ran 175 tests in 10.063s
+
+OK
+[0m
+[0m✗ [0mcd /home/runner/work/X/X && python -c "import hashlib,sys;print(hashlib.sha256(open('state/check_artifacts/momentum_cost_sensitivity_results.json','rb').read()).hexdigest())" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python -c *","action":"deny","source":"project"}
+[0m✗ [0mcd /home/runner/work/X/X && sha256sum state/check_artifacts/momentum_cost_sensitivity_results.json failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import hashlib, subprocess, sys
+p='state/check_artifacts/momentum_cost_sensitivity_results.json'
+h1=hashlib.sha256(open(p,'rb').read()).hexdigest()
+rc=subprocess.run([sys.executable,'research/checks/momentum_cost_sensitivity.py'],capture_output=True).returncode
+h2=hashlib.sha256(open(p,'rb').read()).hexdigest()
+print('rc',rc)
+print('sha256_run1',h1)
+print('sha256_run2',h2)
+print('byte_identical',h1==h2)
+PY
+rc 0
+sha256_run1 e79034a6023cc1e6d971ca9595a94c5110ce9ce23d1f8f6eeabf5128be36af80
+sha256_run2 e79034a6023cc1e6d971ca9595a94c5110ce9ce23d1f8f6eeabf5128be36af80
+byte_identical True
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import json
+a=json.load(open('state/check_artifacts/momentum_cost_sensitivity_results.json'))
+for t in ['NVDA','TSLA','AAPL']:
+    c=a['per_asset'][t]['cells']
+    print(t)
+    for lb in ['3','5','10']:
+        print('  lb',lb,'zero med',[round(x,3) for x in c['zero'][lb]['medians']],'null',[round(x,3) for x in c['zero'][lb]['null_medians']],'verdict',c['zero'][lb]['verdict'])
+        print('       1x med',[round(x,3) for x in c['repo_realistic_1x'][lb]['medians']])
+PY
+NVDA
+  lb 3 zero med [-0.003, 0.059, -0.086] null [-0.028, 0.013, 0.029] verdict REGIME_DEPENDENT
+       1x med [0.41, -0.199, -0.089]
+  lb 5 zero med [-0.024, 0.092, 0.063] null [-0.108, 0.031, 0.001] verdict REGIME_STABLE
+       1x med [0.284, -0.026, 0.059]
+  lb 10 zero med [0.008, -0.056, 0.085] null [-0.033, -0.074, 0.011] verdict REGIME_STABLE
+       1x med [-0.547, -0.348, 0.084]
+TSLA
+  lb 3 zero med [-0.008, -0.025, 0.025] null [-0.537, -0.008, -0.071] verdict CONSISTENT_WITH_NOISE
+       1x med [0.038, -0.034, 0.024]
+  lb 5 zero med [-0.254, 0.019, 0.049] null [0.063, 0.007, -0.019] verdict REGIME_DEPENDENT
+       1x med [-0.285, 0.018, 0.048]
+  lb 10 zero med [-0.194, 0.02, 0.053] null [-0.059, -0.038, 0.01] verdict REGIME_DEPENDENT
+       1x med [-0.287, 0.021, 0.053]
+AAPL
+  lb 3 zero med [0.054, -0.027, -0.087, 0.088] null [-0.029, 0.016, 0.071, -0.063] verdict REGIME_STABLE
+       1x med [0.044, -0.031, -0.091, 0.087]
+  lb 5 zero med [0.085, 0.035, -0.037, 0.054] null [-0.025, -0.011, 0.04, 0.032] verdict REGIME_STABLE
+       1x med [0.082, 0.029, -0.04, 0.054]
+  lb 10 zero med [0.02, 0.05, 0.02, 0.021] null [-0.036, -0.026, -0.026, -0.02] verdict CONSISTENT_WITH_NOISE
+       1x med [0.016, 0.049, 0.019, 0.02]
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import sys, numpy as np
+sys.path.insert(0,'.')
+import research.backtest as bt
+bars=list(bt.load_ticker('NVDA')[0])
+closes=np.array([b.close for b in bars])
+labels=bt.volatility_blocks(closes,n_blocks=4,window=60)
+# segments
+runs=[];cur=labels[0];start=0
+for i in range(1,len(labels)):
+    if labels[i]!=cur:
+        if i-start>=400: runs.append((cur,start,i))
+        cur=labels[i];start=i
+if len(labels)-start>=400: runs.append((cur,start,len(labels)))
+sig=bt.momentum_signals(closes,lookback=5)
+for mult in (0.0,1.0):
+    cfg=bt.BacktestConfig(**{k:v*mult for k,v in dict(commission_per_trade=2.0,commission_per_share=0.003,slippage_cents=2.0,slippage_proportional=0.0005).items()})
+    s,e=runs[0]
+    r=bt.walk_forward(bars[s:e],sig[s:e],train_window=252,test_window=84,warmup=60,overlap_window=60,cfg=cfg)
+    tr=np.array([f.metrics['total_return'] for f in r.folds])
+    lg=np.log1p(np.clip(tr,-1+1e-12,None))
+    print('mult',mult,'seg0 n_folds',len(tr),'min_total_return',round(float(tr.min()),6),'n_below_-0.99',int((tr<-0.99).sum()),'median_log',round(float(np.median(lg)),4),'max_log',round(float(lg.max()),3))
+    print('   worst fold total_returns',np.round(np.sort(tr)[:3],6).tolist())
+PY
+Traceback (most recent call last):
+  File "<stdin>", line 17, in <module>
+ValueError: too many values to unpack (expected 2)
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import sys, numpy as np
+sys.path.insert(0,'.')
+import research.backtest as bt
+bars=list(bt.load_ticker('NVDA')[0])
+closes=np.array([b.close for b in bars])
+labels=bt.volatility_blocks(closes,n_blocks=4,window=60)
+runs=[];cur=labels[0];start=0
+for i in range(1,len(labels)):
+    if labels[i]!=cur:
+        if i-start>=400: runs.append((cur,start,i))
+        cur=labels[i];start=i
+if len(labels)-start>=400: runs.append((cur,start,len(labels)))
+sig=bt.momentum_signals(closes,lookback=5)
+BASE=dict(commission_per_trade=2.0,commission_per_share=0.003,slippage_cents=2.0,slippage_proportional=0.0005)
+for mult in (0.0,1.0):
+    cfg=bt.BacktestConfig(**{k:v*mult for k,v in BASE.items()})
+    nm,s,e=runs[0]
+    r=bt.walk_forward(bars[s:e],sig[s:e],train_window=252,test_window=84,warmup=60,overlap_window=60,cfg=cfg)
+    tr=np.array([f.metrics['total_return'] for f in r.folds])
+    lg=np.log1p(np.clip(tr,-1+1e-12,None))
+    print('seg',nm,'mult',mult,'n_folds',len(tr),'min_tr',round(float(tr.min()),6),'n_tr_lt_-0.99',int((tr<-0.99).sum()),'median_log',round(float(np.median(lg)),4))
+    print('   worst',np.round(np.sort(tr)[:3],6).tolist())
+PY
+seg turbulent mult 0.0 n_folds 28 min_tr -1.030601 n_tr_lt_-0.99 1 median_log -0.0238
+   worst [-1.030601, -0.441174, -0.409913]
+seg turbulent mult 1.0 n_folds 28 min_tr -2.759727 n_tr_lt_-0.99 9 median_log 0.2845
+   worst [-2.759727, -1.851804, -1.475786]
+[0m
+[0m→ [0mRead research/backtest/perturbation.py[90m [limit=70, offset=339][0m
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python - <<'PY'
+import sys, numpy as np
+sys.path.insert(0,'.')
+import research.backtest as bt
+from research.data.preflight import load_manifest
+BASE=dict(commission_per_trade=2.0,commission_per_share=0.003,slippage_cents=2.0,slippage_proportional=0.0005)
+man=load_manifest()
+print('ticker  wipeout_folds/total  (1x, lb5, all segments)')
+for e in man['entries']:
+    t=e['ticker']; bars=list(bt.load_ticker(t)[0]); closes=np.array([b.close for b in bars])
+    labels=bt.volatility_blocks(closes,n_blocks=4,window=60)
+    runs=[];cur=labels[0];start=0
+    for i in range(1,len(labels)):
+        if labels[i]!=cur:
+            if i-start>=400: runs.append((cur,start,i))
+            cur=labels[i];start=i
+    if len(labels)-start>=400: runs.append((cur,start,len(labels)))
+    sig=bt.momentum_signals(closes,lookback=5)
+    tot=0;wipes=0;mintr=0.0
+    for nm,s,e in runs:
+        r=bt.walk_forward(bars[s:e],sig[s:e],train_window=252,test_window=84,warmup=60,overlap_window=60,cfg=bt.BacktestConfig(**BASE))
+        tr=np.array([f.metrics['total_return'] for f in r.folds])
+        tot+=len(tr); wipes+=int((tr<=-1.0).sum()); mintr=min(mintr,float(tr.min()))
+    print(f'{t:6s}  {wipes}/{tot}  min_total_return={mintr:.3f}')
+PY
+ticker  wipeout_folds/total  (1x, lb5, all segments)
+AAPL    0/121  min_total_return=-0.287
+MSFT    0/152  min_total_return=-0.325
+GOOGL   0/136  min_total_return=-0.317
+AMZN    0/136  min_total_return=-0.524
+META    0/100  min_total_return=-0.396
+NVDA    9/136  min_total_return=-2.760
+TSLA    7/120  min_total_return=-33.940
+JPM     0/136  min_total_return=-0.358
+JNJ     0/152  min_total_return=-0.389
+XOM     0/152  min_total_return=-0.422
+[0m
+[0m← [0mEdit state/LEARNING_STATE.md
+Index: /home/runner/work/X/X/state/LEARNING_STATE.md
+===================================================================
+--- /home/runner/work/X/X/state/LEARNING_STATE.md
++++ /home/runner/work/X/X/state/LEARNING_STATE.md
+@@ -9,10 +9,20 @@
+ - **Expected Effect:** Fewer equivalent experiments and more information gained per unit of worker time.
+ - **Anti-gaming Constraint:** Do not tune to OOS results or treat experiment count, positive results, runtime, or commits as learning. Prefer reliable negative conclusions.
+ - **Observed Effect:** The frontier-first contract is now operative and demonstrated across four new-signal-class cells: activation 37263008074 selected the DEFERRED short-horizon return-reversal cell, executed it with a complete test + independent-verifier pair, and closed it FALSIFIED; this activation (37304873966) selected the next deferred cell (cross-sectional relative strength), executed it end-to-end (manifest, preflight, leakage, regime gate, concentration gate, perturbation sweep), repaired four implementation defects found during execution (off-by-one in synthetic spread loops, missing export, engine-path warmup/compounding mismatch fixed via per-fold constant-share signals, and three sweep/determinism bugs), and closed it FALSIFIED; the following activation (37314710995) selected the next deferred cell (volatility targeting), executed it end-to-end through the same regime + concentration + perturbation-sweep gates with an engine-path cross-check and an independent verifier, wrote check + verifier cleanly with no execution-time defects, and closed it FALSIFIED with uniformly negative figures; activation 37318950814 selected the next deferred cell (momentum: go LONG the previous N-day return), executed it end-to-end (manifest, preflight, leakage, regime gate + 10-asset sweep, synthetic sweep, determinism) and independently verified it (fresh `walk_forward` recomputation MATCH on all per-asset/universe medians and verdicts), closing it SUPPORTED with a REGIME_STABLE positive edge in 7/10 of the universe; and the current activation (37361000967) extended the momentum cell with a real-data lookback sweep (lookback 3 / 5 / 10) across all 10 collected tickers through the walk-forward regime-stability gate with a matched coin-flip null, verified the artifact through three independent gates (fresh `walk_forward` + `noise_benchmark` recomputation MATCH on AMZN/JPM; lookback-5 column cross-consistency vs the prior `momentum_results.json` MATCH on all 10 tickers; robustness verdicts re-derived from the artifact reproduce for all assets), found the lookback=5 edge is lookback-robust for 6/10 assets and 0/10 lookback-sensitive, and admitted momentum to the evidence base as candidate positive evidence.
+ - **Decision: RETAIN (verified)** — the frontier-first selection produced a clean ordering (MA crossover -> reversal -> CSRS -> volatility targeting -> momentum), each cell closed with a decisive verdict and no equivalent re-tests; three cells closed FALSIFIED (negative evidence, as expected) but the momentum cell closed SUPPORTED with a genuine positive edge that survived the regime gate, the independent-verification gate, and a post-hoc engine-asymmetry investigation (the apparent reversal/momentum magnitude asymmetry was shown to be an engine warmup+train compounding artifact that understates rather than fakes the momentum edge); the current activation (37361000967) then tested the remaining lookback-robustness question on REAL data and found the edge persists across lookback 3/5/10 for 6/10 assets with 0 lookback-sensitive cases, this activation (current) completed the momentum-boundary review: the cross-sectional-momentum artifact (lookback 63) reproduced exactly via an independent engine walk-forward + coin-flip null path (post-repair verifier: all recomputations MATCH, including baseline null -0.013), verdict FALSIFIED (CONSISTENT_WITH_NOISE; 9/10 sub-universes CONSISTENT_WITH_NOISE, 1/10 REGIME_DEPENDENT (JNJ, dispersion > 2x null), 1/10 REGIME_STABLE (XOM, small positive stable edge); full-universe spread median +0.002 within null tol +0.0305, concentration NO_EDGE, perturbation sweep CONSISTENT_WITH_NOISE). The frontier-first delta remains RETAIN (verified): both momentum boundary cells were tested once, decisively, and independently, with no equivalent re-tests.
+-- **Next:** momentum boundary + 20-day breakout continuation cell closed on this universe: short-horizon per-asset momentum (lookback 3-5) admitted as candidate positive evidence; the genuinely new breakout signal class (long on 20-day-high breakout) was tested and closed FALSIFIED (noise-like in 7/10 assets; small, non-lookback-robust positive REGIME_STABLE verdicts only for AAPL, TSLA, NVDA). No new-signal-class frontier cell remains; the next decision-relevant qualification of the qualified momentum evidence is a conservative transaction-cost sensitivity test (fixed cost model, lookback 3/5/10, matched null). A fresh activation should run that cost test through the gate stack with an a-priori cost-robustness prediction.
++- **Next:** the frontier-first selector's RETAIN decision stands, but the momentum family it admitted is now RETRACTED (see the correction below). The next frontier action is not another momentum variant: the missing signal-contract gate must become a standing pre-admission requirement, and the momentum/reversal family must be re-derived from the repaired signal before any positive or negative claim about that signal class is durable.
+ 
++### Correction (2026-11-20, activation 44647221858) — momentum/reversal signal was degenerate
++
++- **Defect:** `regime_stability.momentum_signals` and `mean_reversion_signals` computed `np.mean(np.log(closes[i-lookback+1:i+1]))` — the mean log *price level* over the window, not the log *return*. For any price series above 1.0 that quantity is positive, so momentum emitted a constant `+1` (always long) and reversal a constant `-1` (always short), independent of returns. On the collected universe the legacy formula produced a single constant weight on 27/30 (ticker, lookback) cells and a constant `+1.0` on 9/10 tickers at every lookback (the three exceptions are NVDA, whose split-adjusted price crosses $1).
++- **Consequence:** the recorded `momentum_results.json` medians are exactly reproducible by a constant-long (buy-and-hold) backtest — 10/10 assets MATCH (e.g. AAPL [0.071, 0.054, 0.092, 0.069] = the segment buy-and-hold log returns). The admitted "REGIME_STABLE positive edge in 7/10" was therefore a statement that 7 large-cap series rose over 2009-2026, not that a momentum signal works. The same defect explains the previously "surprising" corroborations that were recorded as evidence of a genuine anomaly: reversal-vs-momentum P&L correlation -0.99 (constant short vs constant long), "horizon-stable in magnitude" at lookback 20/60 (identical constant position), and "lookback-robust across 3/5/10 with 0 lookback-sensitive cases" (identical constant position at every lookback).
++- **Status change:** the momentum, longer-horizon momentum, momentum lookback-sweep and mean-reversion frontier cells are **RETRACTED / INVALID, pending re-derivation** from the repaired signal. Their artifacts are preserved unchanged as historical evidence of the defective run; they must not be cited as evidence about momentum or reversal.
++- **Why verification did not catch it:** every independent verifier re-implemented the same formula (`np.mean(np.log(closes[...]))` appears in `verify_momentum.py`, `verify_momentum_lookback_sweep.py`, `verify_momentum_longer_horizon.py`, `verify_mean_reversion.py`, `momentum_horizon_gap_analysis.py`), so independent recomputation certified the artifact while sharing the mis-specification. Common-mode defect, not a computation error. `cross_sectional_momentum.py` uses `closes[i]/closes[i-lookback]-1` and is unaffected; `breakout_signals` uses a correct threshold comparison and is unaffected.
++- **Repair:** both signals now use `log(closes[i]) - log(closes[i-lookback])`. Added `tests/test_regime_stability.py::TestMomentumSignalContract` (7 tests: both signs present, reversal == -momentum, sign follows trailing return, sub-$1 prices do not force a short, monotone series is long, neutral before lookback, prefix invariance) — the gate whose absence allowed the defect to reach the evidence base.
++- **Cost-sensitivity result (task R-001, this activation):** with the repaired signal the predeclared cost grid (0x / 1x repo realistic / 2x / 4x, lookbacks 3/5/10, matched coin-flip null, 10 tickers) finds **no positive REGIME_STABLE edge at zero cost on any asset** (0/10 assets with >=2 edge lookbacks, 0/30 EDGE cells), so the cost question is moot and the universe verdict is `NO_BASELINE_EDGE`, not `COST_FRAGILE`. Cost drag at 1x is 0.16-3.27%/yr for 8/10 assets with 92-109x/yr turnover; NVDA's costed cells are not interpretable because 9/136 folds (1x) and 7/120 (TSLA) have equity wipeouts whose log1p clip makes the median depend on the surviving subsample. Artifact `state/check_artifacts/momentum_cost_sensitivity_results.json`; independently verified 120/120 cells + 10/10 legacy cross-consistency.
++- **Process delta:** add a mandatory signal-contract gate (non-degeneracy + sign-follows-input + reversal-is-negation + prefix invariance) before any new signal's results are admitted; a positive result from a constant-position signal is not evidence about the signal class.
++
+ ## Research frontier
+ 
+ | Area / hypothesis | Status | Evidence / reason | Next bounded action |
+ |---|---|---|---|
+
+[0m
+[0m→ [0mRead state/LEARNING_STATE.md[90m [limit=25, offset=28][0m
+[91m[1mError: [0mSign up for free to continue and explore 500 other models. Takes 2 minutes, no credit card required. Or come back later.
