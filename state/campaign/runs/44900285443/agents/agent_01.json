@@ -1,0 +1,68 @@
+{
+  "agent_number": 1,
+  "campaign_slot": 1,
+  "global_agent_number": 1,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-001",
+  "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+  "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+  "question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+  "action": "Audited the durable record without changing any process mechanism: read state/LEARNING_STATE.md (frontier, learning history, delta decision), state/STATE.md section index, all five logs/ACTIVATION-*.md activation records, state/campaign/task_queue.json and runs/44900285443/task_queue_initial.json, campaign_status.json, current_task.json, state/activation_status.json, and the selector source .github/scripts/campaign_controller.py (task_rank, candidate_tasks_for_role, select_task, validate_task) plus .github/scripts/validate_campaign_agent.py. Hand-recomputed the selector's ordinal ranking from the durable queue values and compared it with the recorded selection_basis.compared_against. No process mechanism was redesigned and no numeric score was introduced.",
+  "changed": [
+    "state/campaign/runs/44900285443/agents/agent_01.json (new: this durable agent record)",
+    "logs/ACTIVATION-2026-11-21.md (new: human-readable activation record)",
+    "state/worker_progress.md (phase and verified-milestone checkpoint)"
+  ],
+  "verified": [
+    "Selector mechanism (inspection of .github/scripts/campaign_controller.py:206-218): task_rank is a 7-key lexicographic ordinal sort over expected_information_gain, downstream_leverage, falsification_power, verifiability, then effort, complexity, execution_risk, with task_id as the final tie-break; candidate_tasks_for_role filters to role==LEARNING_PROCESS and status==OPEN and sorts by that key; the module docstring confirms no numeric reward score.",
+    "Ranking recomputed by hand from state/campaign/task_queue.json: P-001 is the unique minimum at (HIGH, HIGH, HIGH, HIGH, LOW, LOW, LOW); P-002 and P-004 rank next because falsification_power is MEDIUM; P-003 and P-006 tie at (MEDIUM, HIGH, HIGH, HIGH, LOW, LOW, LOW) and are ordered by task_id; P-005 ranks last. The recorded selection of P-001 therefore required no tie-break, and the only tie in the OPEN set is at positions 4-5, immaterial to this selection.",
+    "Contract consistency: selection_basis.compared_against = [P-001, P-002, P-004, P-003, P-006] exactly equals candidates[:5] produced by that ordering, so the durable contract, the current controller code, and the current queue values are mutually consistent.",
+    "Opportunistic-selection era (logs/ACTIVATION-2026-10-05.md): three executed research activations (00:13 per-asset t-statistic, 02:21 regime-dependence deep-dive, 03:45 regime-adaptive MA = 37260572520) each took their objective from the linear STATE.md 'Next activation' list, and all three stayed inside the single MA-crossover class. LEARNING_STATE.md lines 51-52 record 37260572520 and 37261348530 as UNVERIFIED process deltas (queued-receipt objective; execution blocked).",
+    "Frontier-first selection era (LEARNING_STATE.md frontier table plus learning-history rows and logs): seven logged activations (37263008074, 37304873966, 37314710995, 37318950814, 37361000967, 37394344201, 37414038601) each selected a distinct frontier cell and closed it with a decisive verdict and an independent-verification MATCH — five signal-class cells (reversal, cross-sectional relative strength, volatility targeting, momentum, 20-day breakout) plus two momentum qualifications; an eighth frontier-first activation (cross-sectional momentum, activation id not recorded in logs or STATE.md) closed a sixth signal class per LEARNING_STATE.md line 34 and its artifact; no equivalent re-test is recorded for any closed cell.",
+    "Counter-evidence preserved (not erased): three of those seven frontier-first activations (37318950814, 37361000967, 37394344201) stayed inside the momentum family, which is the 'repeatedly refining the most interesting recent result' pattern that LEARNING_EFFICIENCY.md section 1 warns against.",
+    "Confound identified and preserved: 37260572520's own NEXT action declared the MA-crossover hypothesis space exhausted and prescribed a new signal class, so class exhaustion, not selection alone, explains part of the shift from one class to six cells.",
+    "Durable-state record-completeness gap verified: activation 37394344201 and the cross-sectional-momentum activation (artifact state/check_artifacts/cross_sectional_momentum_results.json, lookback 63, concentration NO_EDGE) have LEARNING_STATE rows but no 'Current activation' section in state/STATE.md and no logs/ entry, so those two activations are not reconstructible from the human-readable activation records.",
+    "Durable-state inconsistency preserved: LEARNING_STATE.md line 12 records the frontier-first delta as 'Decision: RETAIN (verified)' while line 57 records activation 37318950814's per-activation process decision as 'UNVERIFIED (process delta)'."
+  ],
+  "unverified": [
+    "No post-selection outcome exists for the current controller selector: campaign_status.json records exactly one selection (selection_history length 1) and no completed downstream agent, so the selector's effect on information flow cannot be measured from this campaign.",
+    "No evidence-isolated comparison of selector versus opportunistic choice exists anywhere in the durable record; all five activation logs, STATE.md and LEARNING_STATE.md were read and no activation holds infrastructure, execution availability and signal-class scope constant across both selection modes. The comparison is therefore observational, not controlled.",
+    "Execution and verification limits: bash is denied at this layer, so select_task was not executed and the regression suite was not run; the ranking result above was obtained by inspection of the durable queue values and the controller source, and no controller-side validation of this record was run by the agent.",
+    "Finish time is not captured: the `date` shell form is denied in this environment; activation start is anchored to the observed environment message time 2026-11-21T11:42:20Z."
+  ],
+  "observed_effect": "The audit converts an implicit assumption ('the selector picks the highest-value task') into a verified mechanism statement plus a measured evidence gap: the selector is deterministic, role-aware, contract-bound and uniquely top-ranked, yet no durable evidence isolates its efficiency effect. It also surfaces two concrete durable-state defects that a later agent can act on: missing per-activation records for two activations and contradictory process decisions for the frontier-first delta.",
+  "uncertainty_targeted": "Whether explicit highest-value focused-task selection produces better information flow than the repository's prior opportunistic queue-following.",
+  "uncertainty_reduced": "Reduced: the selector's actual ranking behaviour is now verified from source plus durable queue values (unique top-ranked P-001, compared_against consistent with candidates[:5], single immaterial tie at positions 4-5), and the absence of any isolating comparison in the durable record is verified exhaustively. Not reduced: the causal effect of selection on information flow, because the only completed comparison (opportunistic versus frontier-first) confounds selection with class exhaustion and with the durable frontier's closure accounting.",
+  "process_decision": "RETAIN",
+  "research_result": "NO_MARKET_RESEARCH - process audit only. Hypothesis 'the current focused-task selector improves learning efficiency relative to prior opportunistic task choice' is NOT DEMONSTRATED by durable evidence. Verified positives: the selector is deterministic, role-aware, contract-bound and uniquely ranked at the top; the frontier-first selection discipline it implements coincides with seven logged activations closing five signal classes plus two momentum qualifications, and an eighth unlogged activation closing a sixth class, each with independent verification and no equivalent re-test, against three executed opportunistic activations that all remained inside one exhausted class. Verified negatives: no evidence-isolated comparison exists in the durable record; the controller selector has one selection and no outcome; class exhaustion and the frontier's closure accounting are uncontrolled alternative explanations; three of seven frontier-first activations re-entered the momentum family. Conclusion: retain the selector unchanged (no evidence of harm, verified structural guarantees, redesign out of scope) and record the measurement gap rather than claiming an efficiency gain.",
+  "decision": "VERIFIED_NEGATIVE_RESULT",
+  "next": "In campaign slot 03, write one pre-declared non-numeric measurement rule (decisive frontier cells closed per activation and equivalent re-tests per activation, computed from durable agent records) so a later synthesis can test the selector's efficiency claim without a reward score.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-007",
+      "role": "LEARNING_PROCESS",
+      "status": "OPEN",
+      "primary_question": "Can the selector's efficiency claim be measured from durable agent records without introducing a numeric reward score?",
+      "bottleneck": "The selector's efficiency advantage is asserted from a single selection with no post-selection outcome and no isolating comparison against opportunistic choice.",
+      "objective": "Define and durably record one pre-declared, non-numeric measurement rule (decisive frontier cells closed per activation and equivalent re-tests per activation) that is computable from existing agent records, without changing the selector.",
+      "scope": "Use durable agent records, LEARNING_STATE learning-history rows and campaign_status.json only; declare the rule and leave it uncomputed for a later campaign.",
+      "out_of_scope": "Do not change campaign_controller.py, do not add a numeric reward score, do not re-run historical experiments, and do not evaluate the current campaign outcome.",
+      "deliverable": "One durable measurement rule appended to state/LEARNING_STATE.md that a later synthesis can apply unchanged.",
+      "success_criterion": "The rule is explicit, computable from named existing durable fields, and contains no numeric reward score.",
+      "stop_condition": "Stop once the rule is written and shown to be computable from the named durable fields.",
+      "verification_requirement": "Controller-side schema validation plus manual recomputation of the rule on one completed agent record.",
+      "evidence_basis": "agent_01.json for run 44900285443 verifies that the selector has one selection with no outcome and that no isolating comparison exists in the durable record.",
+      "expected_information_gain": "HIGH",
+      "downstream_leverage": "HIGH",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "effort": "LOW",
+      "complexity": "LOW",
+      "execution_risk": "LOW",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "NONE - no new mechanism, controller change, or numeric score; the only durable additions are this record, one activation log, and a progress checkpoint.",
+  "failure_class": "NONE",
+  "task_selection_observation": "UNCHANGED"
+}
