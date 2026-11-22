@@ -1,0 +1,107 @@
+{
+  "agent_number": 3,
+  "bottleneck": "Research efficiency depends on preserving negative evidence strongly enough to redirect search.",
+  "campaign_slot": 3,
+  "deliverable": "A retain/reject/unverified process decision with concrete duplicate-avoidance evidence.",
+  "evidence_basis": "LEARNING_EFFICIENCY already calls for a novelty guard and recent research cells were closed as FALSIFIED/TESTED.",
+  "global_agent_number": 3,
+  "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
+  "out_of_scope": "Do not rerun historical experiments or add broad metadata systems.",
+  "preceding_agent": {
+    "action": "Wrote and ran a bounded, predeclared cost-sensitivity check (research/checks/momentum_cost_sensitivity.py) over lookback 3/5/10 x cost grid {zero, base (the repository's existing realistic cost model from examples/ma_crossover_real_data.py: commission_per_trade=2.0, commission_per_share=0.003, slippage_cents=2.0, slippage_proportional=0.0005), stress2x} on the existing 10-asset collected universe via the existing stress_segments momentum + regime-stability + coin-flip-null machinery; added a 4-gate independent verifier (research/checks/verify_momentum_cost_sensitivity.py) and a scratch cost-application probe (state/check_smoke/cost_probe.py). No signal rule was tuned after seeing cost results, the universe was not expanded, and no leverage was introduced (target_exposure stays 1.0).",
+    "agent_number": 2,
+    "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+    "campaign_slot": 2,
+    "candidate_tasks": [
+      {
+        "bottleneck": "The framework's coin-flip null is turnover-asymmetric (discrete {-1,0,+1} jumps), so under costs it collapses and the candidate-minus-null gap widens as an artifact; the R-001 cost-robustness verdict is certified only on the candidate's own medians, not against a fair cost-matched null.",
+        "complexity": "MEDIUM",
+        "deliverable": "A reproducible artifact and independent verification classifying whether the momentum edge survives a cost-matched null.",
+        "downstream_leverage": "HIGH",
+        "effort": "MEDIUM",
+        "evidence_basis": "R-001 result: candidate max |median change| 0.001 base / 0.002 stress2x and all edge assets positive, but null/candidate commission ratio ~29x and AMZN null total_return -0.209 at 2x cost; artifact state/check_artifacts/momentum_cost_sensitivity_results.json.",
+        "execution_risk": "MEDIUM",
+        "expected_information_gain": "HIGH",
+        "falsification_power": "HIGH",
+        "objective": "Build one turnover-matched null (same trade timing and size as the momentum candidate, randomized direction) and re-evaluate the lookback 3/5/10 momentum edge under the existing realistic cost model with independent verification.",
+        "out_of_scope": "Do not tune signal rules after seeing results, expand the universe, introduce leverage, or change the cost model.",
+        "primary_question": "Does the short-horizon momentum edge remain a positive edge under a turnover-matched (direction-randomized) null when the existing realistic transaction costs are applied?",
+        "role": "HIGHER_ORDER_OBJECTIVE",
+        "scope": "Existing 10-asset collected universe, existing engine and stress_segments/walk_forward machinery, one turnover-matched null, predeclared cost grid.",
+        "status": "OPEN",
+        "stop_condition": "Stop after the turnover-matched null is evaluated for lookbacks 3/5/10 and independently checked.",
+        "success_criterion": "The edge is classified robust/fragile against a turnover-matched cost null, with the result independently verified regardless of sign.",
+        "task_id": "R-006",
+        "tests_preceding_process": true,
+        "verifiability": "HIGH",
+        "verification_requirement": "Leakage gate, turnover-matched null, independent recomputation, determinism, regression suite."
+      }
+    ],
+    "changed": [
+      "research/checks/momentum_cost_sensitivity.py (new bounded cost-sensitivity check; predeclared lookback x cost grid; candidate-absolute cost-robustness classification + turnover-asymmetry diagnostic)",
+      "research/checks/verify_momentum_cost_sensitivity.py (new independent verifier: zero-cost cross-consistency, fresh cost recomputation, cost-application sanity, classification reproducibility + determinism)",
+      "state/check_artifacts/momentum_cost_sensitivity_results.json (new reproducible artifact)",
+      "state/check_smoke/cost_probe.py (scratch diagnostic confirming costs are charged to the candidate and the null's turnover asymmetry)",
+      "state/campaign/runs/44980089799/agents/agent_02.json (this record)",
+      "state/worker_progress.md (agent_02 milestone update)"
+    ],
+    "complexity_added": "LOW",
+    "decision": "RETAIN",
+    "failure_class": "NONE",
+    "global_agent_number": 2,
+    "next": "At the next HIGHER_ORDER_OBJECTIVE activation, implement and independently verify a turnover-matched (direction-randomized, same trade timing/size) null for lookback 3/5/10 momentum under the existing realistic cost model, so cost robustness is certified against a cost-matched null rather than the cost-unfair coin-flip null.",
+    "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+    "observed_effect": "COST-ROBUSTNESS CLASSIFIED AND INDEPENDENTLY VERIFIED, WITH ONE DECISION-RELEVANT METHODOLOGY DEFECT EXPOSED. Activation start (environment-provided): 2026-11-22T03:24:59Z. (1) Candidate absolute cost trajectory: across the predeclared grid (zero / base realistic / 2x stress) and lookbacks 3/5/10 on the 10-asset universe, the momentum candidate's per-segment median log returns move by at most 0.001 (base) and 0.002 (2x) - far inside the predeclared 0.005 flatness tolerance - and every zero-cost positive REGIME_STABLE edge asset (6 at lookback 3 and 5: AAPL, MSFT, GOOGL, AMZN, META, TSLA; 5 at lookback 10: MSFT, GOOGL, AMZN, META, TSLA) remains strictly positive at both base and 2x cost. Classification: COST_ROBUST for all three lookbacks. (2) Mechanism: the constant-dollar daily-rebalance implementation generates small trades when the momentum sign does not flip, so the candidate's commission is tiny relative to its edge (AMZN: ~$21k commission at base cost vs a +554% full-sample return; per-fold cost ~0.0004-0.0008, below the 3-decimal reporting resolution). Direct probe confirms costs ARE charged (AMZN total_return 5.5373 -> 5.5184 -> 5.4995 for zero -> base -> stress2x). (3) The repository's matched coin-flip null is NOT a valid cost benchmark: its discrete {-1,0,+1} position jumps trade far larger notional than the momentum signal's small rebalance trades, so the null pays ~26-29x the candidate's commission (AMZN null commission $599,705 vs candidate $21,055 at base; null total_return goes from +0.99 at zero cost to -0.21 at 2x). Consequently the framework's candidate-minus-null gap WIDENING under costs (e.g. lookback 5: +0.066 -> +0.070 -> +0.078) is an artifact of null turnover, not evidence of robustness, and the framework edge-count preservation (6/6/6 at lookbacks 3 and 5; 5/6/6 at lookback 10) must not be read as cost-robustness evidence. (4) Verification: 4 independent gates PASS (zero-cost column reproduces the prior momentum_lookback_sweep_results.json exactly for all 10 tickers x 3 lookbacks; fresh walk_forward + noise_benchmark recomputation of AMZN/JPM at base and stress2x MATCH; cost-application sanity monotone with null/candidate commission 28.5x/30.8x; classification re-derived == published, determinism True) and the full regression suite passes (168 tests). (5) Effect on the learning process: this is the first controller-selected research activation to complete in run 44980089799, so it supplies the outcome-side data point agent_01 said was missing; the selected task was decision-relevant and additionally surfaced a reusable methodology defect (cost-unfair null). Whether that reflects the selector mechanism rather than the task's intrinsic value is not attributable from one cycle, so the selector remains UNVERIFIED. (6) Net uncertainty change: the question 'does the short-horizon momentum edge survive conservative transaction costs' is answered YES in absolute candidate terms for lookback 3/5/10; the remaining open question is whether it survives a fair, turnover-matched cost null (recorded as candidate task R-006).",
+    "process_decision": "UNVERIFIED",
+    "question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+    "research_result": "Cost-robustness classification: COST_ROBUST (verified). The short-horizon momentum edge survives the repository's existing realistic transaction-cost model and a 2x conservative stress for lookback 3/5/10 on the collected 10-asset universe: the candidate's per-segment median log returns move by at most 0.001 (base) / 0.002 (2x) and every zero-cost positive REGIME_STABLE edge asset (6 at lookback 3/5, 5 at lookback 10) stays positive. The absolute robustness arises because the constant-dollar daily rebalance generates small trades (candidate commission ~$21k on $1M vs a +554% full-sample return). Critical methodological qualification: the repository's matched coin-flip null is turnover-asymmetric (its discrete {-1,0,+1} jumps pay ~29x the candidate's commission and turn negative at 2x cost), so the framework's candidate-minus-null comparison is confounded under costs and its edge-count preservation (6/6/6 and 5/6/6) is NOT valid cost-robustness evidence; a turnover-matched null is required to certify the edge against a fair cost-matched null. Independently verified (4 gates) and reproducible; no signal tuning, universe expansion, or leverage.",
+    "role": "HIGHER_ORDER_OBJECTIVE",
+    "task_id": "R-001",
+    "task_selection_observation": "UNVERIFIED",
+    "uncertainty_reduced": "Reduced. Verified and recorded: (a) the candidate's per-segment median log returns are essentially unchanged by the repository's realistic cost model and by 2x that cost (max |change| 0.001 base, 0.002 stress2x, all <= 0.005 tol) and every zero-cost edge asset remains positive at both cost levels for lookbacks 3/5/10 -> COST_ROBUST in absolute terms; (b) the coin-flip null is cost-unfair (pays ~26-29x the candidate's commission; goes negative at 2x cost), so the framework's candidate-minus-null comparison is confounded under costs and its edge-count preservation is not valid cost-robustness evidence; (c) independent verification (4 gates) and the 168-test regression suite pass. Not reduced: whether a turnover-matched null confirms the edge net of a fair null; borrow/financing costs (engine margin_rate=0); implementability of the low-turnover daily rebalance.",
+    "uncertainty_targeted": "Whether the short-horizon momentum edge survives conservative transaction-cost stress on the collected real-data universe (lookback 3/5/10), and whether the repository's matched coin-flip null is a valid cost benchmark.",
+    "unverified": [
+      "Whether a turnover-matched (direction-randomized) null would confirm the momentum edge net of a fair cost-matched null is UNVERIFIED: the repository's coin-flip null is cost-unfair, so cost robustness here is certified only on the candidate's own absolute per-segment medians, not against a cost-matched null",
+      "Borrow/financing costs on the short leg are not modeled (engine margin_rate=0); the cost model covers commissions + slippage only, so the cost-robustness result is conditional on zero financing cost",
+      "Whether the low turnover (small constant-dollar rebalance trades) is implementable in practice (daily rebalance vs periodic rebalance) is not tested",
+      "The candidate's zero-cost medians reproduce the prior lookback-sweep artifact, but that artifact shows identical candidate medians across lookbacks 3/5/10 for some assets (e.g. AAPL); this was accepted via the cross-consistency gate but not independently re-derived beyond it",
+      "No controller-side schema validation of this record was run inside this session; the controller validates post-session",
+      "This activation did not modify logs/, state/STATE.md, or state/LEARNING_STATE.md; log/record-integrity repair is governed by the separate P-008 task",
+      "Activation finish UTC timestamp could not be independently read (the `date` invocation was denied at this layer); only the environment-provided activation start (2026-11-22T03:24:59Z) is recorded"
+    ],
+    "verified": [
+      "python3 research/checks/momentum_cost_sensitivity.py -> exit 0; manifest 10/10 OK; preflight PASSED (all data-quality/survivorship checks); leakage PASS on AMZN/JPM; determinism r1==r2 True; classification COST_ROBUST for lookbacks 3, 5 and 10; candidate max |per-segment median change| = 0.001 (base) / 0.002 (stress2x); null/candidate commission ratio 29.0x (lookbacks 3,5) and 26.7x (lookback 10)",
+      "python3 research/checks/verify_momentum_cost_sensitivity.py -> all 4 gates PASS: Gate 1 zero-cost column reproduces momentum_lookback_sweep_results.json exactly (10 tickers x 3 lookbacks, medians/null_medians/verdict/segments); Gate 2 fresh walk_forward + noise_benchmark recomputation of AMZN/JPM at base and stress2x MATCH; Gate 3 candidate full-sample total_return strictly decreases zero > base > stress2x and null/candidate commission ratio 28.5x (AMZN) / 30.8x (AAPL); Gate 4 re-derived classification == published classification for all lookbacks and AMZN lookback-5 base determinism True",
+      "python3 -m unittest discover -s tests -q -> Ran 168 tests, OK (no regressions; only pre-existing numpy RuntimeWarnings)",
+      "python3 state/check_smoke/cost_probe.py -> AMZN candidate total_return zero +5.5373 / base +5.5184 / stress2x +5.4995 with commission $0 / $21,055 / $42,110; AMZN coin-flip null total_return zero +0.9880 / base +0.3893 / stress2x -0.2093 with commission $0 / $599,705 / $1,199,410 (null commission ~28.5x candidate at base)",
+      "read state/check_artifacts/momentum_lookback_sweep_results.json (per_asset[ticker][lookback] schema) and the new momentum_cost_sensitivity_results.json (cost_robustness / turnover / per_cell schema) to confirm artifact structure and zero-cost agreement"
+    ]
+  },
+  "primary_question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+  "role": "LEARNING_PROCESS",
+  "scope": "Inspect LEARNING_STATE, STATE, research checks, and campaign queue semantics; propose at most one minimal change.",
+  "selection_basis": {
+    "compared_against": [
+      "P-002",
+      "P-004",
+      "P-003",
+      "P-006",
+      "P-005"
+    ],
+    "qualitative_priority": [
+      "HIGH",
+      "HIGH",
+      "MEDIUM",
+      "HIGH",
+      "MEDIUM",
+      "LOW",
+      "LOW"
+    ],
+    "reason": "highest evidence-backed qualitative priority among currently OPEN tasks for this role"
+  },
+  "stop_condition": "Stop when the duplicate-work question is resolved or clearly unverified.",
+  "success_criterion": "At least one evidence-backed conclusion about duplicate-work prevention is established.",
+  "task_id": "P-002",
+  "tests_preceding_process": false,
+  "verification_requirement": "Independent controller validation of any implementation change."
+}
