@@ -1,0 +1,2687 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+I'll start by inspecting the durable repository state before any substantive work.
+[0m$ [0mpwd && git log --oneline -8
+/home/runner/work/X/X
+618539a4 Test bounded transient gateway recovery
+7b3fa6cc Bound transient Kilo recovery retries
+9fdd4360 Retry checkpoint persistence until workflow cutoff
+da10b967 Fix campaign outcome preflight test persistence fixture
+370d418e Assert Kilo sessions rely only on workflow-level cutoff
+1ea666f0 Remove one-shot smoke-session timeout
+b5487b8c Remove smoke-session timeout; rely on workflow cutoff
+d0ad93dd Clarify that only the workflow imposes the execution deadline
+[0m
+[0m$ [0mls -la
+total 344
+drwxr-xr-x 11 runner runner  4096 Nov 22 18:39 .
+drwxr-xr-x  3 runner runner  4096 Nov 22 18:39 ..
+drwxr-xr-x  7 runner runner  4096 Nov 22 18:42 .git
+drwxr-xr-x  4 runner runner  4096 Nov 22 18:39 .github
+-rw-r--r--  1 runner runner   147 Nov 22 18:39 .gitignore
+drwxr-xr-x  2 runner runner  4096 Nov 22 18:40 .kilo
+-rw-r--r--  1 runner runner 14333 Nov 22 18:39 AGENTS.md
+-rw-r--r--  1 runner runner  1481 Nov 22 18:39 ENTERPRISE.md
+-rw-r--r--  1 runner runner  6012 Nov 22 18:39 LEARNING_EFFICIENCY.md
+-rw-r--r--  1 runner runner  3204 Nov 22 18:39 MANUAL_SETUP.md
+-rw-r--r--  1 runner runner  2889 Nov 22 18:39 PERSISTENCE_POLICY.md
+-rw-r--r--  1 runner runner  1396 Nov 22 18:39 README.md
+-rw-r--r--  1 runner runner  5681 Nov 22 18:39 REPOSITORY_PLAYBOOK.md
+-rw-r--r--  1 runner runner  6187 Nov 22 18:39 append_activation_log.py
+-rw-r--r--  1 runner runner   416 Nov 22 18:39 check_adjacent.py
+-rw-r--r--  1 runner runner   127 Nov 22 18:39 check_compile.py
+-rw-r--r--  1 runner runner   116 Nov 22 18:39 check_compile2.py
+-rw-r--r--  1 runner runner  1165 Nov 22 18:39 check_determinism.py
+-rw-r--r--  1 runner runner   632 Nov 22 18:39 check_determinism_nvda.py
+-rw-r--r--  1 runner runner   603 Nov 22 18:39 check_determinism_real_data.py
+-rw-r--r--  1 runner runner  1044 Nov 22 18:39 check_determinism_universe.py
+-rw-r--r--  1 runner runner   675 Nov 22 18:39 check_exports.py
+-rw-r--r--  1 runner runner   667 Nov 22 18:39 check_gaps.py
+-rw-r--r--  1 runner runner   258 Nov 22 18:39 check_json1.py
+-rw-r--r--  1 runner runner  1083 Nov 22 18:39 check_network.py
+-rw-r--r--  1 runner runner   824 Nov 22 18:39 debug_diff.py
+-rw-r--r--  1 runner runner  2938 Nov 22 18:39 debug_holidays.py
+-rw-r--r--  1 runner runner  1308 Nov 22 18:39 debug_stress.py
+-rw-r--r--  1 runner runner  5345 Nov 22 18:39 debug_sweep.py
+-rw-r--r--  1 runner runner   519 Nov 22 18:39 debug_ts.py
+-rw-r--r--  1 runner runner   191 Nov 22 18:39 debug_ts2.py
+-rw-r--r--  1 runner runner    68 Nov 22 18:39 debug_ts3.py
+-rw-r--r--  1 runner runner   750 Nov 22 18:39 debug_yahoo.py
+-rw-r--r--  1 runner runner  1572 Nov 22 18:39 debug_yahoo2.py
+-rw-r--r--  1 runner runner  3689 Nov 22 18:39 diag_fold_detail.py
+-rw-r--r--  1 runner runner  3122 Nov 22 18:39 diag_mom_vs_rev.py
+-rw-r--r--  1 runner runner  3947 Nov 22 18:39 diag_null.py
+-rw-r--r--  1 runner runner  2448 Nov 22 18:39 diag_null2.py
+-rw-r--r--  1 runner runner  2088 Nov 22 18:39 diag_null3.py
+-rw-r--r--  1 runner runner  2089 Nov 22 18:39 diag_null4.py
+-rw-r--r--  1 runner runner  2020 Nov 22 18:39 diag_null5.py
+-rw-r--r--  1 runner runner  1980 Nov 22 18:39 diag_null6.py
+-rw-r--r--  1 runner runner  2191 Nov 22 18:39 dump_artifact.py
+drwxr-xr-x  3 runner runner  4096 Nov 22 18:39 examples
+-rw-r--r--  1 runner runner  6474 Nov 22 18:39 log_append.py
+drwxr-xr-x  2 runner runner  4096 Nov 22 18:42 logs
+-rw-r--r--  1 runner runner   136 Nov 22 18:39 probe_env.py
+-rw-r--r--  1 runner runner   968 Nov 22 18:39 probe_hosts.py
+-rw-r--r--  1 runner runner   361 Nov 22 18:39 probe_manifest.py
+-rw-r--r--  1 runner runner   311 Nov 22 18:39 probe_mean_reversion_artifact.py
+-rw-r--r--  1 runner runner   976 Nov 22 18:39 probe_stooq.py
+-rw-r--r--  1 runner runner   947 Nov 22 18:39 probe_yahoo.py
+-rw-r--r--  1 runner runner   609 Nov 22 18:39 probe_yahoo3.py
+-rw-r--r--  1 runner runner   403 Nov 22 18:39 read_env.py
+-rw-r--r--  1 runner runner  1201 Nov 22 18:39 repro_engine.py
+-rw-r--r--  1 runner runner  1719 Nov 22 18:39 repro_engine2.py
+drwxr-xr-x  5 runner runner  4096 Nov 22 18:39 research
+drwxr-xr-x  2 runner runner  4096 Nov 22 18:39 scratch
+-rw-r--r--  1 runner runner  2565 Nov 22 18:39 smoke_csrs.py
+drwxr-xr-x  6 runner runner  4096 Nov 22 18:42 state
+-rw-r--r--  1 runner runner   302 Nov 22 18:39 test_loader_tmp.py
+-rw-r--r--  1 runner runner  2642 Nov 22 18:39 test_segment_merge.py
+-rw-r--r--  1 runner runner  1287 Nov 22 18:39 test_timer.py
+-rw-r--r--  1 runner runner    15 Nov 22 18:39 test_write.py
+drwxr-xr-x  3 runner runner  4096 Nov 22 18:39 tests
+-rw-r--r--  1 runner runner   145 Nov 22 18:39 tmp_art.py
+-rw-r--r--  1 runner runner   456 Nov 22 18:39 tmp_artifact_check.py
+-rw-r--r--  1 runner runner   333 Nov 22 18:39 tmp_cleanup.py
+-rw-r--r--  1 runner runner  6840 Nov 22 18:39 tmp_edit_ls.py
+-rw-r--r--  1 runner runner   672 Nov 22 18:39 tmp_json_check.py
+-rw-r--r--  1 runner runner   132 Nov 22 18:39 tmp_read.py
+-rw-r--r--  1 runner runner   134 Nov 22 18:39 tmp_read2.py
+-rw-r--r--  1 runner runner   136 Nov 22 18:39 tmp_read3.py
+-rw-r--r--  1 runner runner   947 Nov 22 18:39 update_manifest_gaps.py
+-rw-r--r--  1 runner runner   429 Nov 22 18:39 validate_receipt.py
+-rw-r--r--  1 runner runner   243 Nov 22 18:39 verify_json.py
+-rw-r--r--  1 runner runner  2404 Nov 22 18:39 verify_perfold.py
+[0m
+[0m✗ [0mfind state -maxdepth 3 -type f | head -50 && echo "---RESEARCH---" && find research -maxdepth 3 | head -60 failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m✗ [0mfind tests examples -maxdepth 3 -type f | head -60 && echo "---" && cat REPOSITORY_PLAYBOOK.md failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m✱ [0mGlob "research/**/*"[90m 56 matches[0m
+Bash is denied. I'll use repository-native tools instead.
+[0m✱ [0mGlob "state/**/*"[90m 45 matches[0m
+[0m→ [0mRead state/LEARNING_STATE.md
+[0m→ [0mRead state/STATE.md
+[0m→ [0mRead state/campaign/runs/45056319162/agents/agent_02_before.json
+[0m→ [0mRead state/campaign/runs/45056319162/agents/agent_02_contract.json
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py
+[0m→ [0mRead research/checks/momentum.py
+Let me read the momentum framework and cost model, and test execution availability.
+[0m→ [0mRead research/backtest/engine.py
+[0m→ [0mRead research/backtest/regime_stability.py
+[0m✱ [0mGrep "slippage_proportional|commission_per_trade|realistic|REALISTIC|cost_model|round_trip|bps|slippage_cents"[90m in . · 37 matches[0m
+[0m→ [0mRead research/backtest/perturbation.py
+[0m✗ [0mpython3 -c "import numpy; print('numpy', numpy.__version__)" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python3 -c *","action":"deny","source":"project"}
+Let me verify execution capability with a minimal invocation.
+[0m
+[0m$ [0mpython3 research/checks/test_count.py
+10  test_activation_receipt
+  2  test_campaign_agent_validation
+ 17  test_campaign_architecture
+  3  test_campaign_outcome
+  9  test_data
+ 19  test_engine
+  5  test_kilo_outcome
+  9  test_loader
+  8  test_metrics
+ 15  test_perturbation
+ 10  test_preflight
+ 26  test_regime_stability
+ 14  test_regime_universe
+  6  test_staged_secret_scan
+ 15  test_universe
+168 total
+[0m
+[0m→ [0mRead research/checks/verify_momentum_lookback_sweep.py
+[0m→ [0mRead research/checks/verify_momentum.py
+[0m→ [0mRead research/data/manifest.json[90m [limit=40][0m
+[0m→ [0mRead state/check_artifacts/momentum_lookback_sweep_results.json[90m [limit=80][0m
+[0m→ [0mRead state/worker_progress.md
+[0m→ [0mRead state/campaign/task_queue.json
+I have the full framework picture. Let me record the focused-task answers in notes and check the worker_progress + task queue before writing code.
+[0m→ [0mRead research/backtest/__init__.py
+Now I'll write the cost-sensitivity check. Design is fixed a-priori: realistic cost model = `commission_per_trade=2.0, commission_per_share=0.003, slippage_cents=2.0, slippage_proportional=0.0005` (from `examples/ma_crossover.py`), grid = {0.0, 0.5, 1.0, 2.0}× that model, lookbacks {3,5,10}, 10-asset universe, matched coin-flip null at the same costs.
+[0m
+[0m← [0mWrite research/checks/momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -274,22 +274,14 @@
+ for lb in LOOKBACKS:
+     sr = cells[lb][0.0][ticker]
+     pref = prior_assets[ticker][str(lb)]
+     ok = (sr["medians"] == pref["lookback_medians"][str(lb)]
+-          and sr["null_medians"] == pref["lookback_null_medians"][str(lb)]
+-          and sr["verdict"] == pref["verdicts_5"] if lb == 5 else
+-          sr["medians"] == pref["lookback_medians"][str(lb)]
+           and sr["null_medians"] == pref["lookback_null_medians"][str(lb)])
+-    # verdict at lookback!=5 is not stored as a single field in prior
+-    # per_asset universe view; compare medians+nulls for all, and the
+-    # verdict only at lookback 5 (verdicts_5).
++    # The prior artifact stores the lookback-5 verdict explicitly
++    # (verdicts_5); at other lookbacks it stores only medians/nulls in
++    # the universe view, so compare the verdict only at lookback 5.
+     if lb == 5:
+-        ok = (sr["medians"] == pref["lookback_medians"][str(lb)]
+-              and sr["null_medians"] == pref["lookback_null_medians"][str(lb)]
+-              and sr["verdict"] == pref["verdicts_5"])
+-    else:
+-        ok = (sr["medians"] == pref["lookback_medians"][str(lb)]
+-              and sr["null_medians"] == pref["lookback_null_medians"][str(lb)])
++        ok = ok and sr["verdict"] == pref["verdicts_5"]
+     xchecks[f"{ticker}|{lb}"] = "MATCH" if ok else "MISMATCH"
+     if not ok:
+         all_match = False
+         print("  MISMATCH {} lookback {}: cand {} vs {} | null {} vs {}".format(
+
+[0m
+The cross-consistency block is convoluted; let me simplify it to avoid precedence bugs.
+[0m✗ [0mpython3 -c "import json;d=json.load(open('state/check_artifacts/momentum_lookback_sweep_results.json'));print(json.dumps(d['universe']['per_asset']['AMZN'],indent=1)[:900])" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python3 -c *","action":"deny","source":"project"}
+Let me confirm the prior artifact's `universe.per_asset` structure matches my cross-consistency access pattern.
+[0m✱ [0mGrep ""lookback_medians"|"lookback_null_medians"|"verdicts_5"|"universe"|"per_asset""[90m in state/check_artifacts/momentum_lookback_sweep_results.json · 53 matches[0m
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -272,9 +272,9 @@
+ all_match = True
+ for ticker in ticker_order:
+     for lb in LOOKBACKS:
+         sr = cells[lb][0.0][ticker]
+-        pref = prior_assets[ticker][str(lb)]
++        pref = prior_assets[ticker]
+         ok = (sr["medians"] == pref["lookback_medians"][str(lb)]
+               and sr["null_medians"] == pref["lookback_null_medians"][str(lb)])
+         # The prior artifact stores the lookback-5 verdict explicitly
+         # (verdicts_5); at other lookbacks it stores only medians/nulls in
+
+[0m
+The prior artifact's universe view nests under `lookback_medians`; my access path was wrong. Fixing.
+Let me syntax-check before the full run.
+[0m$ [0mpython3 -m py_compile research/checks/momentum_cost_sensitivity.py
+(no output)
+[0m
+Now running the cost-sensitivity check (bounded grid: 3 lookbacks × 4 cost levels × 10 assets, matched null).
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review per asset (lookback=5, realistic costs) ===
+  AMZN: 4465 bars, momentum signals 4465, leakage [PASS], realistic-cost total_return +5.518
+  JPM: 4465 bars, momentum signals 4465, leakage [PASS], realistic-cost total_return +3.904
+  no-look-ahead: momentum sign at bar t uses closes[:t] only; costs are applied to every fill in engine._run_bars.
+
+=== 4. Momentum cost grid (lookback 3/5/10 x cost 0.0/0.5/1.0/2.0) ===
+  Realistic cost model: {'commission_per_trade': 2.0, 'commission_per_share': 0.003, 'slippage_cents': 2.0, 'slippage_proportional': 0.0005}
+  Cost multipliers: [0.0, 0.5, 1.0, 2.0] -> ['zero', 'half', 'realistic', 'conservative']
+
+  lookback  3 | zero        (m=0.0) | edge_assets= 6/10 | mean_cand= 0.0613 | mean_null=-0.0197 | gap=  0.081
+  lookback  3 | half        (m=0.5) | edge_assets= 6/10 | mean_cand= 0.0608 | mean_null=-0.0896 | gap= 0.1504
+  lookback  3 | realistic   (m=1.0) | edge_assets= 6/10 | mean_cand= 0.0603 | mean_null=-0.0169 | gap= 0.0772
+  lookback  3 | conservative (m=2.0) | edge_assets= 6/10 | mean_cand= 0.0595 | mean_null= 0.0287 | gap= 0.0308
+
+  lookback  5 | zero        (m=0.0) | edge_assets= 6/10 | mean_cand= 0.0613 | mean_null=-0.0075 | gap= 0.0688
+  lookback  5 | half        (m=0.5) | edge_assets= 5/10 | mean_cand= 0.0608 | mean_null= 0.0246 | gap= 0.0362
+  lookback  5 | realistic   (m=1.0) | edge_assets= 6/10 | mean_cand= 0.0603 | mean_null= 0.0221 | gap= 0.0382
+  lookback  5 | conservative (m=2.0) | edge_assets= 6/10 | mean_cand= 0.0595 | mean_null= 0.0087 | gap= 0.0508
+
+  lookback 10 | zero        (m=0.0) | edge_assets= 5/10 | mean_cand= 0.0613 | mean_null=-0.0193 | gap= 0.0806
+  lookback 10 | half        (m=0.5) | edge_assets= 6/10 | mean_cand= 0.0608 | mean_null=-0.9637 | gap= 1.0245
+  lookback 10 | realistic   (m=1.0) | edge_assets= 6/10 | mean_cand= 0.0604 | mean_null= 0.0098 | gap= 0.0506
+  lookback 10 | conservative (m=2.0) | edge_assets= 6/10 | mean_cand= 0.0582 | mean_null=-0.0111 | gap= 0.0693
+
+=== 5. Cross-consistency: zero-cost column vs momentum_lookback_sweep_results.json ===
+  cross-checked 30 (ticker, lookback) cells -> ALL MATCH
+
+=== 6. A-priori cost classification ===
+  lookback  3: class=COST_ROBUST          edge_counts={'0.0': 6, '0.5': 6, '1.0': 6, '2.0': 6}
+  lookback  5: class=COST_ROBUST          edge_counts={'0.0': 6, '0.5': 5, '1.0': 6, '2.0': 6}
+  lookback 10: class=COST_ROBUST          edge_counts={'0.0': 5, '0.5': 6, '1.0': 6, '2.0': 6}
+  OVERALL primary verdict: SURVIVES_REALISTIC_COST
+  OVERALL survives 2x conservative cost: True
+determinism AMZN lookback 5 m=1.0: identical
+determinism JPM lookback 10 m=2.0: identical
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Momentum cost-sensitivity sweep across the collected universe: exploratory simulation.
+[0m
+Check ran and the zero-cost column reproduces the prior sweep exactly (30/30 MATCH). But the matched-null means look erratic across cost levels (e.g. lookback 10 half-cost mean_null = −0.9637, then +0.0098 at realistic). That is non-monotonic in cost, which is implausible for a fixed coin-flip signal. I need to inspect the per-asset nulls before trusting the classification.
+[0m$ [0mpython3 -m json.tool state/check_artifacts/momentum_cost_sensitivity_results.json
+...output truncated...
+
+Full output saved to: /home/runner/.local/share/kilo/tool-output/tool_204966c85001q6gc5jw5RECJRZ
+
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_DEPENDENT"
+                    },
+                    "META": {
+                        "candidate_dispersion": 0.013,
+                        "medians": [
+                            0.073,
+                            0.067,
+                            0.042
+                        ],
+                        "n_folds": 19,
+                        "null_dispersion": 0.026,
+                        "null_medians": [
+                            -0.056,
+                            -0.067,
+                            -0.007
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "MSFT": {
+                        "candidate_dispersion": 0.01,
+                        "medians": [
+                            0.052,
+                            0.072
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.018,
+                        "null_medians": [
+                            -0.017,
+                            0.019
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "NVDA": {
+                        "candidate_dispersion": 0.062,
+                        "medians": [
+                            -0.051,
+                            0.012,
+                            0.1
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.549,
+                        "null_medians": [
+                            -1.252,
+                            -0.254,
+                            0.026
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "TSLA": {
+                        "candidate_dispersion": 0.05,
+                        "medians": [
+                            0.132,
+                            0.016,
+                            0.107
+                        ],
+                        "n_folds": 24,
+                        "null_dispersion": 0.49,
+                        "null_medians": [
+                            -1.079,
+                            -0.012,
+                            -0.071
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "XOM": {
+                        "candidate_dispersion": 0.009,
+                        "medians": [
+                            0.018,
+                            0.037
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.035,
+                        "null_medians": [
+                            -0.017,
+                            0.053
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    }
+                }
+            },
+            "1.0": {
+                "cost_label": "realistic",
+                "edge_asset_count": 6,
+                "mean_candidate_median": 0.0603,
+                "mean_cost_adjusted_edge": 0.0772,
+                "mean_null_median": -0.0169,
+                "per_asset": {
+                    "AAPL": {
+                        "candidate_dispersion": 0.014,
+                        "medians": [
+                            0.071,
+                            0.054,
+                            0.092,
+                            0.069
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.051,
+                        "null_medians": [
+                            -0.045,
+                            0.008,
+                            0.068,
+                            -0.064
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent",
+                            "calm"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "AMZN": {
+                        "candidate_dispersion": 0.005,
+                        "medians": [
+                            0.065,
+                            0.076,
+                            0.077
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.034,
+                        "null_medians": [
+                            0.052,
+                            0.003,
+                            -0.031
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "GOOGL": {
+                        "candidate_dispersion": 0.015,
+                        "medians": [
+                            0.069,
+                            0.071,
+                            0.101
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.036,
+                        "null_medians": [
+                            0.035,
+                            0.012,
+                            -0.049
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "JNJ": {
+                        "candidate_dispersion": 0.002,
+                        "medians": [
+                            0.05,
+                            0.045
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.032,
+                        "null_medians": [
+                            -0.042,
+                            0.021
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    },
+                    "JPM": {
+                        "candidate_dispersion": 0.028,
+                        "medians": [
+                            0.113,
+                            0.044,
+                            0.083
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.013,
+                        "null_medians": [
+                            -0.0,
+                            0.026,
+                            -0.003
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_DEPENDENT"
+                    },
+                    "META": {
+                        "candidate_dispersion": 0.013,
+                        "medians": [
+                            0.073,
+                            0.067,
+                            0.042
+                        ],
+                        "n_folds": 19,
+                        "null_dispersion": 0.027,
+                        "null_medians": [
+                            -0.058,
+                            -0.067,
+                            -0.007
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "MSFT": {
+                        "candidate_dispersion": 0.01,
+                        "medians": [
+                            0.052,
+                            0.072
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.021,
+                        "null_medians": [
+                            -0.022,
+                            0.019
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "NVDA": {
+                        "candidate_dispersion": 0.067,
+                        "medians": [
+                            -0.064,
+                            0.012,
+                            0.1
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.186,
+                        "null_medians": [
+                            0.442,
+                            0.389,
+                            0.023
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "TSLA": {
+                        "candidate_dispersion": 0.05,
+                        "medians": [
+                            0.133,
+                            0.016,
+                            0.107
+                        ],
+                        "n_folds": 24,
+                        "null_dispersion": 0.534,
+                        "null_medians": [
+                            -1.175,
+                            -0.016,
+                            -0.071
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "XOM": {
+                        "candidate_dispersion": 0.009,
+                        "medians": [
+                            0.018,
+                            0.037
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.036,
+                        "null_medians": [
+                            -0.02,
+                            0.052
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    }
+                }
+            },
+            "2.0": {
+                "cost_label": "conservative",
+                "edge_asset_count": 6,
+                "mean_candidate_median": 0.0595,
+                "mean_cost_adjusted_edge": 0.0308,
+                "mean_null_median": 0.0287,
+                "per_asset": {
+                    "AAPL": {
+                        "candidate_dispersion": 0.014,
+                        "medians": [
+                            0.071,
+                            0.054,
+                            0.092,
+                            0.069
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.054,
+                        "null_medians": [
+                            -0.063,
+                            -0.001,
+                            0.066,
+                            -0.066
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent",
+                            "calm"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "AMZN": {
+                        "candidate_dispersion": 0.005,
+                        "medians": [
+                            0.065,
+                            0.076,
+                            0.077
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.031,
+                        "null_medians": [
+                            0.043,
+                            -0.004,
+                            -0.032
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "GOOGL": {
+                        "candidate_dispersion": 0.015,
+                        "medians": [
+                            0.069,
+                            0.071,
+                            0.101
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.03,
+                        "null_medians": [
+                            0.016,
+                            0.006,
+                            -0.052
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "JNJ": {
+                        "candidate_dispersion": 0.002,
+                        "medians": [
+                            0.05,
+                            0.045
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.033,
+                        "null_medians": [
+                            -0.048,
+                            0.019
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    },
+                    "JPM": {
+                        "candidate_dispersion": 0.028,
+                        "medians": [
+                            0.113,
+                            0.044,
+                            0.083
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.013,
+                        "null_medians": [
+                            -0.005,
+                            0.023,
+                            -0.004
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_DEPENDENT"
+                    },
+                    "META": {
+                        "candidate_dispersion": 0.013,
+                        "medians": [
+                            0.073,
+                            0.067,
+                            0.042
+                        ],
+                        "n_folds": 19,
+                        "null_dispersion": 0.027,
+                        "null_medians": [
+                            -0.062,
+                            -0.068,
+                            -0.007
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "MSFT": {
+                        "candidate_dispersion": 0.01,
+                        "medians": [
+                            0.052,
+                            0.072
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.026,
+                        "null_medians": [
+                            -0.033,
+                            0.019
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "NVDA": {
+                        "candidate_dispersion": 0.077,
+                        "medians": [
+                            -0.088,
+                            0.011,
+                            0.1
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.143,
+                        "null_medians": [
+                            0.34,
+                            0.295,
+                            0.017
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "TSLA": {
+                        "candidate_dispersion": 0.05,
+                        "medians": [
+                            0.134,
+                            0.016,
+                            0.108
+                        ],
+                        "n_folds": 24,
+                        "null_dispersion": 0.273,
+                        "null_medians": [
+                            0.53,
+                            -0.024,
+                            -0.071
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "XOM": {
+                        "candidate_dispersion": 0.009,
+                        "medians": [
+                            0.018,
+                            0.036
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.037,
+                        "null_medians": [
+                            -0.026,
+                            0.048
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    }
+                }
+            }
+        },
+        "5": {
+            "0.0": {
+                "cost_label": "zero",
+                "edge_asset_count": 6,
+                "mean_candidate_median": 0.0613,
+                "mean_cost_adjusted_edge": 0.0688,
+                "mean_null_median": -0.0075,
+                "per_asset": {
+                    "AAPL": {
+                        "candidate_dispersion": 0.014,
+                        "medians": [
+                            0.071,
+                            0.054,
+                            0.092,
+                            0.069
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.028,
+                        "null_medians": [
+                            -0.025,
+                            -0.011,
+                            0.04,
+                            0.032
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent",
+                            "calm"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "AMZN": {
+                        "candidate_dispersion": 0.005,
+                        "medians": [
+                            0.065,
+                            0.076,
+                            0.077
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.019,
+                        "null_medians": [
+                            -0.007,
+                            -0.002,
+                            0.036
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "GOOGL": {
+                        "candidate_dispersion": 0.015,
+                        "medians": [
+                            0.069,
+                            0.071,
+                            0.101
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.039,
+                        "null_medians": [
+                            -0.081,
+                            0.01,
+                            -0.008
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "JNJ": {
+                        "candidate_dispersion": 0.002,
+                        "medians": [
+                            0.05,
+                            0.046
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.019,
+                        "null_medians": [
+                            -0.024,
+                            0.013
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    },
+                    "JPM": {
+                        "candidate_dispersion": 0.028,
+                        "medians": [
+                            0.113,
+                            0.044,
+                            0.083
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.012,
+                        "null_medians": [
+                            -0.027,
+                            0.002,
+                            -0.008
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_DEPENDENT"
+                    },
+                    "META": {
+                        "candidate_dispersion": 0.013,
+                        "medians": [
+                            0.073,
+                            0.067,
+                            0.042
+                        ],
+                        "n_folds": 19,
+                        "null_dispersion": 0.055,
+                        "null_medians": [
+                            -0.015,
+                            0.045,
+                            -0.09
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "MSFT": {
+                        "candidate_dispersion": 0.01,
+                        "medians": [
+                            0.052,
+                            0.072
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.008,
+                        "null_medians": [
+                            -0.013,
+                            -0.029
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "NVDA": {
+                        "candidate_dispersion": 0.057,
+                        "medians": [
+                            -0.038,
+                            0.013,
+                            0.1
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.06,
+                        "null_medians": [
+                            -0.108,
+                            0.031,
+                            0.001
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "TSLA": {
+                        "candidate_dispersion": 0.05,
+                        "medians": [
+                            0.132,
+                            0.016,
+                            0.107
+                        ],
+                        "n_folds": 24,
+                        "null_dispersion": 0.034,
+                        "null_medians": [
+                            0.063,
+                            0.007,
+                            -0.019
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "XOM": {
+                        "candidate_dispersion": 0.009,
+                        "medians": [
+                            0.018,
+                            0.037
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.005,
+                        "null_medians": [
+                            0.004,
+                            -0.006
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    }
+                }
+            },
+            "0.5": {
+                "cost_label": "half",
+                "edge_asset_count": 5,
+                "mean_candidate_median": 0.0608,
+                "mean_cost_adjusted_edge": 0.0362,
+                "mean_null_median": 0.0246,
+                "per_asset": {
+                    "AAPL": {
+                        "candidate_dispersion": 0.014,
+                        "medians": [
+                            0.071,
+                            0.054,
+                            0.092,
+                            0.069
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.03,
+                        "null_medians": [
+                            -0.033,
+                            -0.016,
+                            0.038,
+                            0.031
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent",
+                            "calm"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "AMZN": {
+                        "candidate_dispersion": 0.005,
+                        "medians": [
+                            0.065,
+                            0.076,
+                            0.077
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.022,
+                        "null_medians": [
+                            -0.016,
+                            -0.005,
+                            0.035
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "GOOGL": {
+                        "candidate_dispersion": 0.015,
+                        "medians": [
+                            0.069,
+                            0.071,
+                            0.101
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.045,
+                        "null_medians": [
+                            -0.096,
+                            0.008,
+                            -0.009
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "JNJ": {
+                        "candidate_dispersion": 0.002,
+                        "medians": [
+                            0.05,
+                            0.045
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.02,
+                        "null_medians": [
+                            -0.028,
+                            0.013
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    },
+                    "JPM": {
+                        "candidate_dispersion": 0.028,
+                        "medians": [
+                            0.113,
+                            0.044,
+                            0.083
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.014,
+                        "null_medians": [
+                            -0.033,
+                            -0.0,
+                            -0.009
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_DEPENDENT"
+                    },
+                    "META": {
+                        "candidate_dispersion": 0.013,
+                        "medians": [
+                            0.073,
+                            0.067,
+                            0.042
+                        ],
+                        "n_folds": 19,
+                        "null_dispersion": 0.056,
+                        "null_medians": [
+                            -0.017,
+                            0.045,
+                            -0.091
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "MSFT": {
+                        "candidate_dispersion": 0.01,
+                        "medians": [
+                            0.052,
+                            0.072
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.006,
+                        "null_medians": [
+                            -0.018,
+                            -0.029
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "NVDA": {
+                        "candidate_dispersion": 0.062,
+                        "medians": [
+                            -0.051,
+                            0.013,
+                            0.1
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.558,
+                        "null_medians": [
+                            1.134,
+                            -0.095,
+                            0.0
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "TSLA": {
+                        "candidate_dispersion": 0.05,
+                        "medians": [
+                            0.132,
+                            0.016,
+                            0.107
+                        ],
+                        "n_folds": 24,
+                        "null_dispersion": 0.009,
+                        "null_medians": [
+                            -0.013,
+                            0.003,
+                            -0.019
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_DEPENDENT"
+                    },
+                    "XOM": {
+                        "candidate_dispersion": 0.009,
+                        "medians": [
+                            0.018,
+                            0.037
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.004,
+                        "null_medians": [
+                            0.002,
+                            -0.006
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    }
+                }
+            },
+            "1.0": {
+                "cost_label": "realistic",
+                "edge_asset_count": 6,
+                "mean_candidate_median": 0.0603,
+                "mean_cost_adjusted_edge": 0.0382,
+                "mean_null_median": 0.0221,
+                "per_asset": {
+                    "AAPL": {
+                        "candidate_dispersion": 0.014,
+                        "medians": [
+                            0.071,
+                            0.054,
+                            0.092,
+                            0.069
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.033,
+                        "null_medians": [
+                            -0.042,
+                            -0.02,
+                            0.037,
+                            0.031
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent",
+                            "calm"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "AMZN": {
+                        "candidate_dispersion": 0.005,
+                        "medians": [
+                            0.065,
+                            0.076,
+                            0.077
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.024,
+                        "null_medians": [
+                            -0.022,
+                            -0.007,
+                            0.035
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "GOOGL": {
+                        "candidate_dispersion": 0.015,
+                        "medians": [
+                            0.069,
+                            0.071,
+                            0.101
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.052,
+                        "null_medians": [
+                            -0.112,
+                            0.005,
+                            -0.009
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "JNJ": {
+                        "candidate_dispersion": 0.002,
+                        "medians": [
+                            0.05,
+                            0.045
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.022,
+                        "null_medians": [
+                            -0.031,
+                            0.012
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    },
+                    "JPM": {
+                        "candidate_dispersion": 0.028,
+                        "medians": [
+                            0.113,
+                            0.044,
+                            0.083
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.016,
+                        "null_medians": [
+                            -0.039,
+                            -0.003,
+                            -0.009
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "META": {
+                        "candidate_dispersion": 0.013,
+                        "medians": [
+                            0.073,
+                            0.067,
+                            0.042
+                        ],
+                        "n_folds": 19,
+                        "null_dispersion": 0.056,
+                        "null_medians": [
+                            -0.019,
+                            0.045,
+                            -0.093
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "MSFT": {
+                        "candidate_dispersion": 0.01,
+                        "medians": [
+                            0.052,
+                            0.072
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.003,
+                        "null_medians": [
+                            -0.023,
+                            -0.03
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_DEPENDENT"
+                    },
+                    "NVDA": {
+                        "candidate_dispersion": 0.067,
+                        "medians": [
+                            -0.064,
+                            0.012,
+                            0.1
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.215,
+                        "null_medians": [
+                            0.396,
+                            0.499,
+                            -0.0
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "TSLA": {
+                        "candidate_dispersion": 0.05,
+                        "medians": [
+                            0.133,
+                            0.016,
+                            0.107
+                        ],
+                        "n_folds": 24,
+                        "null_dispersion": 0.066,
+                        "null_medians": [
+                            0.13,
+                            -0.0,
+                            -0.019
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "XOM": {
+                        "candidate_dispersion": 0.009,
+                        "medians": [
+                            0.018,
+                            0.037
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.003,
+                        "null_medians": [
+                            -0.001,
+                            -0.007
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    }
+                }
+            },
+            "2.0": {
+                "cost_label": "conservative",
+                "edge_asset_count": 6,
+                "mean_candidate_median": 0.0595,
+                "mean_cost_adjusted_edge": 0.0508,
+                "mean_null_median": 0.0087,
+                "per_asset": {
+                    "AAPL": {
+                        "candidate_dispersion": 0.014,
+                        "medians": [
+                            0.071,
+                            0.054,
+                            0.092,
+                            0.069
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.04,
+                        "null_medians": [
+                            -0.061,
+                            -0.029,
+                            0.034,
+                            0.029
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent",
+                            "calm"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "AMZN": {
+                        "candidate_dispersion": 0.005,
+                        "medians": [
+                            0.065,
+                            0.076,
+                            0.077
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.03,
+                        "null_medians": [
+                            -0.037,
+                            -0.012,
+                            0.035
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "GOOGL": {
+                        "candidate_dispersion": 0.015,
+                        "medians": [
+                            0.069,
+                            0.071,
+                            0.101
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.064,
+                        "null_medians": [
+                            -0.14,
+                            -0.0,
+                            -0.01
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "JNJ": {
+                        "candidate_dispersion": 0.002,
+                        "medians": [
+                            0.05,
+                            0.045
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.023,
+                        "null_medians": [
+                            -0.036,
+                            0.011
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    },
+                    "JPM": {
+                        "candidate_dispersion": 0.028,
+                        "medians": [
+                            0.113,
+                            0.044,
+                            0.083
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.021,
+                        "null_medians": [
+                            -0.052,
+                            -0.007,
+                            -0.01
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "META": {
+                        "candidate_dispersion": 0.013,
+                        "medians": [
+                            0.073,
+                            0.067,
+                            0.042
+                        ],
+                        "n_folds": 19,
+                        "null_dispersion": 0.057,
+                        "null_medians": [
+                            -0.023,
+                            0.044,
+                            -0.095
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "MSFT": {
+                        "candidate_dispersion": 0.01,
+                        "medians": [
+                            0.052,
+                            0.072
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.002,
+                        "null_medians": [
+                            -0.034,
+                            -0.03
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_DEPENDENT"
+                    },
+                    "NVDA": {
+                        "candidate_dispersion": 0.077,
+                        "medians": [
+                            -0.088,
+                            0.011,
+                            0.1
+                        ],
+                        "n_folds": 28,
+                        "null_dispersion": 0.146,
+                        "null_medians": [
+                            0.298,
+                            0.193,
+                            -0.051
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "TSLA": {
+                        "candidate_dispersion": 0.05,
+                        "medians": [
+                            0.134,
+                            0.016,
+                            0.108
+                        ],
+                        "n_folds": 24,
+                        "null_dispersion": 0.164,
+                        "null_medians": [
+                            0.334,
+                            -0.008,
+                            -0.02
+                        ],
+                        "segments": [
+                            "turbulent",
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "REGIME_STABLE"
+                    },
+                    "XOM": {
+                        "candidate_dispersion": 0.009,
+                        "medians": [
+                            0.018,
+                            0.036
+                        ],
+                        "n_folds": 75,
+                        "null_dispersion": 0.001,
+                        "null_medians": [
+                            -0.007,
+                            -0.009
+                        ],
+                        "segments": [
+                            "calm",
+                            "turbulent"
+                        ],
+                        "verdict": "CONSISTENT_WITH_NOISE"
+                    }
+                }
+            }
+        }
+    },
+    "seed": 42,
+    "ticker_order": [
+        "AAPL",
+        "MSFT",
+        "GOOGL",
+        "AMZN",
+        "META",
+        "NVDA",
+        "TSLA",
+        "JPM",
+        "JNJ",
+        "XOM"
+    ],
+    "windows": {
+        "min_segment_bars": 400,
+        "n_blocks": 4,
+        "overlap": 60,
+        "test": 84,
+        "train": 252,
+        "warmup": 60,
+        "window": 60
+    }
+}
+[0m
+The matched null is behaving pathologically under the cost grid (NVDA null segment median +1.134, null dispersion 0.558; TSLA similar) and is non-monotonic in cost. That is a red flag. Let me check the engine's slippage semantics in the tests before drawing any conclusion.
+[0m→ [0mRead tests/test_engine.py[90m [limit=110, offset=30][0m
+The slippage convention is intentional per `tests/test_engine.py` ("short fills must also price at close + slippage") — all fills price at close + slippage regardless of side. But that still cannot explain a null median swinging from −0.108 to +1.134 for a *fixed* coin-flip signal across cost levels (a swing of +1.24 log return). I must empirically locate the source before trusting the artifact. Writing a focused diagnostic.
+[0m
+[0m← [0mWrite scratch/diag_cost_monotonicity.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 scratch/diag_cost_monotonicity.py
+NVDA segments: [('turbulent', 1056), ('calm', 1116), ('turbulent', 2232)]
+segment turbulent len=1056 null seed=5042
+signal weight counts: {-1.0: 350, 0.0: 362, 1.0: 344}
+  m=0.0: n_folds=9 median_log=-0.1080 folds=[-0.102, -0.155, 0.155, 0.123, 0.476, -0.131, -0.192, 0.087, -0.204]
+  m=0.5: n_folds=9 median_log=+1.1336 folds=[2.107, 7.951, 2.34, 0.885, 2.126, -0.677, -1.523, 6.275, 0.776]
+  m=1.0: n_folds=9 median_log=+0.3956 folds=[0.485, 0.977, 0.3, 0.326, 0.096, 37.098, 1.787, 0.743, 0.441]
+  m=2.0: n_folds=9 median_log=+0.2980 folds=[0.327, 0.637, 0.254, 0.272, 0.241, 0.915, 0.69, 0.54, 0.347]
+
+  commission_only: median_log=+0.4865
+  slippage_only: median_log=+0.0154
+  both_realistic: median_log=+0.3956
+[0m
+The diagnostic reveals something serious: a *fixed* coin-flip signal produces fold total returns of +795%, +234%, +627% once a small cost is added (m=0.5), versus ±0.2 at m=0. And commission-only alone gives median_log +0.49. Costs cannot create +795% returns. This indicates an engine cost/position-accounting instability. Let me inspect the metrics and one fold's mechanics.
+[0m→ [0mRead research/backtest/metrics.py
+`total_return` is `eq[-1]/eq[0]-1` over the OOS window. A coin-flip fold returning +795% once a tiny commission is added points to a constant-notional rebalancing instability, not economics. Let me instrument one fold to see the mechanism.
+[0m
+[0m← [0mWrite scratch/diag_cost_fold.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 scratch/diag_cost_fold.py
+NVDA segment turbulent len=1056
+[m=0.0] m=0.0: OOS start=928626.0 end=833549.4 total_return=-0.102
+    eq min=457408.6 max=1065439.6 final_cash=1833549.4 final_shares=-4789753.8 n_fills=291 sum_comm=0.0
+    bar 27: close=0.21 weight=+1 d_equity=+137932.2 eq=989242.2
+    bar 154: close=0.30 weight=+1 d_equity=-72534.9 eq=595720.9
+    bar 174: close=0.37 weight=-1 d_equity=-128333.5 eq=457408.6
+    bar 211: close=0.38 weight=+0 d_equity=+76674.8 eq=645380.6
+    bar 335: close=0.21 weight=-1 d_equity=-98715.3 eq=833549.4
+[m=0.5] m=0.5: OOS start=-168252.9 end=-522727.4 total_return=+2.107
+    eq min=-522727.4 max=1037947.7 final_cash=477272.6 final_shares=-4789753.8 n_fills=291 sum_comm=1404382.7
+    bar 21: close=0.26 weight=+1 d_equity=-145689.3 eq=722587.3
+    bar 60: close=0.26 weight=+1 d_equity=-143434.1 eq=453637.8
+    bar 154: close=0.30 weight=+1 d_equity=-152254.7 eq=-175007.3
+    bar 174: close=0.37 weight=-1 d_equity=-132377.7 eq=-331562.1
+    bar 292: close=0.31 weight=+1 d_equity=-136032.5 eq=-215274.9
+OOS closes: first=0.40 last=0.21 min=0.21 max=0.41
+[0m
+Root cause found: the existing "realistic" cost model uses **per-share** terms (`commission_per_share=0.003`, `slippage_cents=2.0`). Under the engine's constant-notional sizing (`target_shares = weight*capital/close`), low-priced split-adjusted series (NVDA ≈ $0.2–0.4 in 2009–13) require millions of shares, so per-fill costs reach ~$14k commission + ~$95k slippage, driving the matched coin-flip null **insolvent** (OOS start equity = −168,253). The metric `total_return = eq[-1]/eq[0]-1` then returns a meaningless **+2.107** from a negative/negative ratio, inflating null dispersion and making REGIME_STABLE trivially achievable. This is an instrument defect, not economics.
+
+I'll record this audit in the artifact with a dual classification (predeclared rule vs decision-relevant), then verify independently.
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -192,8 +192,64 @@
+     survives_2x = all(cls == "COST_ROBUST" for cls in active.values())
+     return primary, survives_2x
+ 
+ 
++def _segments(closes):
++    """Reconstruct contiguous volatility-block segments (same rule as
++    stress_segments: contiguous equal labels, min length)."""
++    labels = bt.volatility_blocks(closes, n_blocks=N_BLOCKS, window=WINDOW)
++    segs, cur, start = [], labels[0], 0
++    for i in range(1, len(labels)):
++        if labels[i] != cur:
++            if i - start >= MIN_SEGMENT_BARS:
++                segs.append((cur, start, i))
++            cur, start = labels[i], i
++    if len(labels) - start >= MIN_SEGMENT_BARS:
++        segs.append((cur, start, len(labels)))
++    return segs
++
++
++def instrument_audit():
++    """Independently expose whether the existing cost model drives the matched
++    null into insolvency (negative equity), which makes ``total_return =
++    end/start - 1`` a meaningless negative/negative ratio.
++
++    Reconstructs the first walk-forward fold of the NVDA lookback-5 null at
++    m=0.5 (the cell with the largest reported null median) from a fixed
++    coin-flip signal and reports the OOS equity endpoints.
++    """
++    bars, _ = bt.load_ticker("NVDA")
++    closes = bars.closes_array()
++    segs = _segments(closes)
++    lab, s, e = segs[0]
++    seg_bars = list(bars)[s:e]
++    lookback, mult = 5, 0.5
++    sig = bt.random_signals(len(seg_bars), seed=42 + lookback * 1000)
++    fold_bars = seg_bars[: TRAIN + TEST]
++    fold_signals = sig[: TRAIN + TEST]
++    res = bt.Backtest(cost_cfg(mult)).run(fold_bars, fold_signals)
++    eq = res.equity_curve
++    oos = eq[-TEST:]
++    start_eq, end_eq = float(oos[0]), float(oos[-1])
++    total_return = end_eq / start_eq - 1.0
++    cum_shares = float(sum(f.shares for f in res.trades))
++    final_cash = float(eq[-1] - cum_shares * fold_bars[-1].close)
++    return dict(
++        ticker="NVDA", lookback=lookback, cost_multiplier=mult, segment=lab,
++        oos_start_equity=round(start_eq, 1),
++        oos_end_equity=round(end_eq, 1),
++        eq_min=round(float(eq.min()), 1),
++        total_return=round(total_return, 3),
++        final_cash=round(final_cash, 1),
++        final_shares=round(cum_shares, 1),
++        n_fills=len(res.trades),
++        insolvent=bool(start_eq < 0.0 or float(eq.min()) < 0.0),
++        note=("negative OOS equity (insolvency) makes total_return=end/start-1 a "
++              "ratio of two negative numbers; the reported positive return is an "
++              "accounting artifact, not a profit"),
++    )
++
++
+ def main() -> int:
+     ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+ 
+     manifest = load_manifest()
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -355,15 +355,45 @@
+     classes[str(lb)] = cls
+     edge_counts[str(lb)] = {str(m): E[m] for m in COST_MULTIPLIERS}
+ primary, survives_2x = overall_verdict(classes)
+ 
+-print("\n=== 6. A-priori cost classification ===")
++# Instrument audit: does the existing cost model drive the matched null
++# into insolvency, invalidating the total_return metric for this sweep?
++audit = instrument_audit()
++if audit["insolvent"]:
++    decision = "UNVERIFIED"
++    decision_reason = (
++        "existing cost model is scale-dependent (per-share commission_per_share="
++        "0.003 and slippage_cents=2.0); under constant-notional sizing it drives "
++        "the matched coin-flip null into insolvency for low-priced split-adjusted "
++        "series (NVDA OOS start equity < 0), after which total_return=end/start-1 "
++        "is a negative/negative ratio whose reported positive value is an "
++        "accounting artifact; this inflates null dispersion and makes REGIME_STABLE "
++        "trivially achievable, so the predeclared cost-robustness classification is "
++        "not decision-grade.")
++else:
++    decision = primary
++    decision_reason = "instrument audit found no null insolvency"
++
++print("\n=== 6. A-priori cost classification (predeclared rule) ===")
+ for lb in LOOKBACKS:
+     print("  lookback {:>2}: class={:<20} edge_counts={}".format(
+         lb, classes[str(lb)], edge_counts[str(lb)]))
+ print("  OVERALL primary verdict: {}".format(primary))
+ print("  OVERALL survives 2x conservative cost: {}".format(survives_2x))
+ 
++print("\n=== 7. Instrument audit (negative-equity / metric validity) ===")
++print("  case: {} lookback {} m={} segment {}".format(
++    audit["ticker"], audit["lookback"], audit["cost_multiplier"], audit["segment"]))
++print("  OOS start equity={} end equity={} eq_min={} total_return={}".format(
++    audit["oos_start_equity"], audit["oos_end_equity"], audit["eq_min"],
++    audit["total_return"]))
++print("  final_cash={} final_shares={} n_fills={}".format(
++    audit["final_cash"], audit["final_shares"], audit["n_fills"]))
++print("  insolvent={} -> decision_relevant_classification={}".format(
++    audit["insolvent"], decision))
++print("  reason: {}".format(decision_reason))
++
+ # Determinism: rerun two cells and assert identical output.
+ det_checks = [("AMZN", 5, 1.0), ("JPM", 10, 2.0)]
+ det_ok = True
+ for ticker, lb, mult in det_checks:
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -419,8 +419,10 @@
+             mean_null_median=mn,
+             mean_cost_adjusted_edge=(round(mc - mn, 4)
+                                      if mc is not None and mn is not None else None),
+             edge_asset_count=sum(1 for t in cell if is_edge(cell[t])),
++            extreme_null_assets=sorted(
++                t for t in cell if cell[t]["null_dispersion"] > 0.1),
+             per_asset=cell,
+         )
+ 
+ artifact = dict(
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -437,12 +437,19 @@
+              min_segment_bars=MIN_SEGMENT_BARS),
+ ticker_order=ticker_order,
+ per_cell=per_cell,
+ classification=dict(
+-    per_lookback=classes,
+-    edge_counts=edge_counts,
+-    overall_primary=primary,
+-    overall_survives_2x_conservative=survives_2x,
++    predeclared_rule=dict(
++        per_lookback=classes,
++        edge_counts=edge_counts,
++        overall_primary=primary,
++        overall_survives_2x_conservative=survives_2x,
++    ),
++    instrument_audit=audit,
++    decision_relevant=dict(
++        classification=decision,
++        reason=decision_reason,
++    ),
+ ),
+ cross_consistency_zero_vs_prior=dict(
+     artifact=str(SWEEP_ARTIFACT.relative_to(Path.cwd())),
+     all_match=all_match,
+
+[0m
+[0m→ [0mRead research/checks/momentum_cost_sensitivity.py[90m [limit=130, offset=330][0m
+Let me verify the edited tail of the check is coherent, then recompile and rerun.
+[0m
+[0m$ [0mpython3 -m py_compile research/checks/momentum_cost_sensitivity.py
+(no output)
+[0m
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review per asset (lookback=5, realistic costs) ===
+  AMZN: 4465 bars, momentum signals 4465, leakage [PASS], realistic-cost total_return +5.518
+  JPM: 4465 bars, momentum signals 4465, leakage [PASS], realistic-cost total_return +3.904
+  no-look-ahead: momentum sign at bar t uses closes[:t] only; costs are applied to every fill in engine._run_bars.
+
+=== 4. Momentum cost grid (lookback 3/5/10 x cost 0.0/0.5/1.0/2.0) ===
+  Realistic cost model: {'commission_per_trade': 2.0, 'commission_per_share': 0.003, 'slippage_cents': 2.0, 'slippage_proportional': 0.0005}
+  Cost multipliers: [0.0, 0.5, 1.0, 2.0] -> ['zero', 'half', 'realistic', 'conservative']
+
+  lookback  3 | zero        (m=0.0) | edge_assets= 6/10 | mean_cand= 0.0613 | mean_null=-0.0197 | gap=  0.081
+  lookback  3 | half        (m=0.5) | edge_assets= 6/10 | mean_cand= 0.0608 | mean_null=-0.0896 | gap= 0.1504
+  lookback  3 | realistic   (m=1.0) | edge_assets= 6/10 | mean_cand= 0.0603 | mean_null=-0.0169 | gap= 0.0772
+  lookback  3 | conservative (m=2.0) | edge_assets= 6/10 | mean_cand= 0.0595 | mean_null= 0.0287 | gap= 0.0308
+
+  lookback  5 | zero        (m=0.0) | edge_assets= 6/10 | mean_cand= 0.0613 | mean_null=-0.0075 | gap= 0.0688
+  lookback  5 | half        (m=0.5) | edge_assets= 5/10 | mean_cand= 0.0608 | mean_null= 0.0246 | gap= 0.0362
+  lookback  5 | realistic   (m=1.0) | edge_assets= 6/10 | mean_cand= 0.0603 | mean_null= 0.0221 | gap= 0.0382
+  lookback  5 | conservative (m=2.0) | edge_assets= 6/10 | mean_cand= 0.0595 | mean_null= 0.0087 | gap= 0.0508
+
+  lookback 10 | zero        (m=0.0) | edge_assets= 5/10 | mean_cand= 0.0613 | mean_null=-0.0193 | gap= 0.0806
+  lookback 10 | half        (m=0.5) | edge_assets= 6/10 | mean_cand= 0.0608 | mean_null=-0.9637 | gap= 1.0245
+  lookback 10 | realistic   (m=1.0) | edge_assets= 6/10 | mean_cand= 0.0604 | mean_null= 0.0098 | gap= 0.0506
+  lookback 10 | conservative (m=2.0) | edge_assets= 6/10 | mean_cand= 0.0582 | mean_null=-0.0111 | gap= 0.0693
+
+=== 5. Cross-consistency: zero-cost column vs momentum_lookback_sweep_results.json ===
+  cross-checked 30 (ticker, lookback) cells -> ALL MATCH
+
+=== 6. A-priori cost classification (predeclared rule) ===
+  lookback  3: class=COST_ROBUST          edge_counts={'0.0': 6, '0.5': 6, '1.0': 6, '2.0': 6}
+  lookback  5: class=COST_ROBUST          edge_counts={'0.0': 6, '0.5': 5, '1.0': 6, '2.0': 6}
+  lookback 10: class=COST_ROBUST          edge_counts={'0.0': 5, '0.5': 6, '1.0': 6, '2.0': 6}
+  OVERALL primary verdict: SURVIVES_REALISTIC_COST
+  OVERALL survives 2x conservative cost: True
+
+=== 7. Instrument audit (negative-equity / metric validity) ===
+  case: NVDA lookback 5 m=0.5 segment turbulent
+  OOS start equity=-168252.9 end equity=-522727.4 eq_min=-522727.4 total_return=2.107
+  final_cash=477272.6 final_shares=-4789753.8 n_fills=291
+  insolvent=True -> decision_relevant_classification=UNVERIFIED
+  reason: existing cost model is scale-dependent (per-share commission_per_share=0.003 and slippage_cents=2.0); under constant-notional sizing it drives the matched coin-flip null into insolvency for low-priced split-adjusted series (NVDA OOS start equity < 0), after which total_return=end/start-1 is a negative/negative ratio whose reported positive value is an accounting artifact; this inflates null dispersion and makes REGIME_STABLE trivially achievable, so the predeclared cost-robustness classification is not decision-grade.
+determinism AMZN lookback 5 m=1.0: identical
+determinism JPM lookback 10 m=2.0: identical
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Momentum cost-sensitivity sweep across the collected universe: exploratory simulation.
+[0m
+Now the independent verifier (fresh path: recompute via `walk_forward` directly, reimplement signals/null, and independently reproduce the insolvency artifact).
+[0m← [0mWrite research/checks/verify_momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 -m py_compile research/checks/verify_momentum_cost_sensitivity.py
+(no output)
+[0m
+[0m$ [0mpython3 research/checks/verify_momentum_cost_sensitivity.py
+=== Gate 1: fresh walk_forward + inlined null (AMZN, JPM; all lookbacks x costs) ===
+  AMZN: all lookbacks x costs recomputed
+  JPM: all lookbacks x costs recomputed
+
+=== Gate 2: zero-cost column cross-consistency (all 10 tickers) ===
+  all 10 tickers x 3 lookbacks zero-cost recomputed -> new + prior
+
+=== Gate 3: classification reproducibility ===
+  lookback 3: edge_counts={'0.0': 6, '0.5': 6, '1.0': 6, '2.0': 6} class=COST_ROBUST (pub {'0.0': 6, '0.5': 6, '1.0': 6, '2.0': 6} COST_ROBUST) -> MATCH
+  lookback 5: edge_counts={'0.0': 6, '0.5': 5, '1.0': 6, '2.0': 6} class=COST_ROBUST (pub {'0.0': 6, '0.5': 5, '1.0': 6, '2.0': 6} COST_ROBUST) -> MATCH
+  lookback 10: edge_counts={'0.0': 5, '0.5': 6, '1.0': 6, '2.0': 6} class=COST_ROBUST (pub {'0.0': 5, '0.5': 6, '1.0': 6, '2.0': 6} COST_ROBUST) -> MATCH
+
+=== Gate 4: instrument audit reproduction (NVDA null insolvency) ===
+  NVDA lb=5 m=0.5 seg0: OOS start=-168252.9 end=-522727.4 total_return=+2.107 (audit -168252.9 -522727.4 2.107) -> MATCH
+  decision_relevant_classification in artifact: UNVERIFIED
+
+=== Gate 5: determinism ===
+  AMZN lb=5 m=1.0 r1=[0.065, 0.076, 0.077] r2=[0.065, 0.076, 0.077] -> identical
+
+All independent recomputations MATCH the artifact; the zero-cost column reproduces the prior sweep; the a-priori classes reproduce; and the null-insolvency instrument audit is independently confirmed.
+NOTE: research/simulation only. No live trading or production execution. Momentum cost-sensitivity independent verification: exploratory simulation.
+[0m
+All 5 verification gates pass. Now the required regression suite.
+[0m$ [0mpython3 -m unittest discover -s tests
+................................................................................./home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/_methods.py:219: RuntimeWarning: Degrees of freedom <= 0 for slice
+  ret = _var(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+/home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/_methods.py:211: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+.........................................../home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/fromnumeric.py:3862: RuntimeWarning: Mean of empty slice
+  return _methods._mean(a, axis=axis, dtype=dtype,
+/home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/_methods.py:134: RuntimeWarning: invalid value encountered in divide
+  ret = um.true_divide(
+............................................
+----------------------------------------------------------------------
+Ran 168 tests in 10.149s
+
+OK
+[0m
+[0m✗ [0mdate -u +%Y-%m-%dT%H:%M:%SZ failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m
+[0m$ [0mgit status --short
+M state/campaign/task_queue.json
+ M state/worker_progress.md
+?? research/checks/momentum_cost_sensitivity.py
+?? research/checks/verify_momentum_cost_sensitivity.py
+?? scratch/diag_cost_fold.py
+?? scratch/diag_cost_monotonicity.py
+?? state/campaign/current_task.json
+?? state/campaign/runs/45056319162/
+?? state/check_artifacts/momentum_cost_sensitivity_results.json
+[0m
+All 168 regression tests pass. Let me gather what I need for the durable record (timestamps, changed files, log conventions).
+[0m✱ [0mGlob "logs/*"[90m 6 matches[0m
+No live clock (`date` denied); I'll use the controller-observed timestamps and mark finish UNVERIFIED rather than invent one. Writing the concise activation log.
+[0m
+[0m← [0mWrite logs/ACTIVATION-2026-11-22.md
+Wrote file successfully.
+[0m
+[0m← [0mWrite state/worker_progress.md
+Wrote file successfully.
+[0m
+Now the required durable handoff record.
+[0m← [0mWrite state/campaign/runs/45056319162/agents/agent_02.json
+Wrote file successfully.
+[0m
+Let me validate the record JSON and confirm required fields are present.
+[0m$ [0mpython3 -m json.tool state/campaign/runs/45056319162/agents/agent_02.json
+{
+    "agent_number": 2,
+    "campaign_slot": 2,
+    "global_agent_number": 2,
+    "role": "HIGHER_ORDER_OBJECTIVE",
+    "task_id": "R-001",
+    "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+    "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+    "question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+    "action": "Executed a predeclared 4-level cost grid (0.0/0.5/1.0/2.0 x the repository's existing realistic model: commission_per_trade=2.0, commission_per_share=0.003, slippage_cents=2.0, slippage_proportional=0.0005) x lookbacks {3,5,10} x the 10-asset collected universe through the existing walk-forward regime/null framework with a cost-matched coin-flip null, added an instrument audit, and independently recomputed via a fresh walk_forward + inlined-null path.",
+    "changed": [
+        "research/checks/momentum_cost_sensitivity.py",
+        "research/checks/verify_momentum_cost_sensitivity.py",
+        "state/check_artifacts/momentum_cost_sensitivity_results.json",
+        "scratch/diag_cost_monotonicity.py",
+        "scratch/diag_cost_fold.py",
+        "logs/ACTIVATION-2026-11-22.md",
+        "state/worker_progress.md"
+    ],
+    "verified": [
+        "python3 research/checks/momentum_cost_sensitivity.py -> exit 0; manifest 10/10 OK; preflight PASSED; leakage PASS; 30/30 zero-cost cells MATCH the prior momentum_lookback_sweep_results.json; determinism identical",
+        "python3 research/checks/verify_momentum_cost_sensitivity.py -> exit 0; 5/5 gates MATCH (AMZN/JPM fresh recompute for all lookbacks x costs; 10-ticker zero-cost tie to prior sweep; a-priori classes reproduce; NVDA null insolvency independently reproduced OOS start -168252.9 -> end -522727.4 with total_return +2.107; determinism identical)",
+        "python3 -m unittest discover -s tests -> Ran 168 tests, OK",
+        "artifact classification.decision_relevant.classification = UNVERIFIED with classification.instrument_audit.insolvent = true"
+    ],
+    "unverified": [
+        "finish timestamp (no independent clock available; date is denied by project policy; not backfilled)",
+        "whether a scale-invariant (percentage-of-notional) cost model would change the verdict (not tested; a new cost model is out of this task's scope)",
+        "whether the candidate (momentum) equity itself approaches insolvency in any fold of any asset at high cost (the coin-flip null insolvency is independently confirmed; the candidate was not exhaustively enumerated fold-by-fold)"
+    ],
+    "observed_effect": "The selected cost-qualification task did NOT yield a clean cost-robustness verdict. The predeclared classifier nominally returns COST_ROBUST / SURVIVES_REALISTIC_COST (positive-edge asset counts stable at 5-6/10 across m=0.0..2.0), but independent inspection showed the existing cost model is scale-dependent (per-share commission 0.003 and slippage 2.0c) and, under the engine's constant-notional sizing, drives the matched coin-flip NULL into insolvency for low-priced split-adjusted series (NVDA lookback-5 m=0.5 first-segment OOS start equity -168252.9); total_return=eq[-1]/eq[0]-1 then returns a meaningless +2.107 from a negative/negative ratio, inflating null dispersion and making REGIME_STABLE trivially achievable. Candidate medians are stable (universe mean candidate median 0.0613 at zero cost -> 0.0595 at 2x); the zero-cost momentum evidence is intact (zero-cost column reproduces the prior sweep exactly).",
+    "uncertainty_targeted": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+    "uncertainty_reduced": "Reduced uncertainty about the measurement instrument: established that the repository's existing realistic cost model cannot answer the cost-robustness question (scale-dependence plus a negative-equity total_return artifact), so the momentum cost question must NOT be recorded as a pass. Did NOT resolve whether the edge survives a valid cost model.",
+    "process_decision": "RETAIN",
+    "research_result": "UNVERIFIED / INCONCLUSIVE for cost robustness. The predeclared rule fired COST_ROBUST (SURVIVES_REALISTIC_COST, survives 2x=True) but this is not decision-grade: the existing cost model is scale-dependent and drives the matched coin-flip null into insolvency, producing meaningless positive total_return and trivially-passing REGIME_STABLE verdicts. A verified methodology defect was identified and preserved with a reproducible audit; the zero-cost momentum evidence is unchanged.",
+    "decision": "UNVERIFIED",
+    "next": "Repair the cost model to be scale-invariant (percentage-of-notional commission and slippage) and make total_return solvent-only, then rerun the same predeclared 4x3x10 grid and the existing independent verifier.",
+    "candidate_tasks": [
+        {
+            "task_id": "R-006",
+            "role": "HIGHER_ORDER_OBJECTIVE",
+            "status": "OPEN",
+            "bottleneck": "The existing realistic cost model is scale-dependent (per-share commission/slippage) and the total_return metric is undefined for insolvent (negative-equity) folds, so no momentum cost-robustness verdict can be admitted.",
+            "objective": "Repair the transaction-cost model to be scale-invariant (percentage-of-notional) and make fold returns solvent-only, then rerun the predeclared lookback {3,5,10} x cost {0.0,0.5,1.0,2.0} momentum grid with a matched null.",
+            "primary_question": "Under a scale-invariant cost model with solvent-only accounting, does the short-horizon momentum edge survive realistic transaction costs on the collected universe?",
+            "scope": "Modify only the cost/metric layer (BacktestConfig cost fields or a percentage-of-notional cost option, plus a solvent-only fold-return rule); reuse the existing 10-asset universe, momentum signals, walk-forward windows, volatility blocks, and matched null.",
+            "out_of_scope": "Do not tune the momentum signal, expand the universe, add leverage, or change the IS/OOS windows.",
+            "deliverable": "A reproducible scale-invariant cost-sensitivity artifact plus independent verification and a cost-robustness classification.",
+            "evidence_basis": "Agent 02 (R-001) verified that the existing per-share cost model drives the matched null insolvent (NVDA OOS start equity -168252.9) and makes total_return a negative/negative ratio (+2.107), so the R-001 cost-robustness result is not decision-grade.",
+            "expected_information_gain": "HIGH",
+            "downstream_leverage": "HIGH",
+            "falsification_power": "HIGH",
+            "verifiability": "HIGH",
+            "effort": "MEDIUM",
+            "complexity": "MEDIUM",
+            "execution_risk": "MEDIUM",
+            "tests_preceding_process": true,
+            "stop_condition": "Stop after the repaired cost model's grid is evaluated and independently verified.",
+            "success_criterion": "The cost-robustness classification is reproducible and independently verified regardless of positive or negative outcome.",
+            "verification_requirement": "Real-data preflight, leakage gate, solvent-only accounting assertion, matched null, independent recomputation, determinism, and existing regression suite."
+        }
+    ],
+    "complexity_added": "LOW: two focused check scripts (check + independent verifier), one artifact, and two diagnostics; no framework/engine changes; no scope expansion.",
+    "failure_class": "NONE",
+    "task_selection_observation": "IMPROVED"
+}
+[0m
+JSON is valid with all required fields and canonical values. Let me confirm I didn't inadvertently modify the controller-owned task queue.
+[0m$ [0mgit diff -- state/campaign/task_queue.json
+diff --git a/state/campaign/task_queue.json b/state/campaign/task_queue.json
+index b06d4bfa..930f21ea 100644
+--- a/state/campaign/task_queue.json
++++ b/state/campaign/task_queue.json
+@@ -3,257 +3,258 @@
+   "selection_principle": "qualitative_evidence_backed_priority",
+   "tasks": [
+     {
+-      "task_id": "P-001",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+       "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+-      "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+-      "scope": "Use LEARNING_STATE, STATE, activation records, and current controller state; produce one bounded process judgment.",
+-      "out_of_scope": "Do not redesign the controller architecture or add a numerical reward score.",
++      "complexity": "LOW",
+       "deliverable": "A durable process decision with evidence-backed examples from recent activations.",
+-      "success_criterion": "The assessment distinguishes a concrete selector advantage, no demonstrated advantage, or an unresolved result using actual durable evidence.",
+-      "stop_condition": "Stop once the selector decision is supported or the evidence is insufficient for a stronger conclusion.",
+-      "verification_requirement": "Controller-side validation plus inspection of cited durable evidence; no reliance on agent confidence.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "LEARNING_STATE documents the previous frontier-first selection gap and five recent frontier cells closed without equivalent retests.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
++      "out_of_scope": "Do not redesign the controller architecture or add a numerical reward score.",
++      "primary_question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Use LEARNING_STATE, STATE, activation records, and current controller state; produce one bounded process judgment.",
++      "status": "DEFERRED",
++      "stop_condition": "Stop once the selector decision is supported or the evidence is insufficient for a stronger conclusion.",
++      "success_criterion": "The assessment distinguishes a concrete selector advantage, no demonstrated advantage, or an unresolved result using actual durable evidence.",
++      "task_id": "P-001",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Controller-side validation plus inspection of cited durable evidence; no reliance on agent confidence."
+     },
+     {
+-      "task_id": "P-002",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+       "bottleneck": "Research efficiency depends on preserving negative evidence strongly enough to redirect search.",
+-      "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
+-      "scope": "Inspect LEARNING_STATE, STATE, research checks, and campaign queue semantics; propose at most one minimal change.",
+-      "out_of_scope": "Do not rerun historical experiments or add broad metadata systems.",
++      "complexity": "LOW",
+       "deliverable": "A retain/reject/unverified process decision with concrete duplicate-avoidance evidence.",
+-      "success_criterion": "At least one evidence-backed conclusion about duplicate-work prevention is established.",
+-      "stop_condition": "Stop when the duplicate-work question is resolved or clearly unverified.",
+-      "verification_requirement": "Independent controller validation of any implementation change.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "LEARNING_EFFICIENCY already calls for a novelty guard and recent research cells were closed as FALSIFIED/TESTED.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
++      "out_of_scope": "Do not rerun historical experiments or add broad metadata systems.",
++      "primary_question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Inspect LEARNING_STATE, STATE, research checks, and campaign queue semantics; propose at most one minimal change.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the duplicate-work question is resolved or clearly unverified.",
++      "success_criterion": "At least one evidence-backed conclusion about duplicate-work prevention is established.",
++      "task_id": "P-002",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Independent controller validation of any implementation change."
+     },
+     {
+-      "task_id": "P-003",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the durable evidence layer preserve useful negative evidence strongly enough to redirect future research?",
+       "bottleneck": "Negative findings are valuable only if later agents can reliably see and use them.",
+-      "objective": "Audit whether recent falsified frontiers and rejected process decisions are discoverable and actually reflected in the current task queue.",
+-      "scope": "Use durable state only; compare a sample of falsified cells with current task candidates.",
+-      "out_of_scope": "Do not rewrite the entire state model or duplicate the research history.",
++      "complexity": "LOW",
+       "deliverable": "A bounded evidence-preservation assessment and, only if necessary, one minimal durable-state repair.",
+-      "success_criterion": "The audit either verifies preservation/reuse or identifies one specific failure that can be repaired and verified.",
+-      "stop_condition": "Stop after the sampled evidence is sufficient to classify the preservation mechanism.",
+-      "verification_requirement": "Controller-side schema validation plus inspection of the referenced durable records.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "The repository contains extensive FALSIFIED and TESTED frontier entries plus a dedicated LEARNING_STATE layer.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Audit whether recent falsified frontiers and rejected process decisions are discoverable and actually reflected in the current task queue.",
++      "out_of_scope": "Do not rewrite the entire state model or duplicate the research history.",
++      "primary_question": "Does the durable evidence layer preserve useful negative evidence strongly enough to redirect future research?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Use durable state only; compare a sample of falsified cells with current task candidates.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the sampled evidence is sufficient to classify the preservation mechanism.",
++      "success_criterion": "The audit either verifies preservation/reuse or identifies one specific failure that can be repaired and verified.",
++      "task_id": "P-003",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Controller-side schema validation plus inspection of the referenced durable records."
+     },
+     {
+-      "task_id": "P-004",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does the odd/even role split add measurable learning value without creating unnecessary orchestration complexity?",
+       "bottleneck": "The ten-agent allocation is an experiment, not a success metric, so its process cost must be justified by evidence.",
+-      "objective": "Boundedly compare observed evidence from alternating process and research roles against a hypothetical single-track sequence and decide whether the split merits retention.",
+-      "scope": "Inspect campaign records only; use qualitative evidence and complexity observations.",
+-      "out_of_scope": "Do not add a quantitative reward score or duplicate workflow infrastructure.",
++      "complexity": "MEDIUM",
+       "deliverable": "A process decision supported by campaign evidence.",
+-      "success_criterion": "The role split is classified as RETAIN, REJECT, or UNVERIFIED using actual campaign evidence.",
+-      "stop_condition": "Stop when the current campaign contains enough observations to classify the split.",
+-      "verification_requirement": "Final controller synthesis must preserve disagreement and unverified evidence.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "The campaign explicitly alternates LEARNING_PROCESS and HIGHER_ORDER_OBJECTIVE roles to create a meta-learning loop.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Boundedly compare observed evidence from alternating process and research roles against a hypothetical single-track sequence and decide whether the split merits retention.",
++      "out_of_scope": "Do not add a quantitative reward score or duplicate workflow infrastructure.",
++      "primary_question": "Does the odd/even role split add measurable learning value without creating unnecessary orchestration complexity?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Inspect campaign records only; use qualitative evidence and complexity observations.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the current campaign contains enough observations to classify the split.",
++      "success_criterion": "The role split is classified as RETAIN, REJECT, or UNVERIFIED using actual campaign evidence.",
++      "task_id": "P-004",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Final controller synthesis must preserve disagreement and unverified evidence."
+     },
+     {
+-      "task_id": "P-005",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does an explicit stop condition reduce scope expansion enough to improve validated learning efficiency?",
+       "bottleneck": "Focused tasks lose efficiency if agents continue interesting side paths after the evidence gate is already satisfied.",
+-      "objective": "Audit the campaign contracts and agent records for scope expansion pressure and determine whether the explicit stop boundary should be retained or minimally strengthened.",
+-      "scope": "Inspect campaign contracts, agent records, and worker progress; propose at most one minimal process change.",
+-      "out_of_scope": "Do not redesign Kilo execution, add scoring, or pursue any secondary research experiment.",
++      "complexity": "LOW",
+       "deliverable": "A bounded process decision with evidence about scope control and stop-condition effectiveness.",
+-      "success_criterion": "The evidence supports RETAIN, REJECT, or UNVERIFIED for the explicit stop boundary.",
+-      "stop_condition": "Stop once observed scope behavior is sufficient to classify the stop-condition mechanism.",
+-      "verification_requirement": "Controller-side validation of the durable record and any changed process artifact.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "The campaign requires zero intentional scope expansion and exactly one stop condition per focused task.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "MEDIUM",
++      "objective": "Audit the campaign contracts and agent records for scope expansion pressure and determine whether the explicit stop boundary should be retained or minimally strengthened.",
++      "out_of_scope": "Do not redesign Kilo execution, add scoring, or pursue any secondary research experiment.",
++      "primary_question": "Does an explicit stop condition reduce scope expansion enough to improve validated learning efficiency?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Inspect campaign contracts, agent records, and worker progress; propose at most one minimal process change.",
++      "status": "OPEN",
++      "stop_condition": "Stop once observed scope behavior is sufficient to classify the stop-condition mechanism.",
++      "success_criterion": "The evidence supports RETAIN, REJECT, or UNVERIFIED for the explicit stop boundary.",
++      "task_id": "P-005",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Controller-side validation of the durable record and any changed process artifact."
+     },
+     {
+-      "task_id": "P-006",
+-      "role": "LEARNING_PROCESS",
+-      "status": "OPEN",
+-      "primary_question": "Does independent controller validation distinguish evidence quality from agent-reported confidence reliably enough for campaign decisions?",
+       "bottleneck": "The research system must not confuse a plausible explanation or successful session with validated learning.",
+-      "objective": "Inspect agent records and controller validation outputs to determine whether the current evidence hierarchy catches unsupported claims and whether one minimal safeguard is warranted.",
+-      "scope": "Audit controller validation outputs, durable records, and final synthesis semantics.",
+-      "out_of_scope": "Do not add a numeric reward score or duplicate an independent research engine.",
++      "complexity": "LOW",
+       "deliverable": "A bounded process decision about evidence-versus-confidence separation.",
+-      "success_criterion": "The sampled controller records support a clear process classification or expose one specific verifiable gap.",
+-      "stop_condition": "Stop when the sampled records are sufficient to classify the separation mechanism.",
+-      "verification_requirement": "Independent inspection of controller validation outputs and regression tests for any implementation change.",
++      "downstream_leverage": "HIGH",
++      "effort": "LOW",
+       "evidence_basis": "The repository explicitly treats Kilo success status, activity, and confidence as insufficient evidence.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Inspect agent records and controller validation outputs to determine whether the current evidence hierarchy catches unsupported claims and whether one minimal safeguard is warranted.",
++      "out_of_scope": "Do not add a numeric reward score or duplicate an independent research engine.",
++      "primary_question": "Does independent controller validation distinguish evidence quality from agent-reported confidence reliably enough for campaign decisions?",
++      "role": "LEARNING_PROCESS",
++      "scope": "Audit controller validation outputs, durable records, and final synthesis semantics.",
++      "status": "OPEN",
++      "stop_condition": "Stop when the sampled records are sufficient to classify the separation mechanism.",
++      "success_criterion": "The sampled controller records support a clear process classification or expose one specific verifiable gap.",
++      "task_id": "P-006",
++      "tests_preceding_process": false,
+       "verifiability": "HIGH",
+-      "effort": "LOW",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": false
++      "verification_requirement": "Independent inspection of controller validation outputs and regression tests for any implementation change."
+     },
+     {
+-      "task_id": "R-001",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+       "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+-      "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+-      "scope": "Use the existing 10-asset collected universe and existing momentum implementation/check framework.",
+-      "out_of_scope": "Do not tune signal rules after seeing cost results, expand the universe, or introduce leverage.",
++      "complexity": "LOW",
+       "deliverable": "A reproducible artifact and independent verification result classifying cost robustness.",
+-      "success_criterion": "The result is reproducible and independently verified, regardless of positive or negative outcome.",
+-      "stop_condition": "Stop after the predeclared cost grid is evaluated and the independent verifier agrees or records the exact discrepancy.",
+-      "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, and existing regression suite.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "LEARNING_STATE admits short-horizon momentum as candidate positive evidence but leaves execution-cost robustness as a meaningful qualification.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
++      "out_of_scope": "Do not tune signal rules after seeing cost results, expand the universe, or introduce leverage.",
++      "primary_question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "Use the existing 10-asset collected universe and existing momentum implementation/check framework.",
++      "selected_agent": 2,
++      "status": "SELECTED",
++      "stop_condition": "Stop after the predeclared cost grid is evaluated and the independent verifier agrees or records the exact discrepancy.",
++      "success_criterion": "The result is reproducible and independently verified, regardless of positive or negative outcome.",
++      "task_id": "R-001",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": true
++      "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, and existing regression suite."
+     },
+     {
+-      "task_id": "R-002",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does the qualified momentum effect survive a small predeclared holding-period variation without becoming a single-point timing artifact?",
+       "bottleneck": "The current evidence is strongest for one-day holding, so temporal robustness is still partly unresolved.",
+-      "objective": "Test a fixed lookback-5 momentum signal with a predeclared small holding-period set using the existing walk-forward/null methodology.",
+-      "scope": "Use only the existing 10-asset universe and a fixed hold-period grid declared before execution.",
+-      "out_of_scope": "Do not tune the lookback or choose a holding period after inspecting results.",
++      "complexity": "LOW",
+       "deliverable": "A reproducible robustness artifact plus independent verification.",
+-      "success_criterion": "The holding-period sensitivity is classified and any positive finding is reproducible.",
+-      "stop_condition": "Stop after the declared holding-period grid is complete and independently checked.",
+-      "verification_requirement": "Matched null, leakage review, independent recomputation, determinism, regression suite.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "Momentum is candidate positive evidence at a one-day hold and has already survived lookback and horizon robustness in magnitude.",
++      "execution_risk": "LOW",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Test a fixed lookback-5 momentum signal with a predeclared small holding-period set using the existing walk-forward/null methodology.",
++      "out_of_scope": "Do not tune the lookback or choose a holding period after inspecting results.",
++      "primary_question": "Does the qualified momentum effect survive a small predeclared holding-period variation without becoming a single-point timing artifact?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "Use only the existing 10-asset universe and a fixed hold-period grid declared before execution.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the declared holding-period grid is complete and independently checked.",
++      "success_criterion": "The holding-period sensitivity is classified and any positive finding is reproducible.",
++      "task_id": "R-002",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "LOW",
+-      "execution_risk": "LOW",
+-      "tests_preceding_process": true
++      "verification_requirement": "Matched null, leakage review, independent recomputation, determinism, regression suite."
+     },
+     {
+-      "task_id": "R-003",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does a single past-only volatility gate create a predeclared robustness improvement for the qualified momentum effect?",
+       "bottleneck": "A candidate momentum effect may depend on market regime even after horizon robustness.",
+-      "objective": "Test one explicitly predeclared past-only volatility gate on lookback-5 momentum through the existing regime-stability and null framework.",
+-      "scope": "One volatility feature, one threshold rule declared before execution, existing 10-asset universe.",
+-      "out_of_scope": "Do not search a threshold grid or optimize the gate after seeing results.",
++      "complexity": "MEDIUM",
+       "deliverable": "A falsifiable regime-conditioned momentum result with independent verification.",
+-      "success_criterion": "The gate either demonstrates a reproducible improvement in robustness or is falsified/unsupported.",
+-      "stop_condition": "Stop after the one predeclared gate is evaluated and independently checked.",
+-      "verification_requirement": "Leakage gate, matched null, regime-stability, independent recomputation, determinism.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "MA regime filters were previously falsified; whether the same class of conditioning helps the different momentum mechanism remains unresolved.",
++      "execution_risk": "MEDIUM",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Test one explicitly predeclared past-only volatility gate on lookback-5 momentum through the existing regime-stability and null framework.",
++      "out_of_scope": "Do not search a threshold grid or optimize the gate after seeing results.",
++      "primary_question": "Does a single past-only volatility gate create a predeclared robustness improvement for the qualified momentum effect?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "One volatility feature, one threshold rule declared before execution, existing 10-asset universe.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the one predeclared gate is evaluated and independently checked.",
++      "success_criterion": "The gate either demonstrates a reproducible improvement in robustness or is falsified/unsupported.",
++      "task_id": "R-003",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "MEDIUM",
+-      "tests_preceding_process": true
++      "verification_requirement": "Leakage gate, matched null, regime-stability, independent recomputation, determinism."
+     },
+     {
+-      "task_id": "R-004",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "RESOLVED",
+-      "primary_question": "Does a fixed 20-day breakout continuation signal produce reproducible evidence beyond the currently qualified momentum family?",
+       "bottleneck": "The research frontier needs genuinely new signal classes rather than endless momentum variants.",
+-      "objective": "Test one fixed 20-day breakout continuation rule on the collected universe through the existing robustness gate stack.",
+-      "scope": "One predeclared breakout rule, existing data universe, existing walk-forward, regime, null, and independent-verification infrastructure.",
+-      "out_of_scope": "Do not sweep breakout lengths, tune after seeing results, or add new data dependencies.",
++      "complexity": "MEDIUM",
+       "deliverable": "A reproducible new-signal-class artifact with independent verification and a clear verdict.",
+-      "success_criterion": "The hypothesis is classified as falsified, supported, or unverified by the existing evidence standard.",
+-      "stop_condition": "Stop after the fixed rule completes the declared gate stack.",
+-      "verification_requirement": "Data preflight, leakage, regime stability, matched null, independent recomputation, determinism, regression suite.",
++      "downstream_leverage": "HIGH",
++      "effort": "MEDIUM",
+       "evidence_basis": "The current frontier explicitly calls for a genuinely new signal class or new data/method frontier after momentum qualification.",
++      "execution_risk": "MEDIUM",
+       "expected_information_gain": "HIGH",
+-      "downstream_leverage": "HIGH",
+       "falsification_power": "HIGH",
++      "objective": "Test one fixed 20-day breakout continuation rule on the collected universe through the existing robustness gate stack.",
++      "out_of_scope": "Do not sweep breakout lengths, tune after seeing results, or add new data dependencies.",
++      "primary_question": "Does a fixed 20-day breakout continuation signal produce reproducible evidence beyond the currently qualified momentum family?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "One predeclared breakout rule, existing data universe, existing walk-forward, regime, null, and independent-verification infrastructure.",
++      "status": "RESOLVED",
++      "stop_condition": "Stop after the fixed rule completes the declared gate stack.",
++      "success_criterion": "The hypothesis is classified as falsified, supported, or unverified by the existing evidence standard.",
++      "task_id": "R-004",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "MEDIUM",
+-      "tests_preceding_process": true
++      "verification_requirement": "Data preflight, leakage, regime stability, matched null, independent recomputation, determinism, regression suite."
+     },
+     {
+-      "task_id": "R-005",
+-      "role": "HIGHER_ORDER_OBJECTIVE",
+-      "status": "OPEN",
+-      "primary_question": "Does a conservative volatility-normalized sizing variant preserve a positive momentum signal without creating leverage-dependent evidence?",
+       "bottleneck": "A research candidate should not depend on uncontrolled sizing assumptions.",
+-      "objective": "Evaluate one fixed volatility-normalized sizing rule for the already-qualified momentum signal without leverage and with the existing null.",
+-      "scope": "One fixed sizing rule, existing universe, existing research engine, no leverage.",
+-      "out_of_scope": "Do not optimize sizing parameters or compare many variants.",
++      "complexity": "MEDIUM",
+       "deliverable": "A bounded sizing robustness result and independent verification.",
+-      "success_criterion": "The result distinguishes signal robustness from sizing artifacts.",
+-      "stop_condition": "Stop after the fixed sizing rule is tested and independently checked.",
+-      "verification_requirement": "Leakage, cost assumptions, matched null, independent recomputation, determinism.",
++      "downstream_leverage": "MEDIUM",
++      "effort": "MEDIUM",
+       "evidence_basis": "The current candidate is mechanical and short-horizon; separating signal evidence from sizing effects is decision-relevant.",
++      "execution_risk": "MEDIUM",
+       "expected_information_gain": "MEDIUM",
+-      "downstream_leverage": "MEDIUM",
+       "falsification_power": "MEDIUM",
++      "objective": "Evaluate one fixed volatility-normalized sizing rule for the already-qualified momentum signal without leverage and with the existing null.",
++      "out_of_scope": "Do not optimize sizing parameters or compare many variants.",
++      "primary_question": "Does a conservative volatility-normalized sizing variant preserve a positive momentum signal without creating leverage-dependent evidence?",
++      "role": "HIGHER_ORDER_OBJECTIVE",
++      "scope": "One fixed sizing rule, existing universe, existing research engine, no leverage.",
++      "status": "OPEN",
++      "stop_condition": "Stop after the fixed sizing rule is tested and independently checked.",
++      "success_criterion": "The result distinguishes signal robustness from sizing artifacts.",
++      "task_id": "R-005",
++      "tests_preceding_process": true,
+       "verifiability": "HIGH",
+-      "effort": "MEDIUM",
+-      "complexity": "MEDIUM",
+-      "execution_risk": "MEDIUM",
+-      "tests_preceding_process": true
++      "verification_requirement": "Leakage, cost assumptions, matched null, independent recomputation, determinism."
+     }
+   ]
+ }
+[0m
+The task queue diff is entirely the controller's pre-session normalization/selection (R-001 → SELECTED, selected_agent: 2; P-001 → DEFERRED) — I did not modify it. All my writes are the ones declared.
+
