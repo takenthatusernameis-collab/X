@@ -1,0 +1,107 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+[0m→ [0mRead state/LEARNING_STATE.md
+I'll start by inspecting the durable state to understand the current learning process and history.
+[0m→ [0mRead state/STATE.md
+Let me continue reading STATE.md and inspect the campaign queue semantics.
+[0m→ [0mRead state/STATE.md[90m [offset=852][0m
+[0m✗ [0mls -la /home/runner/work/X/X/state/campaign/runs/45721512242/agents/ 2>/dev/null; echo "---"; ls -la /home/runner/work/X/X/state/campaign/ 2>/dev/null failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+Bash is denied at this layer; I'll use repository-native tools. Let me inspect the campaign structure and task history.
+[0m✱ [0mGlob "state/**/*.json"[90m 33 matches[0m
+[0m✱ [0mGlob "state/campaign/**/*"[90m 27 matches[0m
+[0m→ [0mRead state/campaign/task_queue.json
+Let me read the task queue, current task, and the agent records to understand queue semantics and history.
+[0m→ [0mRead state/campaign/current_task.json
+[0m→ [0mRead state/campaign/runs/45721512242/task_queue_initial.json
+[0m→ [0mRead state/campaign/runs/45721512242/agents/agent_01.json
+Let me read the agent records, worker progress, and validation files.
+[0m→ [0mRead state/worker_progress.md
+[0m→ [0mRead state/campaign/runs/45721512242/agents/agent_02.json
+[0m✱ [0mGlob "research/checks/*.py"[90m 32 matches[0m
+[0m✱ [0mGlob "logs/*.md"[90m 6 matches[0m
+[0m→ [0mRead state/campaign/runs/45721512242/agents/agent_02_validation.json
+Let me inspect the research checks directory and activation logs to build the duplicate-work picture.
+Interesting: `momentum_hold_period_sensitivity.py` exists but R-002 (holding-period sensitivity) is still OPEN with no artifact. Let me investigate this potential duplicate-work signal.
+[0m→ [0mRead research/checks/momentum_hold_period_sensitivity.py[90m [limit=60][0m
+[0m✱ [0mGrep "hold_period|holding.period|hold-period"[90m 38 matches[0m
+[0m→ [0mRead research/checks/momentum_hold_period_sensitivity.py[90m [offset=430][0m
+A complete 491-line R-002 check exists but R-002 is OPEN with no artifact and no frontier mention. Let me confirm the check is complete/runnable and compare the two momentum sweep files for near-duplication.
+[0m→ [0mRead research/checks/momentum_sweep.py[90m [limit=40][0m
+[0m✱ [0mGrep "results\.json|ARTIFACT|def main"[90m 6 matches[0m
+[0m✱ [0mGrep "results\.json|ARTIFACT_PATH"[90m 3 matches[0m
+Two check files appear invisible to the frontier: `momentum_hold_period_sensitivity.py` (complete, R-002, no artifact) and `momentum_sweep.py` (lookback 3/5/10/20). Let me confirm artifact targets to classify them precisely.
+[0m✱ [0mGrep "results\.json|ARTIFACT_PATH"[90m 3 matches[0m
+I now have concrete duplicate-avoidance evidence. Let me record the pre-work notes and then make the minimal durable change.
+
+**Pre-work answers:**
+1. **Better at learning:** choosing the highest-value unresolved hypothesis and closing it once with decisive, independently-verified evidence (frontier-first selection).
+2. **Current constraint:** the durable record prevents duplicate *experiments* (verdict level) but not near-duplicate *files* — two check files are invisible to the frontier/queue.
+3. **Uncertainty:** whether history adequately prevents repeating equivalent work when a cell is resolved.
+4. **Bounded action:** audit resolved cells + queue vs. `research/checks/` + `state/check_artifacts/`, then add one minimal novelty-guard note.
+5. **Worth it:** LOW effort/risk, HIGH leverage — a future agent could re-author/re-run an existing pending or superseded check.
+
+Evidence found:
+- `momentum_hold_period_sensitivity.py`: complete R-002 implementation, **no artifact**, R-002 OPEN, absent from frontier → *pending, must execute not re-author*.
+- `momentum_sweep.py`: lookback {3,5,10,20}, writes absent `momentum_sweep_results.json`; near-duplicate of recorded `momentum_lookback_sweep.py` ({3,5,10}) + `momentum_longer_horizon.py` ({20,60}) → *superseded*.
+- No duplicate *experiment* across 9 resolved cells (rule 2 works at verdict level).
+
+Applying the one minimal change to `LEARNING_STATE.md`:
+[0m
+[0m← [0mEdit state/LEARNING_STATE.md
+Index: /home/runner/work/X/X/state/LEARNING_STATE.md
+===================================================================
+--- /home/runner/work/X/X/state/LEARNING_STATE.md
++++ /home/runner/work/X/X/state/LEARNING_STATE.md
+@@ -69,4 +69,33 @@
+ 4. Do not use OOS results as a process-tuning oracle.
+ 5. Preserve negative and inconclusive evidence.
+ 6. Do not claim a strategy delta worked until its expected effect is actually observed.
+ 7. When there is insufficient evidence, choose UNVERIFIED rather than forcing RETAIN or REVERT.
++
++## Novelty guard (duplicate-avoidance) — P-002, agent 03 (run 45721512242)
++
++Audit of the resolved frontier cells plus task history found NO duplicate
++*experiment*: 9 cells were each closed once (MA crossover, mean-reversion,
++cross-sectional relative strength, volatility targeting, momentum, momentum
++longer-horizon, cross-sectional momentum, 20-day breakout, momentum
++cost-sensitivity). The principle-level guard (Learning rule 2) is therefore
++RETAINED and effective at the verdict level.
++
++Concrete gap found — near-duplicate *files* that are invisible to the frontier
++table and task queue:
++- `research/checks/momentum_hold_period_sensitivity.py` — a complete R-002
++  implementation (HOLD_PERIODS=(1,2,3,5); writes
++  `state/check_artifacts/momentum_hold_period_sensitivity_results.json`), but NO
++  artifact exists and the frontier table does not mention holding-period.
++  Status: PENDING EXECUTION — a future R-002 activation must run and verify this
++  file, not re-author it.
++- `research/checks/momentum_sweep.py` — lookback sweep {3,5,10,20} writing
++  `momentum_sweep_results.json` (absent); a near-duplicate of the recorded
++  `momentum_lookback_sweep.py` ({3,5,10}) and `momentum_longer_horizon.py`
++  ({20,60}). Status: SUPERSEDED — do not re-run without a new information
++  objective.
++
++Minimal guard adopted (one step, no new metadata system): before executing any
++queued task, grep `research/checks/` and `state/check_artifacts/` for an existing
++implementation/artifact; if one exists, the task record MUST cite it and either
++execute/verify it or record why it is superseded. This closes the observed
++file-level gap without new infrastructure.
+
+[0m
+Now update the worker progress milestone and write the durable agent record.
+[0m← [0mWrite state/worker_progress.md
+Wrote file successfully.
+[0m
+[0m← [0mWrite state/campaign/runs/45721512242/agents/agent_03.json
+Wrote file successfully.
+[0m
+Let me verify both edits landed correctly.
+[0m→ [0mRead state/LEARNING_STATE.md[90m [offset=63][0m
+[0m→ [0mRead state/campaign/runs/45721512242/agents/agent_03.json[90m [limit=20][0m
+[0m→ [0mRead state/campaign/runs/45721512242/agents/agent_03.json[90m [offset=44][0m
+Both edits are in place. Let me confirm the JSON record closes cleanly.
+The record is complete and valid. Task P-002 is done.
+

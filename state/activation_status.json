@@ -1,44 +1,56 @@
 {
-  "activation_id": "37414038601",
-  "run_attempt": "1",
-  "sha": "a29ba2245a0e97007a63f3814bae9b5263204d63",
-  "ref_name": "main",
-  "repository": "takenthatusernameis-collab/X",
-  "status": "COMPLETE",
-  "phase": "COMPLETE",
-  "objective": "Execute task R-004 from the campaign queue: test whether a fixed 20-day breakout continuation signal (long when the close exceeds the highest close of the preceding 20 trading days; hold 1 day; daily rebalance) produces reproducible evidence beyond the currently qualified momentum family, on the collected 10-asset adjusted-close universe through the existing gate stack (manifest, preflight, leakage review, walk-forward regime-stability gate with matched coin-flip null, bounded lookback sensitivity, determinism, independent verifier), and record the verdict in the frontier.",
-  "start_time": null,
-  "finish_time": null,
+  "activation_id": "45721512242",
+  "campaign_outcome": "QUARANTINED",
   "changed": [
-    "research/backtest/regime_stability.py (new: breakout_signals() — past-only 20-day breakout continuation signal; exported)",
-    "research/backtest/__init__.py (export of breakout_signals added)",
-    "research/checks/breakout_20day_cont.py (new: breakout continuation check, lookbacks 5/10/20, 10-asset regime-stability gate, sensitivity verdicts, artifact)",
-    "research/checks/verify_breakout_20day_cont.py (new: independent verifier, 3 gates)",
-    "research/checks/smoke_breakout_signals.py (scratch: representative smoke test; retained as a useful diagnostic)",
-    "tests/test_regime_stability.py (5 new unit tests for breakout_signals: contract, past-only, determinism, edge case, regime-stress integration)",
-    "state/check_artifacts/breakout_20day_cont_results.json (new artifact)",
-    "state/STATE.md (new section documenting the breakout frontier cell, method, results, independent verification, and verdict)",
-    "state/LEARNING_STATE.md (frontier table entry, learning-history row, Next action updated)",
-    "state/activation_status.json (updated for activation 37414038601)",
-    "state/worker_progress.md (updated phase/milestone)",
-    "logs/ACTIVATION-2026-10-06.md (new activation record)"
+    "research/checks/momentum_cost_sensitivity.py",
+    "research/checks/verify_momentum_cost_sensitivity.py",
+    "scratch/diag_cost.py",
+    "scratch/dump_cost.py",
+    "state/LEARNING_STATE.md",
+    "state/STATE.md",
+    "state/campaign/runs/45721512242/agents/agent_03.json",
+    "state/check_artifacts/momentum_cost_sensitivity_results.json",
+    "state/worker_progress.md",
+    "tests/test_momentum_cost_sensitivity.py"
+  ],
+  "next": "P-001",
+  "objective": "Sequential focused-task campaign to improve validated learning efficiency and higher-order quantitative-research capability.",
+  "persistence_decision": "RECOVERY_BRANCH",
+  "phase": "COMPLETE",
+  "process_conclusion": [
+    "unverified",
+    "The durable history DOES prevent duplicate experiments at the verdict level (9 resolved cells, each closed once, no equivalent re-test recorded), so the principle-level novelty guard (Learning rule 2) is retained. The audit exposed a file-level gap: two check files are invisible to the frontier/queue. momentum_hold_period_sensitivity.py is a complete but unexecuted R-002 implementation (no artifact), and momentum_sweep.py is a near-duplicate lookback sweep (3/5/10/20) of two recorded checks with no artifact. A minimal one-step novelty guard was adopted to close this gap without new infrastructure.",
+    "unverified",
+    "unverified",
+    "unverified"
+  ],
+  "research_conclusion": [
+    "Cost-sensitivity classified and independently verified. Predeclared null-relative classification (reference lookback 5): COST_ROBUST=7 (AAPL, MSFT, GOOGL, AMZN, META, TSLA, JPM), COST_MODERATE=0, COST_FRAGILE=0, ZERO_COST_ONLY=0, NO_EDGE=3 (NVDA, JNJ, XOM); 0x lookback-5 column reproduces momentum_results.json exactly (7 REGIME_STABLE / 1 REGIME_DEPENDENT / 2 CONSISTENT_WITH_NOISE). Candidate medians are cost-invariant (9/10 assets move <=0.01 from 0x to 5x), so the edge magnitude is cost-robust; however the matched coin-flip null is not turnover-matched and is unstable under cost, confounding the null-relative verdict. The momentum candidate is retained as candidate positive evidence, now qualified: magnitude cost-robust; null-relative cost verdict pending a turnover-matched benchmark.",
+    "UNVERIFIED",
+    "UNVERIFIED",
+    "UNVERIFIED",
+    "UNVERIFIED"
+  ],
+  "status": "QUARANTINED",
+  "unverified": [
+    "Independent controller validation of the LEARNING_STATE.md novelty-guard edit is pending (controller-side, per verification_requirement).",
+    "Live/production profitability is not tested; this is research simulation only.",
+    "No code or tests were changed; tests_preceding_process=false, so no regression suite applies to this documentation/process change.",
+    "The turnover-matched null is not yet implemented, so the null-relative cost verdict/classification remains confounded by null turnover (candidate task C-001).",
+    "Whether momentum_sweep.py was ever executed in an earlier activation is not established from durable artifacts (no artifact present); it is classified SUPERSEDED on file-overlap evidence, not on a recorded run.",
+    "agent record failed controller validation",
+    "candidate_task_0_invalid:task missing fields: ['verifiability']",
+    "required agent record missing or unreadable"
   ],
   "verified": [
-    "python3 research/checks/smoke_breakout_signals.py: exits 0; AAPL breakout signals generated for lookbacks 5/10/20; one-regime-segment stress_segments run returns CONSISTENT_WITH_NOISE with 28 folds",
-    "python3 research/checks/breakout_20day_cont.py: exits 0; manifest 10/10 OK; PREFLIGHT PASSED (data-quality and survivorship checks); leakage PASS on AMZN/JPM (signals integrity + equity-fill audit); lookback-5 REGIME_STABLE=3 / CONSISTENT_WITH_NOISE=7 / REGIME_DEPENDENT=0; lookback-10 REGIME_STABLE=1 / CONSISTENT_WITH_NOISE=8 / REGIME_DEPENDENT=1; lookback-20 REGIME_STABLE=1 / CONSISTENT_WITH_NOISE=9; sensitivity ROBUST=1 (TSLA) / SENSITIVE=2 (AAPL, NVDA) / NO_EDGE=7; determinism r1==r2; artifact written",
-    "python3 research/checks/verify_breakout_20day_cont.py: GATE 1 PASS — fresh walk_forward + noise_benchmark recomputation of AMZN/JPM medians/nulls/segments MATCH on lookbacks 5/10/20; GATE 2 PASS — fresh medians/nulls for all 10 assets MATCH artifact; regenerated regime/sensitivity verdicts from unrounded values MATCH; GATE 3 PASS — determinism identical",
-    "python3 -m unittest discover -s tests -v: 161 tests, all passing (156 existing + 5 new breakout_signals unit tests), no regressions",
-    "py_compile check of research/checks/breakout_20day_cont.py, verify_breakout_20day_cont.py, research/backtest/regime_stability.py, research/backtest/__init__.py, tests/test_regime_stability.py — all compile",
-    "git diff HEAD verified: tracked changes limited to the expected files; untracked files are the new check/verifier/artifact/scratch log"
-  ],
-  "unverified": [
-    "No per-checkpoint UTC timestamps captured (the `date` shell form is denied in this environment); run identity anchored to GITHUB_RUN_ID=37414038601, SHA a29ba2245a0e97007a63f3814bae9b5263204d63",
-    "The borderline REGIME_STABLE verdicts for AAPL @5, TSLA @5/@20, NVDA @10 sit just above the framework's 0.05 noise band; their sensitivity to the threshold machinery is not independently quantified (flagged as a caveat in STATE.md)",
-    "The runner does not expose KILO_RECOVERY_BRANCH, so no outstanding recovery branch was inspected this activation"
-  ],
-  "next": "Run task R-001: test whether the qualified momentum edge (lookback 3-5) survives conservative transaction-cost stress on the collected universe (fixed cost model, lookback 3/5/10, matched coin-flip null) through the full gate stack, with an a-priori cost-robustness prediction; report RETAIN/REVERT/UNVERIFIED for whether costs erase the edge.",
-  "acceptance": "COMPLETE — the breakout continuation cell ran end-to-end through the complete gate stack (manifest 10/10, preflight PASSED, leakage PASS, regime-stability gate across all 10 tickers with matched null, bounded lookback sensitivity, determinism), was independently verified by a fresh walk_forward path (all 3 gates MATCH), and the regression suite remains green (161/161 tests pass after adding 5 new unit tests); the verdict is FALSIFIED: the breakout filter adds no robust evidence beyond the momentum family (9/10 CONSISTENT_WITH_NOISE at the canonical 20-day lookback; small, non-lookback-robust positive verdicts only for AAPL, TSLA, NVDA, which are absent from the momentum-asset list). Verdict recorded in state/STATE.md and state/LEARNING_STATE.md; the frontier-first delta remains RETAIN (demonstrated a sixth time: right cell selected, decisive verdict, independent verification).",
-  "research_conclusion": "FALSIFIED — the 20-day breakout continuation rule (long when close > max(close of prior 20 days), hold 1 day) does not produce a reproducible robust edge on the collected large-cap universe. At the canonical 20-day lookback: 9/10 assets CONSISTENT_WITH_NOISE, 1/10 (TSLA) REGIME_STABLE with small positive medians; across {5,10,20} sensitivity: ROBUST=1 (TSLA, edges at lookbacks 5 and 20), SENSITIVE=2 (AAPL @5, NVDA @10), NO_EDGE=7 (MSFT, GOOGL, AMZN, META, JPM, JNJ, XOM). The three positive verdicts are small in magnitude and, except for TSLA, do not survive across lookbacks; the assets showing the momentum edge (MSFT, GOOGL, AMZN, META) show NO_EDGE for breakout. The result matches the a-priori prediction (noise-like in most assets; small positive verdicts only where momentum already had an edge), and the frontier cell closes FALSIFIED. Durable negative finding: the threshold-activated entry filter adds no robust edge beyond raw momentum. Caveat: three borderline REGIME_STABLE assets have medians just above the 0.05 noise band; the verdict machinery is borderline-sensitive for those, so they are recorded as small-effect findings, not as a robust edge.",
-  "verdict": "FALSIFIED",
-  "frontier_cell": "20-day breakout continuation (long when close exceeds the highest close of the prior 20 trading days; hold 1 day) on collected data"
+    "Cross-checked task_queue.json: R-002 status OPEN; no frontier row in LEARNING_STATE.md references holding-period; grep for hold_period/holding-period returned matches only in the check file, the queue, and the quarantine diff (not in STATE.md or LEARNING_STATE.md)",
+    "Inspected state/check_artifacts/ listing: momentum_hold_period_sensitivity_results.json is ABSENT and momentum_sweep_results.json is ABSENT, while momentum_lookback_sweep_results.json and momentum_longer_horizon_results.json are PRESENT",
+    "Read research/checks/momentum_hold_period_sensitivity.py (491 lines, complete with main + artifact write) and confirmed it is the R-002 implementation with HOLD_PERIODS=(1,2,3,5)",
+    "Read research/checks/momentum_sweep.py header + artifact path (writes momentum_sweep_results.json, lookbacks 3/5/10/20) and confirmed near-duplication of the recorded lookback_sweep (3/5/10) and longer_horizon (20/60) checks",
+    "python3 -m py_compile research/checks/momentum_cost_sensitivity.py research/checks/verify_momentum_cost_sensitivity.py tests/test_momentum_cost_sensitivity.py -> exit 0",
+    "python3 -m unittest discover -s tests -> Ran 181 tests, OK (168 baseline + 13 new)",
+    "python3 research/checks/momentum_cost_sensitivity.py -> exit 0; manifest 10/10 OK; PREFLIGHT PASSED; leakage PASS (AMZN/JPM); determinism r1==r2 True; artifact written",
+    "python3 research/checks/verify_momentum_cost_sensitivity.py -> exit 0; Gate 1 fresh walk_forward + noise_benchmark (AMZN/JPM/MSFT/NVDA x lookback {3,5,10} x cost {0,1,2,5}) MATCH; Gate 2 0x lookback-5 vs momentum_results.json MATCH (all 10); Gate 3 classification reproducibility MATCH (all 10); Gate 4 determinism identical",
+    "python3 research/data/preflight.py -> PREFLIGHT PASSED (all data-quality and survivorship checks)"
+  ]
 }

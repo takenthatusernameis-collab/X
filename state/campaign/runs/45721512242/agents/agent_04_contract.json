@@ -1,0 +1,98 @@
+{
+  "agent_number": 4,
+  "bottleneck": "The current evidence is strongest for one-day holding, so temporal robustness is still partly unresolved.",
+  "campaign_slot": 4,
+  "deliverable": "A reproducible robustness artifact plus independent verification.",
+  "evidence_basis": "Momentum is candidate positive evidence at a one-day hold and has already survived lookback and horizon robustness in magnitude.",
+  "global_agent_number": 4,
+  "objective": "Test a fixed lookback-5 momentum signal with a predeclared small holding-period set using the existing walk-forward/null methodology.",
+  "out_of_scope": "Do not tune the lookback or choose a holding period after inspecting results.",
+  "preceding_agent": {
+    "action": "Audited the resolved frontier cells (LEARNING_STATE.md, STATE.md), the campaign task queue (task_queue.json, task_queue_initial.json, current_task.json), the agent records (agent_01/02.json + validations), and the on-disk research checks (research/checks/*.py) against state/check_artifacts/*.json. Confirmed no duplicate experiment across the 9 resolved cells, then identified two check files invisible to the frontier/queue and added one minimal novelty-guard note to LEARNING_STATE.md.",
+    "agent_number": 3,
+    "bottleneck": "Research efficiency depends on preserving negative evidence strongly enough to redirect search.",
+    "campaign_slot": 3,
+    "candidate_tasks": [
+      {
+        "bottleneck": "The novelty guard is currently a manual LEARNING_STATE note; a future agent could still re-author an existing pending check if it does not grep first.",
+        "complexity": "MEDIUM",
+        "deliverable": "A controller-validated novelty-pointer check with a passing regression test.",
+        "downstream_leverage": "MEDIUM",
+        "effort": "MEDIUM",
+        "evidence_basis": "P-002 (agent 03, run 45721512242) found two check files invisible to the frontier/queue (momentum_hold_period_sensitivity.py pending, momentum_sweep.py superseded).",
+        "execution_risk": "LOW",
+        "expected_information_gain": "MEDIUM",
+        "falsification_power": "MEDIUM",
+        "objective": "Add a lightweight controller-side check that, when a task is selected, greps research/checks/ and state/check_artifacts/ and requires the agent record to cite any existing implementation/artifact.",
+        "out_of_scope": "Do not add a broad metadata system, do not rerun historical experiments, do not modify protected workflow files.",
+        "primary_question": "Can the controller enforce the novelty-guard pointer at task-selection time so a task whose check file already exists must cite it before execution?",
+        "role": "LEARNING_PROCESS",
+        "scope": "Controller task-selection/validation path only; no new metadata store, no numerical scoring.",
+        "status": "OPEN",
+        "stop_condition": "Stop after the controller check and its test pass and the durable record is updated.",
+        "success_criterion": "A task whose check file already exists cannot be marked executed without citing it, verified by a unit test.",
+        "task_id": "P-007",
+        "tests_preceding_process": false,
+        "verifiability": "HIGH",
+        "verification_requirement": "Controller-side validation plus regression test for the new check."
+      }
+    ],
+    "changed": [
+      "state/LEARNING_STATE.md",
+      "state/worker_progress.md",
+      "state/campaign/runs/45721512242/agents/agent_03.json"
+    ],
+    "complexity_added": "LOW: one documentation/process note appended to LEARNING_STATE.md plus this audit record and a worker_progress milestone; no code, no new metadata system, no framework change.",
+    "decision": "USEFUL_CHANGE",
+    "failure_class": "NONE",
+    "global_agent_number": 3,
+    "next": "When R-002 is next selected, execute the existing research/checks/momentum_hold_period_sensitivity.py (do not re-author it) and persist its artifact, then have the controller validate the P-002 LEARNING_STATE novelty-guard edit.",
+    "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
+    "observed_effect": "The durable history DOES prevent duplicate experiments at the verdict level (9 resolved cells, each closed once, no equivalent re-test recorded), so the principle-level novelty guard (Learning rule 2) is retained. The audit exposed a file-level gap: two check files are invisible to the frontier/queue. momentum_hold_period_sensitivity.py is a complete but unexecuted R-002 implementation (no artifact), and momentum_sweep.py is a near-duplicate lookback sweep (3/5/10/20) of two recorded checks with no artifact. A minimal one-step novelty guard was adopted to close this gap without new infrastructure.",
+    "process_decision": "IMPROVE",
+    "question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+    "research_result": "Duplicate-work audit (LEARNING_PROCESS, P-002). No duplicate experiment found across the 9 resolved frontier cells; the frontier-first + rule-2 novelty guard is RETAINED at the verdict level. Concrete near-duplicate FILE evidence: (1) research/checks/momentum_hold_period_sensitivity.py is a complete R-002 check with no artifact and no frontier mention -> PENDING EXECUTION, must be run not re-authored; (2) research/checks/momentum_sweep.py (lookbacks 3/5/10/20, absent artifact) is a near-duplicate of the recorded momentum_lookback_sweep.py (3/5/10) and momentum_longer_horizon.py (20/60) -> SUPERSEDED, do not re-run. Minimal guard adopted in LEARNING_STATE.md: before executing a queued task, grep research/checks/ and state/check_artifacts/ for an existing implementation/artifact and cite it in the task record (execute/verify or record supersession). This is sufficient for the observed gap and adds no metadata system.",
+    "role": "LEARNING_PROCESS",
+    "task_id": "P-002",
+    "task_selection_observation": "IMPROVED",
+    "uncertainty_reduced": "Resolved: the history prevents duplicate experiments at the verdict level (rule 2 effective across 9 cells); the residual duplicate-work risk is at the file level (invisible pending/superseded checks), and a minimal pre-execution grep-and-cite guard closes it. No broad metadata system is required.",
+    "uncertainty_targeted": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+    "unverified": [
+      "Independent controller validation of the LEARNING_STATE.md novelty-guard edit is pending (controller-side, per verification_requirement).",
+      "No code or tests were changed; tests_preceding_process=false, so no regression suite applies to this documentation/process change.",
+      "Whether momentum_sweep.py was ever executed in an earlier activation is not established from durable artifacts (no artifact present); it is classified SUPERSEDED on file-overlap evidence, not on a recorded run."
+    ],
+    "verified": [
+      "Inspected state/check_artifacts/ listing: momentum_hold_period_sensitivity_results.json is ABSENT and momentum_sweep_results.json is ABSENT, while momentum_lookback_sweep_results.json and momentum_longer_horizon_results.json are PRESENT",
+      "Read research/checks/momentum_hold_period_sensitivity.py (491 lines, complete with main + artifact write) and confirmed it is the R-002 implementation with HOLD_PERIODS=(1,2,3,5)",
+      "Read research/checks/momentum_sweep.py header + artifact path (writes momentum_sweep_results.json, lookbacks 3/5/10/20) and confirmed near-duplication of the recorded lookback_sweep (3/5/10) and longer_horizon (20/60) checks",
+      "Cross-checked task_queue.json: R-002 status OPEN; no frontier row in LEARNING_STATE.md references holding-period; grep for hold_period/holding-period returned matches only in the check file, the queue, and the quarantine diff (not in STATE.md or LEARNING_STATE.md)"
+    ]
+  },
+  "primary_question": "Does the qualified momentum effect survive a small predeclared holding-period variation without becoming a single-point timing artifact?",
+  "role": "HIGHER_ORDER_OBJECTIVE",
+  "scope": "Use only the existing 10-asset universe and a fixed hold-period grid declared before execution.",
+  "selection_basis": {
+    "compared_against": [
+      "R-002",
+      "C-001",
+      "R-003",
+      "R-005"
+    ],
+    "qualitative_priority": [
+      "HIGH",
+      "HIGH",
+      "HIGH",
+      "HIGH",
+      "MEDIUM",
+      "LOW",
+      "LOW"
+    ],
+    "reason": "highest evidence-backed qualitative priority among currently OPEN tasks for this role"
+  },
+  "stop_condition": "Stop after the declared holding-period grid is complete and independently checked.",
+  "success_criterion": "The holding-period sensitivity is classified and any positive finding is reproducible.",
+  "task_id": "R-002",
+  "tests_preceding_process": true,
+  "verification_requirement": "Matched null, leakage review, independent recomputation, determinism, regression suite."
+}
