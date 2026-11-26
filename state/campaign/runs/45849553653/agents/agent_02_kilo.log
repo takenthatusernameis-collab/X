@@ -1,0 +1,978 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+[0m→ [0mRead .
+I'll start by inspecting the durable evidence and existing research infrastructure before any changes.
+[0m→ [0mRead state/LEARNING_STATE.md
+[0m→ [0mRead research
+I'll inspect the research infrastructure: the momentum implementation, cost model, and existing check framework.
+[0m→ [0mRead state/STATE.md
+[0m→ [0mRead research/checks
+Let me read the rest of STATE.md and inspect the momentum check and cost model infrastructure.
+[0m→ [0mRead research/backtest
+[0m→ [0mRead state/STATE.md[90m [offset=852][0m
+[0m→ [0mRead research/checks/momentum.py
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py
+Let me inspect the momentum check, the lookback sweep, the engine cost model, and the real-data loader.
+[0m→ [0mRead research/backtest/engine.py
+Let me inspect the engine cost model, momentum_signals, and how realistic costs are applied in examples.
+[0m✱ [0mGrep "def momentum_signals"[90m in research/backtest/regime_stability.py · 1 match[0m
+[0m→ [0mRead examples/ma_crossover_real_data.py
+[0m→ [0mRead research/backtest/regime_stability.py[90m [limit=120, offset=1][0m
+Let me examine the realistic cost convention in the real-data example and how `stress_segments` handles costs.
+Let me find how `stress_segments` accepts cost config and its full signature.
+[0m✱ [0mGrep "def stress_segments|def stress_segments_across_tickers|cfg|BacktestConfig|def _run_segment|walk_forward"[90m in research/backtest/regime_stability.py · 21 matches[0m
+[0m→ [0mRead research/backtest/regime_stability.py[90m [limit=220, offset=600][0m
+Let me read the `stress_segments` body and verdict logic to understand exactly what the cost config affects.
+Let me read the existing verifiers to follow the established independent-verification pattern.
+[0m→ [0mRead research/checks/verify_momentum_lookback_sweep.py
+[0m→ [0mRead research/checks/verify_momentum.py
+[0m→ [0mRead state/worker_progress.md
+[0m→ [0mRead state/campaign/runs/45849553653/agents/agent_01.json
+Let me read the agent_01 record, worker progress, and the validation contract to match the required schema.
+[0m→ [0mRead .github/scripts/validate_campaign_agent.py
+[0m→ [0mRead state/campaign/task_queue.json
+[0m→ [0mRead state/campaign/current_task.json
+[0m✱ [0mGrep "def validate_task"[90m in .github/scripts/campaign_controller.py · 1 match[0m
+Let me read the task queue, current task, and the `validate_task` schema in the controller.
+Let me confirm the required task fields and allowed statuses/severities.
+[0m✱ [0mGrep "REQUIRED_TASK_FIELDS|TASK_STATUSES|SEVERITIES|^DECISIONS|^PROCESS_DECISIONS|^SELECTION_OBSERVATIONS|^FAILURE_CLASSES"[90m in .github/scripts/campaign_controller.py · 11 matches[0m
+[0m→ [0mRead .github/scripts/campaign_controller.py[90m [limit=30, offset=48][0m
+[0m→ [0mRead research/data
+[0m→ [0mRead state/check_artifacts
+Now let me verify the environment and data availability before writing code.
+[0m
+[0m$ [0mpython3 --version
+Python 3.12.3
+[0m
+[0m→ [0mRead state/check_artifacts/momentum_results.json
+[0m✗ [0mpython3 -c "import numpy; print(numpy.__version__)" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python3 -c *","action":"deny","source":"project"}
+`python3 -c` is denied but `python3 script.py` works. Let me confirm the data preflight gate runs (also required by the task).
+[0m
+[0m$ [0mpython3 research/data/preflight.py
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+[0m
+[0m✱ [0mGrep "def noise_benchmark|def random_signals"[90m in research/backtest/perturbation.py · 2 matches[0m
+Let me inspect the noise benchmark (matched null) and the lookback-sweep artifact structure for cross-consistency.
+[0m→ [0mRead state/check_artifacts/momentum_lookback_sweep_results.json[90m [limit=80][0m
+[0m→ [0mRead research/backtest/perturbation.py[90m [limit=60, offset=306][0m
+[0m
+[0m# [0mTodos
+[•] Write research/checks/momentum_cost_sensitivity.py (predeclared cost grid, matched null, artifact)
+[ ] Write research/checks/verify_momentum_cost_sensitivity.py (independent fresh walk_forward recomputation)
+[ ] Run the check end-to-end; confirm preflight/leakage/determinism/artifact
+[ ] Run the independent verifier; confirm MATCH or record discrepancy
+[ ] Run full regression suite (tests/) after changes
+[ ] Write agent_02.json record and update worker_progress.md
+[0m
+I have enough understanding. Let me record my pre-work answers and plan, then write the check.
+
+**Pre-work answers:**
+1. **What the system is learning to do better:** choose, falsify, validate, and preserve robust quantitative-research conclusions under uncertainty.
+2. **Current binding constraint:** the admitted momentum edge is short-horizon/mechanical; its execution-cost robustness is untested, so admission may be overstated.
+3. **Uncertainty blocking a better decision:** whether the lookback 3/5/10 momentum edge survives the repository's realistic transaction costs (matched null).
+4. **Single bounded action:** run a predeclared 3-level cost grid (zero / realistic / 2× realistic) through the existing `stress_segments` gate with the cost-matched coin-flip null, then independently recompute.
+5. **Worth it:** HIGH priority, LOW execution risk, directly qualifies the only positive candidate; a negative result is durable and decision-relevant.
+Now I'll write the cost-sensitivity check.
+[0m← [0mWrite research/checks/momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+Now the independent verifier with a fresh `walk_forward` path plus cross-consistency against the prior momentum artifacts.
+[0m← [0mWrite research/checks/verify_momentum_cost_sensitivity.py
+Wrote file successfully.
+[0m
+Now let me run the cost-sensitivity check end-to-end.
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review per asset (lookback=5) ===
+  AMZN: 4465 bars, momentum signals 4465, leakage [PASS], total_return +5.537
+  JPM: 4465 bars, momentum signals 4465, leakage [PASS], total_return +3.916
+  no-look-ahead: momentum sign at bar t uses closes[:t] only; neutral bars before the lookback window carry the equity forward.
+
+=== 4. Cost grid (predeclared) ===
+  zero      : commission_per_trade=0.0 commission_per_share=0.0 slippage_cents=0.0 slippage_proportional=0.0
+  realistic : commission_per_trade=2.0 commission_per_share=0.003 slippage_cents=2.0 slippage_proportional=0.0005
+  double    : commission_per_trade=4.0 commission_per_share=0.006 slippage_cents=4.0 slippage_proportional=0.001
+  matched null: framework coin-flip null run with the SAME cost config on the same segments (cost-matched).
+
+=== 5. Momentum cost-sensitivity sweep (lookback 3/5/10 x cost grid) ===
+  Params: walk-forward per segment train=252d / test=84d / warmup=60d / overlap=60d, min 400 bars/segment, 4 contiguous volatility blocks
+
+  AAPL   overall=COST_ROBUST  3:COST[z=+0.071 r=+0.071 d=+0.071] 5:COST[z=+0.071 r=+0.071 d=+0.071] 10:NO_E[z=+0.071 r=+0.071 d=+0.071]
+  MSFT   overall=COST_ROBUST  3:COST[z=+0.052 r=+0.052 d=+0.052] 5:COST[z=+0.052 r=+0.052 d=+0.052] 10:COST[z=+0.052 r=+0.052 d=+0.052]
+  GOOGL  overall=COST_ROBUST  3:COST[z=+0.069 r=+0.069 d=+0.069] 5:COST[z=+0.069 r=+0.069 d=+0.069] 10:COST[z=+0.069 r=+0.069 d=+0.069]
+  AMZN   overall=COST_ROBUST  3:COST[z=+0.065 r=+0.065 d=+0.065] 5:COST[z=+0.065 r=+0.065 d=+0.065] 10:COST[z=+0.065 r=+0.065 d=+0.065]
+  META   overall=COST_ROBUST  3:COST[z=+0.073 r=+0.073 d=+0.073] 5:COST[z=+0.073 r=+0.073 d=+0.073] 10:COST[z=+0.073 r=+0.073 d=+0.073]
+  NVDA   overall=NO_EDGE      3:NO_E[z=-0.038 r=-0.064 d=-0.088] 5:NO_E[z=-0.038 r=-0.064 d=-0.088] 10:NO_E[z=-0.038 r=-0.064 d=-0.088]
+  TSLA   overall=COST_ROBUST  3:COST[z=+0.132 r=+0.133 d=+0.134] 5:COST[z=+0.132 r=+0.133 d=+0.134] 10:COST[z=+0.132 r=+0.133 d=+0.134]
+  JPM    overall=NO_EDGE      3:NO_E[z=+0.113 r=+0.113 d=+0.113] 5:NO_E[z=+0.113 r=+0.113 d=+0.113] 10:NO_E[z=+0.113 r=+0.113 d=+0.113]
+  JNJ    overall=NO_EDGE      3:NO_E[z=+0.050 r=+0.050 d=+0.050] 5:NO_E[z=+0.050 r=+0.050 d=+0.050] 10:NO_E[z=+0.050 r=+0.050 d=+0.050]
+  XOM    overall=NO_EDGE      3:NO_E[z=+0.018 r=+0.018 d=+0.018] 5:NO_E[z=+0.018 r=+0.018 d=+0.018] 10:NO_E[z=+0.018 r=+0.018 d=+0.018]
+
+  cells EDGE at zero=17/30  realistic=18/30  double=18/30
+  cell cost_class counts: {'COST_ROBUST': 16, 'COST_FRAGILE': 1, 'NO_EDGE': 13}
+  per-asset overall counts: {'COST_ROBUST': 6, 'COST_FRAGILE': 0, 'NO_EDGE': 4}
+
+determinism: r1 == r2 (AMZN/JPM lookback5 realistic): True
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Momentum cost-sensitivity on the collected universe: exploratory simulation.
+[0m
+[0m✱ [0mGrep "def parameter_sweep"[90m in research/backtest/perturbation.py · 1 match[0m
+The near-identical medians across cost levels (except NVDA) are a red flag — costs should reduce returns. I must verify the cost config actually reaches the candidate path before trusting this. Let me inspect `parameter_sweep`.
+[0m→ [0mRead research/backtest/perturbation.py[90m [limit=30, offset=219][0m
+[0m✗ [0mWrite /tmp/kilo/debug_cost.py failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"external_directory","action":"deny","pattern":"*","source":"project"}
+`parameter_sweep` does forward `cfg`. The identical medians are suspicious. Let me debug directly with a throwaway script in /tmp to inspect per-fold trades and returns under zero vs realistic costs.
+External dir is blocked. I'll place the debug script in the repo `scratch/` dir and remove it after.
+[0m
+[0m← [0mWrite scratch/debug_cost.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 scratch/debug_cost.py
+runs: [('turbulent', 60, 1116), ('calm', 1116, 3348), ('turbulent', 3348, 4464)]
+zero n_folds 28 median_log 0.0654 mean_ret 0.0863 median_ret 0.0676 ntrades[0:5] [6, 0, 0, 4, 9] mean_ntrades 4.9
+realistic n_folds 28 median_log 0.0654 mean_ret 0.0865 median_ret 0.0676 ntrades[0:5] [6, 0, 0, 4, 9] mean_ntrades 4.9
+[0m
+Costs aren't being applied (n_trades identical, median identical) and trade counts are implausibly low (~5/fold). I need to inspect the actual `momentum_signals` body and signal behavior.
+[0m→ [0mRead research/backtest/regime_stability.py[90m [limit=45, offset=886][0m
+[0m
+[0m← [0mWrite scratch/debug_cost.py
+Wrote file successfully.
+[0m
+`momentum_signals` uses `mean(log(prices))` (always > 0 for prices > 1), so it may be effectively always-long. And the median fold may have zero trades, hiding costs. Let me instrument further.
+[0m$ [0mpython3 scratch/debug_cost.py
+close range: 2.422 284.019989
+weight counts: {np.float64(0.0): 5, np.float64(1.0): 4460}
+const+1 zero n_trades 399 total_ret 1.0178
+const+1 real n_trades 399 total_ret 1.0074
+fold 0 start 61 end 456 ntrades 6 tot_ret 0.2406
+fold 1 start 85 end 480 ntrades 0 tot_ret 0.3043
+fold 2 start 109 end 504 ntrades 0 tot_ret 0.1838
+fold 3 start 133 end 528 ntrades 4 tot_ret 0.0846
+fold 4 start 157 end 552 ntrades 9 tot_ret -0.0121
+fold 5 start 181 end 576 ntrades 4 tot_ret 0.0352
+[0m
+Two critical findings: (1) `momentum_signals` is effectively **always-long** (weight +1 for 4460/4465 bars) because it uses mean log *price* (always > 0), not log return; (2) costs do apply in the engine, yet median folds show ~0 trades. I must understand the zero-trade folds before reporting. Let me instrument one fold fully.
+[0m← [0mWrite scratch/debug_cost.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 scratch/debug_cost.py
+fold1 start_date 85 end_date 480 test_window_bars 84
+fold1 ntrades 0 total_return 0.30433962495861366
+test closes[:5] [5.8945, 6.0035, 6.121, 6.379, 6.3915]
+test weights[:5] [1.0, 1.0, 1.0, 1.0, 1.0]
+test unique weights {1.0}
+test close min/max 5.8945 8.8625
+full fold fills 334 first fills [(145, 232315.02), (146, 893.94), (147, -4480.68), (148, 4371.96), (149, 4175.84)]
+equity test start/end 1398668.64 1824338.92
+[0m
+The full fold has 334 fills but `n_trades`=0 (OOS filter issue), and aggregate returns are identical across cost levels — suggesting `walk_forward` may not apply costs. Let me compare `walk_forward` zero vs realistic per fold directly.
+[0m← [0mWrite scratch/debug_cost.py
+Wrote file successfully.
+[0m
+[0m$ [0mpython3 scratch/debug_cost.py
+zero agg median 0.0654 mean 0.07792
+real agg median 0.06539 mean 0.078
+fold 0 zero 0.24058 real 0.24199 diff 0.00141 ntrades z/r 6 6
+fold 1 zero 0.30434 real 0.30636 diff 0.002018 ntrades z/r 0 0
+fold 2 zero 0.18383 real 0.18475 diff 0.000927 ntrades z/r 0 0
+fold 3 zero 0.08457 real 0.08476 diff 0.000183 ntrades z/r 4 4
+fold 4 zero -0.01209 real -0.01261 diff -0.000518 ntrades z/r 9 9
+fold 5 zero 0.03523 real 0.03506 diff -0.000174 ntrades z/r 4 4
+fold0 equity zero end 1828576.01 real end 1821754.58
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -108,8 +108,33 @@
+         return "COST_FRAGILE"
+     return "NO_EDGE"
+ 
+ 
++def signal_profile(closes, lookback):
++    """Characterize the existing momentum signal's weights (data provenance).
++
++    Reports the non-neutral weight composition so the cost result can be
++    interpreted: a genuine short-horizon momentum signal should be roughly
++    balanced between +1 and -1, whereas a degenerate (e.g. always-long)
++    implementation will be almost entirely one sign. This characterizes the
++    signal; it does not modify it.
++    """
++    sig = bt.momentum_signals(closes, lookback=lookback)
++    n = len(sig)
++    n_pos = sum(1 for s in sig if s.weight > 0)
++    n_neg = sum(1 for s in sig if s.weight < 0)
++    n_neu = n - n_pos - n_neg
++    nonneutral = n_pos + n_neg
++    return dict(
++        n_bars=n,
++        n_long=n_pos,
++        n_short=n_neg,
++        n_neutral=n_neu,
++        frac_long=round(n_pos / nonneutral, 4) if nonneutral else 0.0,
++        frac_short=round(n_neg / nonneutral, 4) if nonneutral else 0.0,
++    )
++
++
+ def run_cell(ticker, bars, lookback, cfg):
+     """One (asset, lookback, cost) stress_segments run -> plain dict."""
+     closes = bars.closes_array()
+     labels = bt.volatility_blocks(closes, n_blocks=N_BLOCKS, window=WINDOW)
+
+[0m
+Root cause found: `momentum_signals` uses `mean(log(prices))` (always > 0 for prices > 1), so it emits **+1 on 4460/4465 bars — an always-long constant-dollar position, not a momentum signal**. Costs do apply but are tiny (~0.002/fold) because constant-dollar rebalancing has low share turnover. This is a material finding: the "momentum edge" is really unconditional long exposure. I must record this in the artifact so the cost result is interpretable, without changing the signal (out of scope). Let me add signal characterization to the check.
+[0m✗ [0mEdit research/checks/momentum_cost_sensitivity.py failed
+[91m[1mError: [0mThe edit tool was called with invalid arguments: ["newString"]: is missing and is required.
+Please rewrite the input so it satisfies the expected schema.
+Now add the signal-characterization section to `main` and include it in the artifact.
+[0m✗ [0mEdit research/checks/momentum_cost_sensitivity.py failed
+[91m[1mError: [0mThe edit tool was called with invalid arguments: ["newString"]: is missing and is required.
+Please rewrite the input so it satisfies the expected schema.
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -210,8 +210,25 @@
+           f"leakage [PASS], total_return {total_return:+.3f}")
+ print("  no-look-ahead: momentum sign at bar t uses closes[:t] only; "
+       "neutral bars before the lookback window carry the equity forward.")
+ 
++print("\n=== 3b. Signal characterization (weight composition, lookback=5) ===")
++signal_profile = {}
++for entry in manifest["entries"]:
++    ticker = entry["ticker"]
++    bars_t = bt.load_ticker(ticker)[0]
++    prof = signal_profile(bars_t.closes_array(), 5)
++    signal_profile[ticker] = prof
++    print("  {:6s} long={:5d} short={:5d} neutral={:4d} "
++          "frac_long={:.3f} frac_short={:.3f}".format(
++              ticker, prof["n_long"], prof["n_short"], prof["n_neutral"],
++              prof["frac_long"], prof["frac_short"]))
++n_degenerate = sum(1 for p in signal_profile.values() if p["frac_long"] > 0.99)
++print("  assets effectively always-long (frac_long>0.99): {}/10".format(n_degenerate))
++print("  NOTE: a genuine short-horizon momentum signal should be roughly")
++print("  balanced between long and short; a near-100% long composition means")
++print("  the tested signal is (near-)constant long exposure, not a direction bet.")
++
+ print("\n=== 4. Cost grid (predeclared) ===")
+ for name, cfg in COST_LEVELS.items():
+     print(f"  {name:10s}: commission_per_trade={cfg.commission_per_trade} "
+           f"commission_per_share={cfg.commission_per_share} "
+
+[0m
+[0m✗ [0mEdit research/checks/momentum_cost_sensitivity.py failed
+[91m[1mError: [0mThe edit tool was called with invalid arguments: ["newString"]: is missing and is required.
+Please rewrite the input so it satisfies the expected schema.
+Now add `signal_profile` to the artifact dict.
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -344,8 +344,9 @@
+     "(COST_FRAGILE); the candidate-minus-null gap is largely preserved "
+     "because the matched null pays the same costs. FALSIFIED if the "
+     "majority of zero-cost EDGE cells remain EDGE at realistic."
+ ),
++signal_profile=signal_profile,
+ per_cell=per_cell,
+ summary=dict(
+     cells_edge_zero=cells_edge_zero,
+     cells_edge_realistic=cells_edge_realistic,
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -344,8 +344,9 @@
+     "(COST_FRAGILE); the candidate-minus-null gap is largely preserved "
+     "because the matched null pays the same costs. FALSIFIED if the "
+     "majority of zero-cost EDGE cells remain EDGE at realistic."
+ ),
++signal_profile_note="frac_long near 1.0 => degenerate near-constant-long signal, not a direction bet; cost class then describes a constant-long position.",
+ signal_profile=signal_profile,
+ per_cell=per_cell,
+ summary=dict(
+     cells_edge_zero=cells_edge_zero,
+
+[0m
+Now add a signal-characterization gate to the verifier so the degeneracy finding is independently reproduced.
+[0m← [0mEdit research/checks/verify_momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/verify_momentum_cost_sensitivity.py
+@@ -153,9 +153,35 @@
+ assert art["dataset_id"] == DATASET_ID
+ assert art["lookbacks"] == list(LOOKBACKS)
+ all_ok = True
+ 
+-print("=== Gate 1: fresh walk_forward + noise_benchmark (AMZN, JPM; all lookbacks/costs) ===")
++print("=== Gate 0: signal characterization (independent weight recount) ===")
++n_degenerate = 0
++for ticker, pub in art["signal_profile"].items():
++    bars, _ = bt.load_ticker(ticker)
++    closes = bars.closes_array()
++    sig = momentum_signals(closes, 5)
++    n_pos = sum(1 for s in sig if s.weight > 0)
++    n_neg = sum(1 for s in sig if s.weight < 0)
++    nonneutral = n_pos + n_neg
++    frac_long = round(n_pos / nonneutral, 4) if nonneutral else 0.0
++    ok = (n_pos == pub["n_long"] and n_neg == pub["n_short"]
++          and frac_long == pub["frac_long"])
++    if not ok:
++        all_ok = False
++    if frac_long > 0.99:
++        n_degenerate += 1
++    print("  {}: long={} short={} frac_long={} vs published long={} short={} "
++          "frac_long={} -> {}".format(
++              ticker, n_pos, n_neg, frac_long, pub["n_long"], pub["n_short"],
++              pub["frac_long"], "MATCH" if ok else "MISMATCH"))
++print("  assets effectively always-long (frac_long>0.99): {}/10".format(n_degenerate))
++if n_degenerate >= 8:
++    print("  FINDING: the existing momentum signal is degenerate (near-constant")
++    print("  long) for most assets; the cost classification therefore describes a")
++    print("  constant-long position, not a short-horizon momentum direction bet.")
++
++print("\n=== Gate 1: fresh walk_forward + noise_benchmark (AMZN, JPM; all lookbacks/costs) ===")
+ for asset in ["AMZN", "JPM"]:
+     bars, _ = bt.load_ticker(asset)
+     closes = bars.closes_array()
+     runs = segments_from_labels(vol_blocks(closes, N_BLOCKS, WINDOW), MIN_SEGMENT_BARS)
+
+[0m
+Let me verify the indentation around the inserted gate.
+[0m→ [0mRead research/checks/verify_momentum_cost_sensitivity.py[90m [limit=20, offset=191][0m
+[0m→ [0mRead research/checks/verify_momentum_cost_sensitivity.py[90m [limit=30, offset=160][0m
+[0m→ [0mRead research/checks/verify_momentum_cost_sensitivity.py[90m [limit=14, offset=148][0m
+Let me compile-check both files before running.
+[0m
+[0m$ [0mpython3 -m py_compile research/checks/momentum_cost_sensitivity.py research/checks/verify_momentum_cost_sensitivity.py
+(no output)
+[0m
+Both compile. Now re-run the check with the signal characterization.
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review per asset (lookback=5) ===
+  AMZN: 4465 bars, momentum signals 4465, leakage [PASS], total_return +5.537
+  JPM: 4465 bars, momentum signals 4465, leakage [PASS], total_return +3.916
+  no-look-ahead: momentum sign at bar t uses closes[:t] only; neutral bars before the lookback window carry the equity forward.
+
+=== 3b. Signal characterization (weight composition, lookback=5) ===
+Traceback (most recent call last):
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 370, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py", line 219, in main
+    prof = signal_profile(bars_t.closes_array(), 5)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: 'dict' object is not callable
+[0m
+Name collision: the local dict shadows the function. Let me rename the dict to `signal_profiles`.
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -211,14 +211,14 @@
+ print("  no-look-ahead: momentum sign at bar t uses closes[:t] only; "
+       "neutral bars before the lookback window carry the equity forward.")
+ 
+ print("\n=== 3b. Signal characterization (weight composition, lookback=5) ===")
+-signal_profile = {}
++signal_profiles = {}
+ for entry in manifest["entries"]:
+     ticker = entry["ticker"]
+     bars_t = bt.load_ticker(ticker)[0]
+     prof = signal_profile(bars_t.closes_array(), 5)
+-    signal_profile[ticker] = prof
++    signal_profiles[ticker] = prof
+     print("  {:6s} long={:5d} short={:5d} neutral={:4d} "
+           "frac_long={:.3f} frac_short={:.3f}".format(
+               ticker, prof["n_long"], prof["n_short"], prof["n_neutral"],
+               prof["frac_long"], prof["frac_short"]))
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -221,9 +221,9 @@
+     print("  {:6s} long={:5d} short={:5d} neutral={:4d} "
+           "frac_long={:.3f} frac_short={:.3f}".format(
+               ticker, prof["n_long"], prof["n_short"], prof["n_neutral"],
+               prof["frac_long"], prof["frac_short"]))
+-n_degenerate = sum(1 for p in signal_profile.values() if p["frac_long"] > 0.99)
++n_degenerate = sum(1 for p in signal_profiles.values() if p["frac_long"] > 0.99)
+ print("  assets effectively always-long (frac_long>0.99): {}/10".format(n_degenerate))
+ print("  NOTE: a genuine short-horizon momentum signal should be roughly")
+ print("  balanced between long and short; a near-100% long composition means")
+ print("  the tested signal is (near-)constant long exposure, not a direction bet.")
+
+[0m
+[0m← [0mEdit research/checks/momentum_cost_sensitivity.py
+Index: /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+===================================================================
+--- /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
++++ /home/runner/work/X/X/research/checks/momentum_cost_sensitivity.py
+@@ -345,9 +345,9 @@
+     "because the matched null pays the same costs. FALSIFIED if the "
+     "majority of zero-cost EDGE cells remain EDGE at realistic."
+ ),
+ signal_profile_note="frac_long near 1.0 => degenerate near-constant-long signal, not a direction bet; cost class then describes a constant-long position.",
+-signal_profile=signal_profile,
++signal_profile=signal_profiles,
+ per_cell=per_cell,
+ summary=dict(
+     cells_edge_zero=cells_edge_zero,
+     cells_edge_realistic=cells_edge_realistic,
+
+[0m
+[0m$ [0mpython3 research/checks/momentum_cost_sensitivity.py
+=== 1. Manifest integrity ===
+  AAPL: OK
+  MSFT: OK
+  GOOGL: OK
+  AMZN: OK
+  META: OK
+  NVDA: OK
+  TSLA: OK
+  JPM: OK
+  JNJ: OK
+  XOM: OK
+  dataset: yf-ohlcv-universe-2009-to-2026-10-03 | collection: 2026-10-03 | universe: 10
+
+=== 2. Data preflight (research/data/preflight.py) ===
+[PASS] 1. Existence and integrity: all 10 files present; checksums match
+[PASS] 8. Survivorship: universe fixed to 10 members per manifest; no delisted or newly added members in dataset
+[PASS] 2. Completeness (AAPL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (MSFT): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (GOOGL): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (AMZN): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (META): 3614 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (NVDA): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (TSLA): 4091 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JPM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (JNJ): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 2. Completeness (XOM): 4465 rows; 2 missing trading day(s) fully explained by documented holidays + source data gaps 2018-12-05,2025-01-09
+[PASS] 3. Ordering (AAPL): dates strictly non-decreasing
+[PASS] 3. Ordering (MSFT): dates strictly non-decreasing
+[PASS] 3. Ordering (GOOGL): dates strictly non-decreasing
+[PASS] 3. Ordering (AMZN): dates strictly non-decreasing
+[PASS] 3. Ordering (META): dates strictly non-decreasing
+[PASS] 3. Ordering (NVDA): dates strictly non-decreasing
+[PASS] 3. Ordering (TSLA): dates strictly non-decreasing
+[PASS] 3. Ordering (JPM): dates strictly non-decreasing
+[PASS] 3. Ordering (JNJ): dates strictly non-decreasing
+[PASS] 3. Ordering (XOM): dates strictly non-decreasing
+[PASS] 4. No future dates (AAPL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (MSFT): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (GOOGL): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (AMZN): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (META): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (NVDA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (TSLA): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JPM): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (JNJ): no bars after collection date 2026-10-03
+[PASS] 4. No future dates (XOM): no bars after collection date 2026-10-03
+[PASS] 5. OHLC cross-consistency (AAPL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (MSFT): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (GOOGL): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (AMZN): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (META): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (NVDA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (TSLA): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JPM): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (JNJ): low <= open/close <= high on all bars
+[PASS] 5. OHLC cross-consistency (XOM): low <= open/close <= high on all bars
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review per asset (lookback=5) ===
+  AMZN: 4465 bars, momentum signals 4465, leakage [PASS], total_return +5.537
+  JPM: 4465 bars, momentum signals 4465, leakage [PASS], total_return +3.916
+  no-look-ahead: momentum sign at bar t uses closes[:t] only; neutral bars before the lookback window carry the equity forward.
+
+=== 3b. Signal characterization (weight composition, lookback=5) ===
+  AAPL   long= 4460 short=    0 neutral=   5 frac_long=1.000 frac_short=0.000
+  MSFT   long= 4460 short=    0 neutral=   5 frac_long=1.000 frac_short=0.000
+  GOOGL  long= 4460 short=    0 neutral=   5 frac_long=1.000 frac_short=0.000
+  AMZN   long= 4460 short=    0 neutral=   5 frac_long=1.000 frac_short=0.000
+  META   long= 3609 short=    0 neutral=   5 frac_long=1.000 frac_short=0.000
+  NVDA   long= 2608 short= 1852 neutral=   5 frac_long=0.585 frac_short=0.415
+  TSLA   long= 4086 short=    0 neutral=   5 frac_long=1.000 frac_short=0.000
+  JPM    long= 4460 short=    0 neutral=   5 frac_long=1.000 frac_short=0.000
+  JNJ    long= 4460 short=    0 neutral=   5 frac_long=1.000 frac_short=0.000
+  XOM    long= 4460 short=    0 neutral=   5 frac_long=1.000 frac_short=0.000
+  assets effectively always-long (frac_long>0.99): 9/10
+  NOTE: a genuine short-horizon momentum signal should be roughly
+  balanced between long and short; a near-100% long composition means
+  the tested signal is (near-)constant long exposure, not a direction bet.
+
+=== 4. Cost grid (predeclared) ===
+  zero      : commission_per_trade=0.0 commission_per_share=0.0 slippage_cents=0.0 slippage_proportional=0.0
+  realistic : commission_per_trade=2.0 commission_per_share=0.003 slippage_cents=2.0 slippage_proportional=0.0005
+  double    : commission_per_trade=4.0 commission_per_share=0.006 slippage_cents=4.0 slippage_proportional=0.001
+  matched null: framework coin-flip null run with the SAME cost config on the same segments (cost-matched).
+
+=== 5. Momentum cost-sensitivity sweep (lookback 3/5/10 x cost grid) ===
+  Params: walk-forward per segment train=252d / test=84d / warmup=60d / overlap=60d, min 400 bars/segment, 4 contiguous volatility blocks
+
+  AAPL   overall=COST_ROBUST  3:COST[z=+0.071 r=+0.071 d=+0.071] 5:COST[z=+0.071 r=+0.071 d=+0.071] 10:NO_E[z=+0.071 r=+0.071 d=+0.071]
+  MSFT   overall=COST_ROBUST  3:COST[z=+0.052 r=+0.052 d=+0.052] 5:COST[z=+0.052 r=+0.052 d=+0.052] 10:COST[z=+0.052 r=+0.052 d=+0.052]
+  GOOGL  overall=COST_ROBUST  3:COST[z=+0.069 r=+0.069 d=+0.069] 5:COST[z=+0.069 r=+0.069 d=+0.069] 10:COST[z=+0.069 r=+0.069 d=+0.069]
+  AMZN   overall=COST_ROBUST  3:COST[z=+0.065 r=+0.065 d=+0.065] 5:COST[z=+0.065 r=+0.065 d=+0.065] 10:COST[z=+0.065 r=+0.065 d=+0.065]
+  META   overall=COST_ROBUST  3:COST[z=+0.073 r=+0.073 d=+0.073] 5:COST[z=+0.073 r=+0.073 d=+0.073] 10:COST[z=+0.073 r=+0.073 d=+0.073]
+  NVDA   overall=NO_EDGE      3:NO_E[z=-0.038 r=-0.064 d=-0.088] 5:NO_E[z=-0.038 r=-0.064 d=-0.088] 10:NO_E[z=-0.038 r=-0.064 d=-0.088]
+  TSLA   overall=COST_ROBUST  3:COST[z=+0.132 r=+0.133 d=+0.134] 5:COST[z=+0.132 r=+0.133 d=+0.134] 10:COST[z=+0.132 r=+0.133 d=+0.134]
+  JPM    overall=NO_EDGE      3:NO_E[z=+0.113 r=+0.113 d=+0.113] 5:NO_E[z=+0.113 r=+0.113 d=+0.113] 10:NO_E[z=+0.113 r=+0.113 d=+0.113]
+  JNJ    overall=NO_EDGE      3:NO_E[z=+0.050 r=+0.050 d=+0.050] 5:NO_E[z=+0.050 r=+0.050 d=+0.050] 10:NO_E[z=+0.050 r=+0.050 d=+0.050]
+  XOM    overall=NO_EDGE      3:NO_E[z=+0.018 r=+0.018 d=+0.018] 5:NO_E[z=+0.018 r=+0.018 d=+0.018] 10:NO_E[z=+0.018 r=+0.018 d=+0.018]
+
+  cells EDGE at zero=17/30  realistic=18/30  double=18/30
+  cell cost_class counts: {'COST_ROBUST': 16, 'COST_FRAGILE': 1, 'NO_EDGE': 13}
+  per-asset overall counts: {'COST_ROBUST': 6, 'COST_FRAGILE': 0, 'NO_EDGE': 4}
+
+determinism: r1 == r2 (AMZN/JPM lookback5 realistic): True
+
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_cost_sensitivity_results.json
+NOTE: research/simulation only. No live trading or production execution. Momentum cost-sensitivity on the collected universe: exploratory simulation.
+[0m
+The characterization is decisive: **9/10 assets are effectively always-long** (frac_long=1.000); only NVDA has a genuine long/short mix (0.585/0.415) and is the only asset showing real cost sensitivity (z −0.038 → r −0.064 → d −0.088). My a-priori prediction (edge falls to non-EDGE at realistic) is FALSIFIED — because the signal is constant-long with low turnover. Now run the independent verifier.
+[0m$ [0mpython3 research/checks/verify_momentum_cost_sensitivity.py
+=== Gate 0: signal characterization (independent weight recount) ===
+  AAPL: long=4460 short=0 frac_long=1.0 vs published long=4460 short=0 frac_long=1.0 -> MATCH
+  AMZN: long=4460 short=0 frac_long=1.0 vs published long=4460 short=0 frac_long=1.0 -> MATCH
+  GOOGL: long=4460 short=0 frac_long=1.0 vs published long=4460 short=0 frac_long=1.0 -> MATCH
+  JNJ: long=4460 short=0 frac_long=1.0 vs published long=4460 short=0 frac_long=1.0 -> MATCH
+  JPM: long=4460 short=0 frac_long=1.0 vs published long=4460 short=0 frac_long=1.0 -> MATCH
+  META: long=3609 short=0 frac_long=1.0 vs published long=3609 short=0 frac_long=1.0 -> MATCH
+  MSFT: long=4460 short=0 frac_long=1.0 vs published long=4460 short=0 frac_long=1.0 -> MATCH
+  NVDA: long=2608 short=1852 frac_long=0.5848 vs published long=2608 short=1852 frac_long=0.5848 -> MATCH
+  TSLA: long=4086 short=0 frac_long=1.0 vs published long=4086 short=0 frac_long=1.0 -> MATCH
+  XOM: long=4460 short=0 frac_long=1.0 vs published long=4460 short=0 frac_long=1.0 -> MATCH
+  assets effectively always-long (frac_long>0.99): 9/10
+  FINDING: the existing momentum signal is degenerate (near-constant
+  long) for most assets; the cost classification therefore describes a
+  constant-long position, not a short-horizon momentum direction bet.
+
+=== Gate 1: fresh walk_forward + noise_benchmark (AMZN, JPM; all lookbacks/costs) ===
+  AMZN lb=3 zero      segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  AMZN lb=3 realistic segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  AMZN lb=3 double    segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  AMZN lb=5 zero      segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  AMZN lb=5 realistic segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  AMZN lb=5 double    segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  AMZN lb=10 zero      segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  AMZN lb=10 realistic segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  AMZN lb=10 double    segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  JPM lb=3 zero      segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  JPM lb=3 realistic segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  JPM lb=3 double    segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  JPM lb=5 zero      segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  JPM lb=5 realistic segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  JPM lb=5 double    segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  JPM lb=10 zero      segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  JPM lb=10 realistic segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+  JPM lb=10 double    segments=['turbulent', 'calm', 'turbulent'] -> MATCH
+
+=== Gate 2: zero-cost cross-consistency vs prior momentum artifacts ===
+  AAPL lookback5 zero vs momentum_results.json -> MATCH
+  AMZN lookback5 zero vs momentum_results.json -> MATCH
+  GOOGL lookback5 zero vs momentum_results.json -> MATCH
+  JNJ lookback5 zero vs momentum_results.json -> MATCH
+  JPM lookback5 zero vs momentum_results.json -> MATCH
+  META lookback5 zero vs momentum_results.json -> MATCH
+  MSFT lookback5 zero vs momentum_results.json -> MATCH
+  NVDA lookback5 zero vs momentum_results.json -> MATCH
+  TSLA lookback5 zero vs momentum_results.json -> MATCH
+  XOM lookback5 zero vs momentum_results.json -> MATCH
+  all zero-cost cells cross-checked against momentum_results.json and momentum_lookback_sweep_results.json
+
+=== Gate 3: classification reproducibility (all 10 tickers) ===
+  AAPL: classes=['COST_ROBUST', 'COST_ROBUST', 'NO_EDGE'] -> overall=COST_ROBUST vs published COST_ROBUST -> MATCH
+  AMZN: classes=['COST_ROBUST', 'COST_ROBUST', 'COST_ROBUST'] -> overall=COST_ROBUST vs published COST_ROBUST -> MATCH
+  GOOGL: classes=['COST_ROBUST', 'COST_ROBUST', 'COST_ROBUST'] -> overall=COST_ROBUST vs published COST_ROBUST -> MATCH
+  JNJ: classes=['NO_EDGE', 'NO_EDGE', 'NO_EDGE'] -> overall=NO_EDGE vs published NO_EDGE -> MATCH
+  JPM: classes=['NO_EDGE', 'NO_EDGE', 'NO_EDGE'] -> overall=NO_EDGE vs published NO_EDGE -> MATCH
+  META: classes=['COST_ROBUST', 'COST_ROBUST', 'COST_ROBUST'] -> overall=COST_ROBUST vs published COST_ROBUST -> MATCH
+  MSFT: classes=['COST_ROBUST', 'COST_FRAGILE', 'COST_ROBUST'] -> overall=COST_ROBUST vs published COST_ROBUST -> MATCH
+  NVDA: classes=['NO_EDGE', 'NO_EDGE', 'NO_EDGE'] -> overall=NO_EDGE vs published NO_EDGE -> MATCH
+  TSLA: classes=['COST_ROBUST', 'COST_ROBUST', 'COST_ROBUST'] -> overall=COST_ROBUST vs published COST_ROBUST -> MATCH
+  XOM: classes=['NO_EDGE', 'NO_EDGE', 'NO_EDGE'] -> overall=NO_EDGE vs published NO_EDGE -> MATCH
+
+Determinism: recomputing AMZN lookback5 realistic medians twice.
+  AMZN lb5 realistic r1: [0.065, 0.076, 0.077]; r2: [0.065, 0.076, 0.077] -> identical
+
+All independent recomputations MATCH the check artifact, the zero-cost column cross-checks against the prior momentum artifacts, and the cost-robustness classification reproduces.
+NOTE: research/simulation only. No live trading or production execution. Momentum cost-sensitivity independent verification: exploratory simulation.
+[0m
+All verification gates MATCH. Now run the full regression suite (required after touching `research/`).
+[0m$ [0mpython3 -m unittest discover -s tests -q
+/home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/_methods.py:219: RuntimeWarning: Degrees of freedom <= 0 for slice
+  ret = _var(a, axis=axis, dtype=dtype, out=out, ddof=ddof,
+/home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/_methods.py:211: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+/home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/fromnumeric.py:3862: RuntimeWarning: Mean of empty slice
+  return _methods._mean(a, axis=axis, dtype=dtype,
+/home/runner/work/_temp/x-python/lib/python3.12/site-packages/numpy/_core/_methods.py:134: RuntimeWarning: invalid value encountered in divide
+  ret = um.true_divide(
+----------------------------------------------------------------------
+Ran 168 tests in 9.935s
+
+OK
+[0m
+168 tests pass. Let me inspect the artifact summary, then clean up the scratch debug file.
+[0m✗ [0mpython3 -c "import json;d=json.load(open('state/check_artifacts/momentum_cost_sensitivity_results.json'));print(json.dumps(d['summary'],indent=1));print('keys',list(d.keys()))" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python3 -c *","action":"deny","source":"project"}
+[0m✗ [0mrm -f scratch/debug_cost.py failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"rm *","action":"deny","source":"project"}
+`python3 -c` is blocked; I already have the summary from the run output. Let me remove the scratch debug file.
+[0m
+[0m← [0mEdit state/STATE.md
+Index: /home/runner/work/X/X/state/STATE.md
+===================================================================
+--- /home/runner/work/X/X/state/STATE.md
++++ /home/runner/work/X/X/state/STATE.md
+@@ -1520,4 +1520,67 @@
+ exploratory simulation only. Real-data work must carry its own audited
+ data and provenance and pass the leakage and perturbation gates before
+ admission to the evidence base.
+ 
++---
++
++## Current activation (momentum cost-sensitivity + signal-definition defect — R-001, activation 45849553653, campaign slot 02)
++
++Bounded cost-sensitivity check for lookback 3/5/10 momentum under the
++repository's existing realistic cost model and a cost-matched coin-flip null.
++New artifacts: `research/checks/momentum_cost_sensitivity.py` (check),
++`research/checks/verify_momentum_cost_sensitivity.py` (independent verifier),
++`state/check_artifacts/momentum_cost_sensitivity_results.json` (artifact).
++
++Method (predeclared, not tuned): existing 10-ticker universe; existing
++`bt.momentum_signals` (lookbacks 3/5/10); existing `bt.stress_segments`
++walk-forward regime gate (train=252d/test=84d/warmup=60d/overlap=60d, 4
++contiguous volatility blocks, min 400 bars/segment); matched null =
++framework `noise_benchmark` run with the SAME cost config on the same
++segments. Cost grid: zero / realistic (commission_per_trade=2.0,
++commission_per_share=0.003, slippage_cents=2.0, slippage_proportional=0.0005,
++the existing `examples/ma_crossover_real_data.py` model) / double (2x
++realistic).
++
++A-priori prediction (declared before execution): most zero-cost EDGE cells
++would fall to non-EDGE at the realistic level (COST_FRAGILE), because a daily
++rebalanced rule pays costs on nearly every bar. This prediction was
++**FALSIFIED**: 16/30 cells COST_ROBUST, 1/30 COST_FRAGILE, 13/30 NO_EDGE;
++6/10 assets COST_ROBUST overall (AAPL, MSFT, GOOGL, AMZN, META, TSLA), 4/10
++NO_EDGE (NVDA, JPM, JNJ, XOM). Cells EDGE: 17/30 zero, 18/30 realistic, 18/30
++double.
++
++Root cause of the falsification (verified finding): the existing
++`bt.momentum_signals` is **degenerate**. It computes
++`ret = mean(log(closes[i-lookback+1:i+1]))` — the mean of log PRICES, not the
++log return — which is > 0 for every price > 1, so the weight is +1 on
++4460/4465 bars for 9/10 assets (frac_long = 1.000). The "momentum" signal is
++therefore a near-constant LONG (constant-dollar) position, not a short-horizon
++direction bet; the falsified reversal class is the same construction with the
++opposite sign (near-constant short). This also explains the durable -0.99
++momentum/reversal P&L correlation: it is long-vs-short the same market, not a
++momentum/reversal signal pair. Only NVDA has a genuine long/short mix
++(frac_long 0.585 / frac_short 0.415, because its adjusted close was < 1 in the
++early window) and it is the only asset that shows material cost sensitivity:
++medians -0.038 (zero) -> -0.064 (realistic) -> -0.088 (double). The cost
++classification therefore describes the cost robustness of a constant-long
++position (low turnover, ~0.002 log-return cost per fold), NOT of a momentum
++strategy.
++
++Verification: preflight PASSED; leakage PASS (AMZN/JPM); independent verifier
++all gates MATCH — Gate 0 signal weight recount (9/10 always-long) MATCH; Gate 1
++fresh `walk_forward` + `noise_benchmark` recomputation (AMZN/JPM x lookbacks
++3/5/10 x zero/realistic/double) MATCH; Gate 2 zero-cost column cross-checks
++exactly against `momentum_results.json` and
++`momentum_lookback_sweep_results.json`; Gate 3 cost-robustness classification
++reproduces for all 10 tickers; determinism identical. Regression suite: 168
++tests OK.
++
++Decision: UNVERIFIED for the primary question (cost robustness of a genuine
++short-horizon momentum signal is not established, because the tested signal is
++degenerate). The verified durable finding is the signal-definition defect, which
++redirects the frontier: repair `momentum_signals` to use the actual log return
++(`log(close_t/close_{t-lookback})`) and re-register the momentum admission and
++cost test a-priori. The degenerate signal is a research finding, not a tool
++failure; fixing the signal rule is out of scope for this activation (it would be
++changing the signal after seeing results) and is handed off as a candidate task.
++
+
+[0m
+`rm` is denied; the scratch debug helper may persist per policy. Now append a concise activation record to STATE.md.
+[0m← [0mWrite state/worker_progress.md
+Wrote file successfully.
+[0m
+Now update the worker progress checkpoint.
+Now write the durable controller record `agent_02.json`.
+[0m← [0mWrite state/campaign/runs/45849553653/agents/agent_02.json
+Wrote file successfully.
+[0m
+[91m[1mError: [0mSign up for free to continue and explore 500 other models. Takes 2 minutes, no credit card required. Or come back later.
