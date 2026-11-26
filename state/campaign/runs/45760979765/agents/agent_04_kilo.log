@@ -1,0 +1,356 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+I'll start by inspecting the durable evidence before any changes. Let me read the key state and infrastructure files.
+[0m→ [0mRead state/LEARNING_STATE.md
+[0m→ [0mRead state/STATE.md
+[0m→ [0mRead state/campaign/task_queue.json
+[0m→ [0mRead state/worker_progress.md
+Let me read the rest of STATE.md and inspect the existing momentum infrastructure.
+[0m→ [0mRead state/STATE.md[90m [offset=852][0m
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py
+[0m→ [0mRead research/backtest/regime_stability.py
+[0m→ [0mRead research/checks/momentum_cost_sensitivity.py
+Let me inspect the framework's momentum/regime functions and the cost sensitivity check pattern.
+[0m→ [0mRead research/backtest/__init__.py
+Now I understand the pattern. Let me check the remaining part of regime_stability.py exports and verify the momentum_signals contract. The key task: test lookback-5 momentum with a predeclared holding-period set. The current `momentum_signals` holds 1 day with daily rebalance. I need a holding-period variant.
+
+Let me check the `__init__.py` exports and the verify pattern.
+[0m→ [0mRead research/checks/verify_momentum_cost_sensitivity.py
+Let me verify how `parameter_sweep` and `walk_forward` consume signals, to design the hold variant correctly.
+[0m→ [0mRead research/backtest/perturbation.py
+[0m✱ [0mGrep "momentum_signals|def test_.*momentum|breakout_signals"[90m in tests/test_regime_stability.py · 17 matches[0m
+Confirmed: `parameter_sweep` recomputes signals on each segment slice via `signals_fn`. Now let me check the existing tests for the signal functions so I can add matching unit tests.
+[0m
+[0m$ [0mcd /home/runner/work/X/X && python3 -m unittest discover -s tests 2>&1 | tail -5
+............................................
+----------------------------------------------------------------------
+Ran 168 tests in 9.995s
+
+OK
+[0m
+[0m✱ [0mGrep "class TestMomentum|momentum_signals"[90m in tests/test_regime_stability.py · 0 matches[0m
+Baseline is 168 tests passing. Let me check existing momentum_signals tests to mirror the style.
+[0m→ [0mRead tests/test_regime_stability.py[90m [limit=40, offset=1][0m
+[0m→ [0mRead tests/test_regime_stability.py[90m [offset=480][0m
+I have full understanding. Let me record my pre-work analysis and begin implementation.
+
+**Pre-work notes:**
+1. **Learning goal:** turn provisional hypotheses into durable, independently-verified evidence and pick the next highest-value frontier.
+2. **Binding constraint:** the only admitted positive candidate (lookback-5 momentum) is qualified on lookback/horizon/cost but only at a 1-day hold — temporal robustness is unresolved.
+3. **Preventing uncertainty:** is the edge hold-robust or a hold=1 single-point timing artifact?
+4. **Bounded action:** run lookback-5 momentum through the existing walk-forward+matched-null regime gate over a predeclared hold set {1,5,10,20} on the 10-asset universe, with independent verifier + determinism.
+5. **Worth it:** LOW cost/risk (reuse infra; one past-only signal fn + check + verifier + tests), HIGH falsification power on the last temporal qualification of the only positive candidate.
+
+Let me add the `momentum_hold_signals` framework function.
+[0m
+[0m← [0mEdit research/backtest/regime_stability.py
+Index: /home/runner/work/X/X/research/backtest/regime_stability.py
+===================================================================
+--- /home/runner/work/X/X/research/backtest/regime_stability.py
++++ /home/runner/work/X/X/research/backtest/regime_stability.py
+@@ -912,8 +912,62 @@
+         out[i] = Signal(date=i + 1, weight=1.0 if ret > 0 else -1.0)
+     return out
+ 
+ 
++def momentum_hold_signals(
++    closes: NDArray,
++    lookback: int = 5,
++    hold: int = 1,
++) -> List[Signal]:
++    """Past-only momentum signal with a fixed holding period (temporal robustness).
++
++    The classic ``momentum_signals`` bet takes a fresh position at every bar
++    (a 1-day hold with daily rebalance). This variant generalises the holding
++    period: the momentum sign is computed from the previous ``lookback``-day
++    return, but the resulting position is held constant for ``hold`` bars
++    before the next rebalance. Rebalances occur at bars ``lookback``,
++    ``lookback + hold``, ``lookback + 2*hold`` ...; the weight at bar ``i`` is
++    the raw momentum sign at the most recent rebalance bar ``<= i``. Bars
++    before ``lookback`` are neutral.
++
++    For ``hold == 1`` this reduces *exactly* to ``momentum_signals`` (a fresh
++    signal at every bar), so the ``hold == 1`` column reproduces the admitted
++    lookback-5 momentum artifact and serves as the reference in a holding-period
++    robustness sweep.
++
++    No look-ahead: the raw sign at the rebalance bar ``j`` uses only
++    ``closes[:j+1]`` and ``j <= i``, so the held weight at bar ``i`` never uses
++    a close later than ``i``.
++
++    Args:
++        closes: closing prices.
++        lookback: lookback window in bars for the momentum sign.
++        hold: holding period in bars (>= 1); the position is held constant
++            between rebalances.
++
++    Returns:
++        List of Signal, one per bar.
++    """
++    n = len(closes)
++    out: List[Signal] = [Signal(date=i + 1, weight=0.0) for i in range(n)]
++    lookback = int(lookback)
++    hold = int(hold)
++    if lookback < 1:
++        raise ValueError("lookback must be >= 1")
++    if hold < 1:
++        raise ValueError("hold must be >= 1")
++    # Raw per-bar momentum sign (identical construction to momentum_signals).
++    raw = [0.0] * n
++    for i in range(lookback, n):
++        ret = float(np.mean(np.log(closes[i - lookback + 1 : i + 1])))
++        raw[i] = 1.0 if ret > 0 else -1.0
++    # Hold the position for `hold` bars between rebalances.
++    for i in range(lookback, n):
++        j = lookback + hold * ((i - lookback) // hold)
++        out[i] = Signal(date=i + 1, weight=raw[j])
++    return out
++
++
+ def breakout_signals(
+     closes: NDArray,
+     lookback: int = 20,
+ ) -> List[Signal]:
+
+[0m
+Now export it in `__init__.py`:
+[0m← [0mEdit research/backtest/__init__.py
+Index: /home/runner/work/X/X/research/backtest/__init__.py
+===================================================================
+--- /home/runner/work/X/X/research/backtest/__init__.py
++++ /home/runner/work/X/X/research/backtest/__init__.py
+@@ -66,8 +66,9 @@
+ ma_crossover_signals,
+ regime_adaptive_ma_signals,
+ mean_reversion_signals,
+ momentum_signals,
++momentum_hold_signals,
+ breakout_signals,
+ volatility_blocks,
+ RegimeUniverseSummary,
+ stress_segments_across_tickers,
+
+[0m
+[0m← [0mEdit research/backtest/__init__.py
+Index: /home/runner/work/X/X/research/backtest/__init__.py
+===================================================================
+--- /home/runner/work/X/X/research/backtest/__init__.py
++++ /home/runner/work/X/X/research/backtest/__init__.py
+@@ -151,8 +151,9 @@
+ "ma_crossover_signals",
+ "regime_adaptive_ma_signals",
+ "mean_reversion_signals",
+ "momentum_signals",
++"momentum_hold_signals",
+ "breakout_signals",
+ "volatility_blocks",
+ "RegimeUniverseSummary",
+ "stress_segments_across_tickers",
+
+[0m
+Now add unit tests for the new signal function:
+[0m← [0mEdit tests/test_regime_stability.py
+Index: /home/runner/work/X/X/tests/test_regime_stability.py
+===================================================================
+--- /home/runner/work/X/X/tests/test_regime_stability.py
++++ /home/runner/work/X/X/tests/test_regime_stability.py
+@@ -569,6 +569,85 @@
+         )
+         self.assertEqual(result.overall_verdict, r2.overall_verdict)
+ 
+ 
++class TestMomentumHoldSignals(unittest.TestCase):
++    """Unit tests for the fixed-holding-period momentum signal class."""
++
++    def test_hold_one_equals_momentum_signals(self):
++        """hold=1 must reproduce momentum_signals exactly (reference column)."""
++        np.random.seed(21)
++        closes = np.abs(np.random.randn(400).cumsum() + 100.0)
++        for lookback in (3, 5, 10):
++            a = bt.momentum_hold_signals(closes, lookback=lookback, hold=1)
++            b = bt.momentum_signals(closes, lookback=lookback)
++            self.assertEqual([s.weight for s in a], [s.weight for s in b])
++
++    def test_hold_constant_between_rebalances(self):
++        """The weight is constant across each hold block and only changes at
++        rebalance bars lookback + k*hold."""
++        np.random.seed(99)
++        closes = np.abs(np.random.randn(500).cumsum() + 100.0)
++        lookback, hold = 5, 10
++        sig = bt.momentum_hold_signals(closes, lookback=lookback, hold=hold)
++        self.assertEqual(len(sig), len(closes))
++        # Neutral before the lookback window.
++        for i in range(lookback):
++            self.assertEqual(sig[i].weight, 0.0, msg=i)
++        # Within each hold block the weight is constant.
++        for start in range(lookback, len(closes), hold):
++            block = [sig[i].weight for i in range(start, min(start + hold, len(closes)))]
++            self.assertEqual(len(set(block)), 1, msg=start)
++        # The weight at each rebalance bar equals the raw momentum sign there.
++        for i in range(lookback, len(closes)):
++            j = lookback + hold * ((i - lookback) // hold)
++            raw = float(np.mean(np.log(closes[j - lookback + 1 : j + 1])))
++            expected = 1.0 if raw > 0 else -1.0
++            self.assertEqual(sig[i].weight, expected, msg=i)
++
++    def test_hold_past_only(self):
++        """A held weight at bar i must not depend on closes after i."""
++        np.random.seed(1234)
++        closes = np.abs(np.random.randn(500).cumsum() + 100.0)
++        lookback, hold = 5, 5
++        sig_orig = bt.momentum_hold_signals(closes, lookback=lookback, hold=hold)
++        tweaked = np.array(closes, copy=True)
++        tweaked[300] *= 2.0
++        sig_tweaked = bt.momentum_hold_signals(tweaked, lookback=lookback, hold=hold)
++        for i in range(0, 300):
++            self.assertEqual(sig_orig[i].weight, sig_tweaked[i].weight, msg=i)
++
++    def test_hold_determinism(self):
++        """Holding-period signals must be fully deterministic."""
++        np.random.seed(7)
++        closes = np.abs(np.random.randn(1000).cumsum() + 100.0)
++        s1 = bt.momentum_hold_signals(closes, lookback=5, hold=10)
++        s2 = bt.momentum_hold_signals(closes, lookback=5, hold=10)
++        self.assertEqual([s.weight for s in s1], [s.weight for s in s2])
++
++    def test_hold_short_series_and_validation(self):
++        """Short series emits all-neutral; invalid hold/lookback raise."""
++        closes = np.array([100.0, 101.0, 102.0], dtype=np.float64)
++        sig = bt.momentum_hold_signals(closes, lookback=5, hold=1)
++        self.assertEqual(len(sig), 3)
++        self.assertEqual(sum(1 for s in sig if s.weight != 0.0), 0)
++        with self.assertRaises(ValueError):
++            bt.momentum_hold_signals(closes, lookback=5, hold=0)
++        with self.assertRaises(ValueError):
++            bt.momentum_hold_signals(closes, lookback=0, hold=1)
++
++    def test_hold_in_regime_stress(self):
++        """The holding-period signal must integrate with regime_stress."""
++        bars = bt.generate_bars(600, seed=11)
++        grid = bt.parameter_grid_around((("lookback", 5), ("hold", 5)))
++        result = bt.regime_stress(
++            bt.momentum_hold_signals, list(bars), grid,
++            (("lookback", 5.0), ("hold", 5.0)),
++            train_window=60, test_window=20, warmup=0,
++        )
++        self.assertIn(result.overall_verdict,
++                      ("CONSISTENT_WITH_NOISE", "REGIME_STABLE",
++                       "REGIME_DEPENDENT", "REGIME_STABLE_LOSS"))
++
++
+ if __name__ == "__main__":
+     unittest.main(verbosity=2)
+
+[0m
+Let me verify the new function and tests pass before building the check.
+[0m$ [0mcd /home/runner/work/X/X && python3 -m unittest tests.test_regime_stability.TestMomentumHoldSignals -v 2>&1 | tail -20
+test_hold_constant_between_rebalances (tests.test_regime_stability.TestMomentumHoldSignals.test_hold_constant_between_rebalances)
+The weight is constant across each hold block and only changes at ... ok
+test_hold_determinism (tests.test_regime_stability.TestMomentumHoldSignals.test_hold_determinism)
+Holding-period signals must be fully deterministic. ... ok
+test_hold_in_regime_stress (tests.test_regime_stability.TestMomentumHoldSignals.test_hold_in_regime_stress)
+The holding-period signal must integrate with regime_stress. ... ok
+test_hold_one_equals_momentum_signals (tests.test_regime_stability.TestMomentumHoldSignals.test_hold_one_equals_momentum_signals)
+hold=1 must reproduce momentum_signals exactly (reference column). ... ok
+test_hold_past_only (tests.test_regime_stability.TestMomentumHoldSignals.test_hold_past_only)
+A held weight at bar i must not depend on closes after i. ... ok
+test_hold_short_series_and_validation (tests.test_regime_stability.TestMomentumHoldSignals.test_hold_short_series_and_validation)
+Short series emits all-neutral; invalid hold/lookback raise. ... ok
+
+----------------------------------------------------------------------
+Ran 6 tests in 0.385s
+
+OK
+[0m
+All 6 new tests pass, including `hold=1 == momentum_signals`. Now I'll write the check. First let me confirm the artifact dir and an existing artifact naming pattern.
+[0m$ [0mcd /home/runner/work/X/X && ls state/check_artifacts/ | grep -i momentum
+cross_sectional_momentum_results.json
+momentum_cost_sensitivity_results.json
+momentum_horizon_gap_analysis.json
+momentum_longer_horizon_results.json
+momentum_lookback_sweep_results.json
+momentum_results.json
+smoke_cs_momentum.json
+[0m
+Now I'll write the holding-period sensitivity check:
+[0m← [0mWrite research/checks/momentum_hold_period.py
+Wrote file successfully.
+[0m
+Now run the check:
+[0m$ [0mcd /home/runner/work/X/X && python3 research/checks/momentum_hold_period.py 2>&1 | tail -60
+[PASS] 6. Volume non-negative finite (AAPL): all volume fields valid
+[PASS] 6. Volume non-negative finite (MSFT): all volume fields valid
+[PASS] 6. Volume non-negative finite (GOOGL): all volume fields valid
+[PASS] 6. Volume non-negative finite (AMZN): all volume fields valid
+[PASS] 6. Volume non-negative finite (META): all volume fields valid
+[PASS] 6. Volume non-negative finite (NVDA): all volume fields valid
+[PASS] 6. Volume non-negative finite (TSLA): all volume fields valid
+[PASS] 6. Volume non-negative finite (JPM): all volume fields valid
+[PASS] 6. Volume non-negative finite (JNJ): all volume fields valid
+[PASS] 6. Volume non-negative finite (XOM): all volume fields valid
+[PASS] 7. Price positivity (AAPL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (MSFT): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (GOOGL): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (AMZN): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (META): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (NVDA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (TSLA): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JPM): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (JNJ): all closes positive, no zero-price bars
+[PASS] 7. Price positivity (XOM): all closes positive, no zero-price bars
+[PASS] 10. Known gaps audit: all documented gaps verified genuinely absent in every ticker
+=== Preflight summary ===
+Dataset: yf-ohlcv-universe-2009-to-2026-10-03 | universe: 10 | collection: 2026-10-03 | windows: 4 | bars per ticker: {'AAPL': 4465, 'MSFT': 4465, 'GOOGL': 4465, 'AMZN': 4465, 'META': 3614, 'NVDA': 4465, 'TSLA': 4091, 'JPM': 4465, 'JNJ': 4465, 'XOM': 4465}
+
+PREFLIGHT PASSED: all data-quality and survivorship checks passed
+
+=== 3. Leakage review per asset (lookback=5, hold=5) ===
+  AMZN: 4465 bars, signals 4465, leakage [PASS], total_return +5.537
+  JPM: 4465 bars, signals 4465, leakage [PASS], total_return +3.916
+  no-look-ahead: held weight at bar i uses closes[:i] only (rebalance bar j <= i); neutral bars before the lookback carry equity.
+
+=== 4. Holding-period sweep (hold 1 / 5 / 10 / 20; lookback fixed 5) ===
+  Params: walk-forward per segment train=252d / test=84d / warmup=60d / overlap=60d, min 400 bars/segment, 4 contiguous volatility blocks, each hold vs a coin-flip null on the same segments
+
+  Predeclared HOLD_PERIODS = [1, 5, 10, 20] (hold=1 is the reference / admitted 1-day hold)
+
+  hold=1 (reference) verdict counts across universe: {'REGIME_STABLE': 8, 'CONSISTENT_WITH_NOISE': 2, 'REGIME_DEPENDENT': 0, 'REGIME_STABLE_LOSS': 0}
+  holding-period robustness verdict counts: HOLD_ROBUST=7 (>=2 holds positive edge) | HOLD_SENSITIVE=0 (edge at exactly one hold) | NO_EDGE=3
+
+  Per-asset holding-period profiles (medians per hold + verdict):
+    AAPL   segments=['turbulent', 'calm', 'turbulent', 'calm'] h1: 0.071 EDGE, h5: 0.071 NO_EDGE, h10: 0.071 EDGE, h20: 0.071 EDGE rob=HOLD_ROBUST   edge_counts={'EDGE': 3, 'LOSS': 0, 'NO_EDGE': 1} single_point=False
+    MSFT   segments=['calm', 'turbulent'] h1: 0.052 EDGE, h5: 0.052 EDGE, h10: 0.052 EDGE, h20: 0.052 EDGE rob=HOLD_ROBUST   edge_counts={'EDGE': 4, 'LOSS': 0, 'NO_EDGE': 0} single_point=False
+    GOOGL  segments=['turbulent', 'calm', 'turbulent'] h1: 0.069 EDGE, h5: 0.069 EDGE, h10: 0.069 EDGE, h20: 0.069 NO_EDGE rob=HOLD_ROBUST   edge_counts={'EDGE': 3, 'LOSS': 0, 'NO_EDGE': 1} single_point=False
+    AMZN   segments=['turbulent', 'calm', 'turbulent'] h1: 0.065 EDGE, h5: 0.065 EDGE, h10: 0.065 EDGE, h20: 0.065 EDGE rob=HOLD_ROBUST   edge_counts={'EDGE': 4, 'LOSS': 0, 'NO_EDGE': 0} single_point=False
+    META   segments=['turbulent', 'calm', 'turbulent'] h1: 0.073 EDGE, h5: 0.073 EDGE, h10: 0.073 EDGE, h20: 0.073 EDGE rob=HOLD_ROBUST   edge_counts={'EDGE': 4, 'LOSS': 0, 'NO_EDGE': 0} single_point=False
+    NVDA   segments=['turbulent', 'calm', 'turbulent'] h1:-0.038 NO_EDGE, h5:-0.038 NO_EDGE, h10:-0.038 NO_EDGE, h20:-0.038 NO_EDGE rob=NO_EDGE       edge_counts={'EDGE': 0, 'LOSS': 0, 'NO_EDGE': 4} single_point=False
+    TSLA   segments=['turbulent', 'calm', 'turbulent'] h1: 0.132 EDGE, h5: 0.132 EDGE, h10: 0.132 EDGE, h20: 0.132 NO_EDGE rob=HOLD_ROBUST   edge_counts={'EDGE': 3, 'LOSS': 0, 'NO_EDGE': 1} single_point=False
+    JPM    segments=['turbulent', 'calm', 'turbulent'] h1: 0.113 EDGE, h5: 0.113 NO_EDGE, h10: 0.113 EDGE, h20: 0.113 EDGE rob=HOLD_ROBUST   edge_counts={'EDGE': 3, 'LOSS': 0, 'NO_EDGE': 1} single_point=False
+    JNJ    segments=['calm', 'turbulent'] h1: 0.050 NO_EDGE, h5: 0.050 NO_EDGE, h10: 0.050 NO_EDGE, h20: 0.050 NO_EDGE rob=NO_EDGE       edge_counts={'EDGE': 0, 'LOSS': 0, 'NO_EDGE': 4} single_point=False
+    XOM    segments=['calm', 'turbulent'] h1: 0.018 NO_EDGE, h5: 0.018 NO_EDGE, h10: 0.018 NO_EDGE, h20: 0.018 NO_EDGE rob=NO_EDGE       edge_counts={'EDGE': 0, 'LOSS': 0, 'NO_EDGE': 4} single_point=False
+
+  hold=1 EDGE assets (7): ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'JPM']
+  HOLD_ROBUST among them (7): ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'JPM']
+  HOLD_SENSITIVE among them (0): []
+  single-point (1-day) timing artifacts (0): []
+  universe temporal classification: TEMPORALLY_ROBUST
+
+determinism: r1 == r2: True
+artifact written to: /home/runner/work/X/X/state/check_artifacts/momentum_hold_period_results.json
+NOTE: research/simulation only. No live trading or production execution. Momentum holding-period sensitivity on the collected universe: exploratory simulation.
+[0m
+The check ran and classified TEMPORALLY_ROBUST, but the printed first-segment medians look identical across holds, which is suspicious. Let me inspect the full per-segment medians in the artifact to confirm the hold parameter actually changes the signal.
+[0m✗ [0mcd /home/runner/work/X/X && python3 -c "
+import json
+a=json.load(open('state/check_artifacts/momentum_hold_period_results.json'))
+for t in ['AAPL','MSFT','GOOGL','AMZN','TSLA']:
+    print(t)
+    for h in ['1','5','10','20']:
+        m=a['per_asset'][t]['hold_medians'][h]
+        v=a['per_asset'][t]['verdicts'][h]
+        print('  h'+h, m, v)
+" failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"python3 -c *","action":"deny","source":"project"}
+[91m[1mError: [0mSign up for free to continue and explore 500 other models. Takes 2 minutes, no credit card required. Or come back later.

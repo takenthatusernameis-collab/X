@@ -1,0 +1,65 @@
+{
+  "agent_number": 3,
+  "campaign_slot": 3,
+  "global_agent_number": 3,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-002",
+  "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
+  "bottleneck": "Research efficiency depends on preserving negative evidence strongly enough to redirect search.",
+  "question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+  "action": "Read-only audit of durable evidence: state/LEARNING_STATE.md (frontier table lines 17-36, Active strategy delta, Learning rules), state/STATE.md, state/campaign/task_queue.json, runs/45760979765/campaign_status.json, agent_01.json (P-001) and agent_02.json (R-001) records, research/checks/momentum_sweep.py vs momentum_lookback_sweep.py vs momentum_longer_horizon.py, and .github/scripts/campaign_controller.py (load_queue + select_task). Made exactly one minimal durable-state change: annotated the orphaned near-duplicate research/checks/momentum_sweep.py as superseded in state/LEARNING_STATE.md. No controller/process file was modified.",
+  "changed": [
+    "state/LEARNING_STATE.md (added a concise 'Novelty / duplicate-avoidance audit (P-002)' section: RETAIN conclusion, the one near-duplicate research/checks/momentum_sweep.py explicitly marked superseded, and the no-semantic-guard residual caveat)",
+    "state/worker_progress.md (phase/status milestone update to AGENT_03_COMPLETE / DONE)",
+    "state/campaign/runs/45760979765/agents/agent_03.json (this record)"
+  ],
+  "verified": [
+    "Inspected state/LEARNING_STATE.md frontier table (lines 17-36): each resolved signal-class cell (MA crossover, short-horizon reversal, cross-sectional relative strength, volatility targeting, momentum, cross-sectional momentum, 20-day breakout, momentum cost robustness) appears exactly once with a terminal status; no cell is duplicated or re-run under a different name.",
+    "Inspected .github/scripts/campaign_controller.py load_queue (lines 176-184) and select_task (lines 269-305): the only duplicate guard is exact task_id matching (line 181 'duplicate task_id'; line 289 candidate task_id membership); selection is an ordinal priority sort over OPEN tasks for the role; there is NO semantic/near-duplicate novelty check.",
+    "Compared research/checks/momentum_sweep.py (LOOKBACKS=(3,5,10,20)) with research/checks/momentum_lookback_sweep.py (LOOKBACKS=(3,5,10)): both are lookback-sweep implementations of the same momentum experiment on the same collected universe through the same volatility-block regime gate + coin-flip null; they are near-duplicates on the 3/5/10 core.",
+    "glob state/check_artifacts/*sweep*.json returns only momentum_lookback_sweep_results.json; glob momentum_sweep_results.json returns none; glob *hold*.json returns none. So momentum_sweep.py produced no durable artifact and momentum_hold_period_sensitivity.py (R-002, OPEN) has not been executed to an artifact.",
+    "grep across *.md: momentum_sweep.py is referenced by NO durable record; momentum_lookback_sweep.py is the admitted artifact (activation 2026-10-05, logs/ACTIVATION-2026-10-05.md lines 761-818). momentum_longer_horizon.py covers lookback 20/60 (LEARNING_STATE line 31), so momentum_sweep.py's only unique content (lookback 20 + fold t-stats) is already covered.",
+    "Inspected state/campaign/task_queue.json and runs/45760979765/campaign_status.json: agents 01/02/03 selected P-001 / R-001 / P-002 respectively — three distinct tasks; no equivalent experiment was executed twice within the campaign."
+  ],
+  "unverified": [
+    "The controller has no semantic (near-duplicate) novelty enforcement; duplicate prevention relies on the frontier table plus agent discipline. This has held for agents 01-03 but is not deterministically enforced, so a future near-duplicate task phrasing could still be selected.",
+    "Whether research/checks/momentum_sweep.py was ever executed is unknown (no artifact, no log reference); it is treated as superseded/redundant, not as a validated negative result, and its unrun status is not claimed either way.",
+    "git history and commit timestamps were not inspected (bash is project-denied at this layer); the audit relies on durable file contents and executed-command evidence recorded by prior agents.",
+    "The audit covers the current campaign (3 agents) and the pre-campaign manual phase; it does not prove the guard would catch every future equivalent experiment, only that none has occurred so far at the frontier-cell level."
+  ],
+  "observed_effect": "The audit produced a concrete, evidence-backed duplicate-avoidance conclusion: the durable history prevents duplicate frontier-cell experiments (each resolved cell is recorded once with a terminal status, and agents 01-03 executed three distinct tasks with no equivalent re-test). The single near-duplicate found is a pre-campaign orphaned implementation (research/checks/momentum_sweep.py, no artifact, referenced nowhere) which is now explicitly annotated as superseded so a future agent will not re-run it as a new experiment. The minimal novelty guard (frontier table terminal statuses + Learning rule 2 + exact-task_id dedup) is judged SUFFICIENT for the current campaign; no controller/process mechanism change is warranted.",
+  "uncertainty_targeted": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+  "uncertainty_reduced": "Reduced: established from durable evidence that resolved frontier cells are each recorded once with terminal status and that no equivalent experiment was executed twice across campaign agents 01-03; identified and annotated the single near-duplicate (research/checks/momentum_sweep.py) as superseded so it will not be re-run. Not eliminated: the controller has no semantic novelty enforcement, so prevention still depends on the frontier artifact and agent discipline, and a future near-duplicate phrasing could slip through.",
+  "process_decision": "RETAIN",
+  "research_result": "PROCESS (no market hypothesis tested; out of scope): the minimal novelty guard is RETAINED as sufficient. Concrete duplicate-avoidance evidence: (a) the LEARNING_STATE frontier table lists each resolved signal-class cell exactly once with a terminal status; (b) the campaign selector (campaign_controller.select_task/load_queue) deduplicates only exact task_id and otherwise ranks OPEN tasks by ordinal priority, with no semantic novelty check; (c) agents 01-03 executed three distinct tasks (P-001, R-001, P-002) with zero equivalent re-tests; (d) exactly one near-duplicate implementation exists (research/checks/momentum_sweep.py vs the admitted momentum_lookback_sweep.py + momentum_longer_horizon.py), it is pre-campaign, has no artifact, and is referenced by no durable record, and is now annotated superseded. Conclusion: the durable history adequately prevents repeating equivalent experiments at the operative frontier-cell level, and a minimal novelty guard is sufficient; no code-level guard is warranted without an observed executed duplicate. This is a process judgment from durable evidence, not from agent confidence or execution success.",
+  "decision": "RETAIN",
+  "next": "Run R-006 (bounded walk-forward window sensitivity for lookback-5 momentum on the existing 10-asset universe through the existing regime + matched-null gate) as the next highest-value research cell.",
+  "candidate_tasks": [
+    {
+      "bottleneck": "The momentum edge is cost-robust but its walk-forward window parameterisation (train=252d/test=84d/overlap=60d) is a single untested mechanical choice.",
+      "complexity": "LOW",
+      "deliverable": "A reproducible artifact and independent verification result classifying window-parameterisation sensitivity.",
+      "downstream_leverage": "MEDIUM",
+      "effort": "MEDIUM",
+      "evidence_basis": "The admitted momentum candidate is lookback-, horizon- and cost-robust; window parameterisation is the remaining untested mechanical axis.",
+      "execution_risk": "LOW",
+      "expected_information_gain": "MEDIUM",
+      "falsification_power": "MEDIUM",
+      "objective": "Run a bounded walk-forward window sensitivity (train/test/overlap grid) for lookback-5 momentum on the existing 10-asset universe through the existing regime + matched-null gate.",
+      "out_of_scope": "Do not tune signal rules to the window results, expand the universe, or introduce leverage.",
+      "primary_question": "Does the cost-robust short-horizon momentum edge depend on the specific walk-forward window parameterisation?",
+      "role": "HIGHER_ORDER_OBJECTIVE",
+      "scope": "Use the existing 10-asset collected universe and existing momentum/regime implementation.",
+      "status": "OPEN",
+      "stop_condition": "Stop after the predeclared window grid is evaluated and the independent verifier agrees or records the exact discrepancy.",
+      "success_criterion": "The result is reproducible and independently verified, regardless of positive or negative outcome.",
+      "task_id": "R-006",
+      "tests_preceding_process": true,
+      "verifiability": "HIGH",
+      "verification_requirement": "Real-data preflight, leakage gate, independent recomputation, determinism, and existing regression suite."
+    }
+  ],
+  "complexity_added": "LOW (one concise durable-state audit note in state/LEARNING_STATE.md plus a worker_progress milestone; no code, no new dependency, no controller/process-file change)",
+  "failure_class": "NONE",
+  "task_selection_observation": "IMPROVED"
+}

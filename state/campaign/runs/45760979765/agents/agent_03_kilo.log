@@ -1,0 +1,84 @@
+--- Fresh Kilo session attempt 1 ---
+[0m
+> code · free-kilo
+[0m
+[0m→ [0mRead state/STATE.md
+[0m→ [0mRead state/LEARNING_STATE.md
+[0m→ [0mRead state/worker_progress.md
+I'll start by inspecting the durable evidence before any change. Let me read the key state files and campaign structure.
+[0m✗ [0mls -la /home/runner/work/X/X/state/campaign/runs/45760979765/agents/ 2>/dev/null; echo "---"; ls /home/runner/work/X/X/research/checks/ 2>/dev/null failed
+[91m[1mError: [0mThe user has specified a rule which prevents you from using this specific tool call. Here are some of the relevant rules {"permission":"bash","pattern":"*","action":"deny","source":"project"}
+[0m✱ [0mGlob "state/campaign/runs/45760979765/**/*.json"[90m 14 matches[0m
+Bash is denied at this layer; I'll use repository-native tools. Let me inspect the campaign records and research checks.
+[0m✱ [0mGlob "research/checks/*.py"[90m 32 matches[0m
+[0m✱ [0mGlob "state/check_artifacts/*.json"[90m 12 matches[0m
+[0m✱ [0mGlob "logs/*.md"[90m 7 matches[0m
+[0m→ [0mRead state/campaign/runs/45760979765/agents/agent_03_contract.json
+[0m→ [0mRead state/campaign/runs/45760979765/agents/agent_03_before.json
+[0m→ [0mRead state/campaign/runs/45760979765/task_queue_initial.json
+[0m→ [0mRead state/campaign/runs/45760979765/campaign_status.json
+[0m→ [0mRead LEARNING_EFFICIENCY.md
+[0m→ [0mRead state/campaign/runs/45760979765/agents/agent_01.json
+Let me read the P-001 record, the learning-efficiency policy, and the current task queue to understand prior process audits and the novelty-guard requirement.
+[0m→ [0mRead state/campaign/task_queue.json
+[0m→ [0mRead research/checks/momentum_hold_period_sensitivity.py
+Now let me examine the research checks for near-duplicate work and the controller's selection semantics. Key question: are there OPEN queue tasks whose work already exists, or duplicate checks?
+[0m✱ [0mGrep "novel|duplicate|dedup|equivalent|already|resolved|frontier"[90m in .github/scripts/campaign_controller.py · 3 matches[0m
+[0m→ [0mRead research/checks/momentum_sweep.py
+Key signal: `momentum_sweep.py` and `momentum_lookback_sweep.py` look like near-duplicates, and the controller only guards exact `task_id` collisions. Let me confirm.
+[0m→ [0mRead research/checks/momentum_lookback_sweep.py[90m [limit=60][0m
+[0m→ [0mRead .github/scripts/campaign_controller.py[90m [limit=120, offset=150][0m
+[0m✱ [0mGlob "state/check_artifacts/momentum_sweep_results.json"[90m 0 matches[0m
+[0m→ [0mRead .github/scripts/campaign_controller.py[90m [limit=160, offset=269][0m
+[0m✱ [0mGrep "momentum_sweep|momentum_lookback_sweep|hold_period_sensitivity"[90m in . · 12 matches[0m
+[0m✱ [0mGlob "state/check_artifacts/*sweep*.json"[90m 1 match[0m
+[0m✱ [0mGlob "state/check_artifacts/*hold*.json"[90m 0 matches[0m
+[0m→ [0mRead logs/ACTIVATION-2026-11-26.md
+Let me confirm the near-duplicate status and check for any durable references before deciding on a minimal change.
+I have enough evidence. Findings:
+- **Frontier table**: each resolved signal-class cell appears once with terminal status; no duplicate cells.
+- **Controller**: `select_task`/`load_queue` only dedup exact `task_id`; no semantic novelty check.
+- **One concrete near-duplicate**: `research/checks/momentum_sweep.py` (lookbacks 3/5/10/20) is redundant with the admitted `momentum_lookback_sweep.py` (3/5/10) + `momentum_longer_horizon.py` (20/60); its artifact is absent and no durable record references it.
+- Agents 01–03 executed distinct tasks (P-001, R-001, P-002) — no duplicate executed experiment.
+
+Now the pre-work notes and one minimal durable-state change.
+
+**Pre-work notes:** (1) The system is improving its ability to choose/falsify/validate/preserve research and redirect search. (2) The binding constraint is whether negative/resolved evidence actually redirects later search. (3) Uncertainty: does durable history prevent equivalent re-experiments once a cell is resolved? (4) Bounded action: audit resolved cells + task history + selector semantics for duplicates. (5) Worth it: LOW risk/complexity, HIGH leverage — duplicate work wastes scarce sequential slots.
+
+Applying the one minimal change (annotate the orphaned near-duplicate as superseded):
+[0m
+[0m← [0mEdit state/LEARNING_STATE.md
+Index: /home/runner/work/X/X/state/LEARNING_STATE.md
+===================================================================
+--- /home/runner/work/X/X/state/LEARNING_STATE.md
++++ /home/runner/work/X/X/state/LEARNING_STATE.md
+@@ -60,8 +60,15 @@
+ | 37414038601 (2026-10-06) | Execute the 20-day breakout continuation frontier cell (a genuinely new signal class: long when the close exceeds the highest close of the preceding 20 trading days; hold 1 day; daily rebalance) on the collected universe through the full gate stack | VERIFIED: check ran end-to-end (manifest 10/10 OK, preflight PASSED, leakage PASS on AMZN/JPM + equity-fill audit, regime-stability gate across all 10 tickers with a matched coin-flip null, bounded lookback sensitivity {5, 10, 20}, determinism r1==r2); independent verifier executed — Gate 1 (AMZN/JPM fresh walk_forward + noise_benchmark, lookbacks 5/10/20) MATCH, Gate 2 (all-asset fresh medians/nulls + regenerated regime/sensitivity verdicts from unrounded values) MATCH, Gate 3 determinism identical; 161/161 regression tests pass (156 existing + 5 new `breakout_signals` unit tests); new framework function `regime_stability.py::breakout_signals` and its export verified. Verdict: FALSIFIED — the breakout filter produces no robust edge: lookback-5 REGIME_STABLE=3 / CONSISTENT_WITH_NOISE=7, lookback-10 REGIME_STABLE=1 / CONSISTENT_WITH_NOISE=8 / REGIME_DEPENDENT=1, lookback-20 (canonical) REGIME_STABLE=1 / CONSISTENT_WITH_NOISE=9; sensitivity verdicts ROBUST=1 (TSLA, edges at lookbacks 5 and 20), SENSITIVE=2 (AAPL @5, NVDA @10), NO_EDGE=7. The small positive verdicts (AAPL @5, TSLA @5/@20, NVDA @10) are absent from the momentum-asset list (MSFT/GOOGL/AMZN/META show NO_EDGE) and are non-lookback-robust. The result matches the a-priori prediction (noise-like in most assets; small positive verdicts only among momentum assets) and closes the genuinely-new-signal-class frontier cell as FALSIFIED. | One genuinely new signal class tested and decisively closed (FALSIFIED) with full independent verification; frontier-first selection operated correctly a sixth time | RETAIN (frontier-first delta demonstrated: right cell selected, executed through the full gate stack, and closed with a decisive, independently-verified verdict) |
+ 
+ | 2026-11-26 (run 45760979765 slot 02) | Execute the momentum cost-robustness frontier cell (R-001): bounded transaction-cost sensitivity for lookback 3/5/10 on the collected universe through the existing regime + matched-null gate, with an a-priori cost-robustness prediction | VERIFIED: `research/checks/momentum_cost_sensitivity.py` ran end-to-end (manifest 10/10 OK, PREFLIGHT PASSED, leakage PASS on AMZN/JPM, determinism r1==r2) over a zero/realistic(1x repo model)/conservative(2x) cost grid, cost cfg threaded through candidate AND matched coin-flip null; `research/checks/verify_momentum_cost_sensitivity.py` (fresh walk_forward + noise_benchmark, no stress_segments) MATCH on Gate 1 (AMZN/JPM all lookbacks/costs), Gate 2 (zero-cost column vs `momentum_lookback_sweep_results.json`, all 10x3, 3dp), Gate 3 (verdict reproducibility), determinism identical; 168/168 tests pass. Verdict: COST_ROBUST — all 6 zero-cost lookback-robust assets (AAPL, MSFT, GOOGL, AMZN, META, TSLA) keep a positive REGIME_STABLE edge under 1x and 2x costs (COST_ROBUST=6/DEGRADED=0/REJECTED=0); per-fold cost drag ~1e-5..1e-4 (about 1000x below the edge); a-priori prediction CONFIRMED (6/6). Documented caveat: the coin-flip null has ~60x the candidate's turnover and is far more cost-penalised, so the candidate-minus-null gap is not a valid cost-stress measure; the verdict uses the candidate's own absolute medians. | One decision-relevant qualification of the only positive candidate closed decisively (COST_ROBUST) with full independent verification; a reusable cost-sensitivity check + verifier added; the null-turnover asymmetry is now durable methodology evidence; frontier-first selection operated correctly a seventh time | RETAIN (frontier-first delta demonstrated: right cell selected, executed through the full gate stack, closed with a decisive, independently-verified verdict) |
+ 
++## Novelty / duplicate-avoidance audit (P-002, 2026-11-26, run 45760979765 slot 03)
++
++- **Question:** Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?
++- **Conclusion: RETAIN — the minimal novelty guard is sufficient.** The frontier table above lists each resolved signal-class cell exactly once with a terminal status (FALSIFIED / TESTED / COST_ROBUST / REJECTED); the campaign selector (`.github/scripts/campaign_controller.py::select_task` + `load_queue`) enforces exact `task_id` deduplication and ordinal priority over OPEN tasks; the prompt firewall and Learning rule 2 forbid equivalent re-tests. Across campaign agents 01–03 (P-001, R-001, P-002) no equivalent experiment was executed twice.
++- **One concrete near-duplicate found (pre-campaign manual phase, no artifact):** `research/checks/momentum_sweep.py` (lookbacks 3/5/10/20) is redundant with the ADMITTED `research/checks/momentum_lookback_sweep.py` (3/5/10; artifact `momentum_lookback_sweep_results.json`) plus `research/checks/momentum_longer_horizon.py` (20/60). It has no artifact and is referenced by no durable record. **Do not re-run it as a new experiment — treat it as superseded.**
++- **Residual (not a current bottleneck):** the controller has no *semantic* (near-duplicate) novelty check — only exact `task_id` — so prevention relies on the frontier table plus agent discipline. That has held so far; a code-level guard is out of scope and not warranted without an observed executed duplicate.
++
+ ## Learning rules
+ 
+ 1. One substantive activation should normally choose one primary strategy delta.
+ 2. A repeated experiment requires a new hypothesis, diagnostic purpose, materially new data, independent verification need, or different information objective.
+
+[0m
+[0m← [0mWrite state/worker_progress.md
+Wrote file successfully.
+[0m
+[0m← [0mWrite state/campaign/runs/45760979765/agents/agent_03.json
+Wrote file successfully.
+[0m
+Now the durable handoff record:
+Let me verify both writes landed correctly.
+[0m→ [0mRead state/LEARNING_STATE.md[90m [limit=22, offset=62][0m
+[0m→ [0mRead state/campaign/runs/45760979765/agents/agent_03.json[90m [limit=12][0m
+P-002 complete. Duplicate-work question resolved with concrete evidence; one minimal durable-state change applied.
+
