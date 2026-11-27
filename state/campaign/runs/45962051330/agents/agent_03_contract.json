@@ -1,0 +1,105 @@
+{
+  "agent_number": 3,
+  "bottleneck": "The current controller qualitative-priority selector's end-to-end effect on information flow is not yet observed; only its frontier-first precursor is evidenced.",
+  "campaign_slot": 3,
+  "deliverable": "A bounded process judgment classifying the controller selector as IMPROVED, UNCHANGED, WORSENED, or UNVERIFIED with cited durable evidence.",
+  "evidence_basis": "P-001 found the frontier-first precursor improved information flow, but the controller selector itself has only one selection so far.",
+  "global_agent_number": 3,
+  "objective": "After the current campaign completes, compare the controller-selected task sequence and per-activation information gain against the prior frontier-first manual activation sequence using durable records only.",
+  "out_of_scope": "Do not change the controller, add a reward score, or rerun historical experiments.",
+  "preceding_agent": {
+    "action": "Inspected durable state (LEARNING_STATE frontier/history, STATE activation sections, task_queue/current_task, activation_status, worker_progress) and the existing momentum check/verifier and cost model (engine BacktestConfig; examples' realistic costs; stress_segments/noise_benchmark accept a cfg). Wrote a bounded predeclared cost-sensitivity check (research/checks/momentum_cost_sensitivity.py) reusing the existing stress_segments + matched coin-flip null with a cost BacktestConfig over a fixed grid {zero, realistic, stress2x} x lookback {3,5,10} x the 10-asset universe, with an a-priori classification rule and prediction, plus an independent verifier (research/checks/verify_momentum_cost_sensitivity.py) that recomputes via a fresh walk_forward + noise_benchmark path (no stress_segments). Ran the check and verifier end-to-end, ran the regression suite, and folded the verdict and caveats into STATE.md, LEARNING_STATE.md, activation_status.json, worker_progress.md, and logs/ACTIVATION-2026-11-27.md. No framework, test, example, or protected control-plane files were modified.",
+    "agent_number": 2,
+    "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+    "campaign_slot": 2,
+    "candidate_tasks": [
+      {
+        "bottleneck": "The standard coin-flip null trades far more than the low-turnover momentum signal, so under costs its dispersion changes and the matched-null comparison is asymmetric; n_edge can shift without any candidate-median change.",
+        "complexity": "MEDIUM",
+        "deliverable": "A reproducible artifact and independent verification comparing turnover-matched vs standard null cost-robustness verdicts.",
+        "downstream_leverage": "MEDIUM",
+        "effort": "MEDIUM",
+        "evidence_basis": "R-001 found the standard coin-flip null trades more than the low-turnover signal, making n_edge null-dispersion-sensitive under costs.",
+        "execution_risk": "LOW",
+        "expected_information_gain": "MEDIUM",
+        "falsification_power": "MEDIUM",
+        "objective": "Implement and run a turnover-matched null (coin-flip signals with the same per-bar turnover as the momentum signal) under the realistic cost model and compare the cost-robustness classification to the standard null.",
+        "out_of_scope": "Do not tune the signal, expand the universe, or change the cost model.",
+        "primary_question": "Does a turnover-matched coin-flip null change the cost-robustness verdict for the momentum candidate relative to the standard coin-flip null?",
+        "role": "HIGHER_ORDER_OBJECTIVE",
+        "scope": "Use the existing 10-asset universe, the existing momentum signal, and a turnover-matched null variant; bounded comparison only.",
+        "status": "OPEN",
+        "stop_condition": "Stop after the turnover-matched null is evaluated and independently checked.",
+        "success_criterion": "The comparison yields a clear classification (verdict unchanged or changed) with the exact figures.",
+        "task_id": "R-006",
+        "tests_preceding_process": true,
+        "verifiability": "HIGH",
+        "verification_requirement": "Leakage, matched null, independent recomputation, determinism, regression suite."
+      }
+    ],
+    "changed": [
+      "research/checks/momentum_cost_sensitivity.py (new: bounded predeclared cost grid {zero, realistic, stress2x} x lookback {3,5,10} x 10 assets via existing stress_segments + matched coin-flip null with a cost BacktestConfig; a-priori classification; artifact)",
+      "research/checks/verify_momentum_cost_sensitivity.py (new: independent verifier, 3 gates via a fresh walk_forward + noise_benchmark path that does not call stress_segments)",
+      "state/check_artifacts/momentum_cost_sensitivity_results.json (new artifact)",
+      "state/STATE.md (new activation section: method, a-priori prediction, results, independent verification, verdict, frontier update)",
+      "state/LEARNING_STATE.md (frontier cost-robustness row, learning-history row, Next action updated)",
+      "state/activation_status.json (updated for run 45962051330 agent 02)",
+      "state/worker_progress.md (phase/milestone)",
+      "logs/ACTIVATION-2026-11-27.md (new activation record)",
+      "scratch/probe_env_02.py, scratch/timing_probe_02.py, scratch/cost_diag_02.py, scratch/utcnow_02.py (diagnostic helpers retained per persistence policy)"
+    ],
+    "complexity_added": "NONE",
+    "decision": "RETAIN",
+    "failure_class": "NONE",
+    "global_agent_number": 2,
+    "next": "Run task R-002: test the qualified lookback-5 momentum signal across a predeclared small holding-period set through the existing walk-forward and matched-null methodology.",
+    "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+    "observed_effect": "Closed the decision-relevant cost qualification of the only positive candidate: the admitted short-horizon momentum edge is now classified COST_ROBUST (survives the realistic cost model and a 2x conservative stress with essentially unchanged candidate medians for exactly the six previously-admitted assets; 0 COST_FRAGILE / 0 COST_ERASES_EDGE) instead of cost-unqualified. The activation also surfaced an honest qualification (robustness is a low-turnover / persistent-long-bias effect, and the regime verdict is null-dispersion-sensitive), which redirects future work toward a turnover-matched null and the holding-period / volatility-gate qualifications rather than more cost levels. Frontier-first selection operated correctly a seventh time (right cell selected, decisive independently verified verdict).",
+    "process_decision": "RETAIN",
+    "question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+    "research_result": "COST_ROBUST \u2014 the short-horizon momentum edge (lookback 3/5/10) survives the repository's realistic cost model (commission_per_trade=2.0, commission_per_share=0.003, slippage_cents=2.0, slippage_proportional=0.0005) and a 2x conservative stress with essentially unchanged candidate segment medians (cost drag at lookback 5 = 0.0000 for every asset with a baseline edge). Classification across the 10-asset universe: COST_ROBUST=6 (AAPL, MSFT, GOOGL, AMZN, META, TSLA \u2014 exactly the previously-admitted lookback-robust set), NO_BASELINE_EDGE=4 (NVDA, JPM, JNJ, XOM), COST_FRAGILE=0, COST_ERASES_EDGE=0. Costs are genuinely charged (e.g. AAPL realistic commission $18.7k over 4452 constant-dollar rebalancing fills; full-sample total return +553.0% zero -> +551.4% realistic) but small relative to the multi-percent per-fold edge. Qualification: robustness follows from low turnover (~1 sign flip/asset over 2009-2026; a persistent long bias), not a high-turnover timing alpha; the regime-verdict machinery is null-dispersion-sensitive. Exploratory research simulation, not a traded idea.",
+    "role": "HIGHER_ORDER_OBJECTIVE",
+    "task_id": "R-001",
+    "task_selection_observation": "IMPROVED",
+    "uncertainty_reduced": "Reduced: cost robustness is now classified and independently verified (COST_ROBUST=6 / NO_BASELINE_EDGE=4 / 0 erased; candidate medians unchanged by realistic and 2x costs; 3 verifier gates MATCH; 168 tests pass). Residual uncertainty is the low-turnover mechanism and the null-dispersion sensitivity of the n_edge verdict, both recorded as caveats and converted into a candidate task.",
+    "uncertainty_targeted": "Whether the admitted short-horizon momentum edge survives conservative transaction-cost stress on the collected real-data universe (tradable net of costs vs a gross-only artifact).",
+    "unverified": [
+      "Exact per-checkpoint UTC timestamps beyond the session start 2026-11-27T08:03:45Z (environment message time) and a finish probe 2026-11-27T08:12:17Z (Python datetime read); the `date` shell form is denied, so no independent wall-clock cross-check of the finish time was possible",
+      "The n_edge-based classification is null-dispersion-sensitive: the coin-flip null trades far more than the low-turnover signal, so its dispersion changes under costs and n_edge can shift by +/-1 with no candidate-median change (e.g. MSFT lookback-5 zero=REGIME_STABLE vs realistic=REGIME_DEPENDENT on identical medians [0.052, 0.072]); the candidate-median invariance (cost drag ~0) is the primary evidence and the n_edge counts carry this caveat",
+      "Cost-robustness is conditional on the signal's LOW TURNOVER (~1 sign flip per asset over 2009-2026; operationally a persistent long bias for these trending large-caps); it is not a stringent test of a high-turnover timing alpha and does not establish live tradability; the result is exploratory research simulation only"
+    ],
+    "verified": [
+      "python3 research/checks/momentum_cost_sensitivity.py: exits 0; manifest 10/10 OK; PREFLIGHT PASSED; leakage PASS on AMZN/JPM (signal integrity + equity-fill audit under realistic costs); cost grid computed for all 3 levels x 3 lookbacks x 10 assets; classification COST_ROBUST=6 (AAPL, MSFT, GOOGL, AMZN, META, TSLA) / NO_BASELINE_EDGE=4 (NVDA, JPM, JNJ, XOM) / COST_FRAGILE=0 / COST_ERASES_EDGE=0; cost drag at lookback 5 = 0.0000 for all but NVDA (+0.009); determinism r1==r2 True; zero-cost column cross-consistent with momentum_lookback_sweep_results.json True; artifact written",
+      "python3 research/checks/verify_momentum_cost_sensitivity.py: Gate 1 PASS (fresh walk_forward + noise_benchmark recomputation of AMZN/JPM medians/nulls/dispersion/verdicts for all lookbacks and all cost levels MATCH the artifact); Gate 2 PASS (zero-cost column reproduces momentum_lookback_sweep_results.json on all 10 assets / 3 lookbacks); Gate 3 PASS (classification + n_edge re-derive from the artifact via the documented rule, cost params match, AMZN lookback-5 realistic recomputation identical across reruns)",
+      "python3 -m unittest discover -s tests -q: 168 tests, all passing (OK); only pre-existing numpy ddof RuntimeWarnings, no failures",
+      "git diff --check: clean on the touched files (no whitespace/conflict errors)"
+    ]
+  },
+  "primary_question": "Does the controller-selected sequence in a completed campaign close more distinct frontier cells per activation than the prior frontier-first manual sequence?",
+  "role": "LEARNING_PROCESS",
+  "scope": "Use completed campaign agent records, task_queue selection_history, LEARNING_STATE, and activation logs; qualitative comparison only.",
+  "selection_basis": {
+    "compared_against": [
+      "P-007",
+      "P-002",
+      "P-004",
+      "P-003",
+      "P-006"
+    ],
+    "qualitative_priority": [
+      "HIGH",
+      "HIGH",
+      "MEDIUM",
+      "HIGH",
+      "LOW",
+      "LOW",
+      "LOW"
+    ],
+    "reason": "highest evidence-backed qualitative priority among currently OPEN tasks for this role"
+  },
+  "stop_condition": "Stop once the completed-campaign sequence is compared or the evidence is declared insufficient.",
+  "success_criterion": "The comparison yields a clear classification or an explicit statement that the evidence is insufficient.",
+  "task_id": "P-007",
+  "tests_preceding_process": false,
+  "verification_requirement": "Controller-side validation plus inspection of the cited completed-campaign records."
+}
