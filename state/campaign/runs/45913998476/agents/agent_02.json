@@ -1,0 +1,68 @@
+{
+  "agent_number": 2,
+  "campaign_slot": 2,
+  "global_agent_number": 2,
+  "role": "HIGHER_ORDER_OBJECTIVE",
+  "task_id": "R-001",
+  "objective": "Run a bounded cost-sensitivity check for lookback 3/5/10 momentum under the repository's existing realistic cost model and matched null.",
+  "bottleneck": "The candidate positive momentum evidence is short-horizon and mechanical; cost robustness remains decision-relevant.",
+  "question": "Does the short-horizon momentum edge survive conservative transaction-cost stress on the collected real-data universe?",
+  "action": "Wrote and executed research/checks/momentum_cost_sensitivity.py: a predeclared bounded cost grid {zero, realistic, stress2x} x lookback {3,5,10} across the fixed 10-asset collected universe via the authoritative stress_segments_across_tickers path, with the matched coin-flip null run under the SAME cfg (costs) as the candidate. realistic = the repo's existing model copied verbatim from examples/ma_crossover_real_data.py (commission_per_trade=2.0, commission_per_share=0.003, slippage_cents=2.0, slippage_proportional=0.0005); stress2x doubles every component. Wrote an independent verifier (research/checks/verify_momentum_cost_sensitivity.py) that recomputes via a fresh walk_forward + noise_benchmark path (not stress_segments) and cross-checks the zero-cost lookback-5 column against momentum_results.json. No signal, lookback, universe, or cost value was tuned after seeing results.",
+  "changed": [
+    "research/checks/momentum_cost_sensitivity.py (new: bounded cost-sensitivity check + artifact writer)",
+    "research/checks/verify_momentum_cost_sensitivity.py (new: independent 4-gate verifier)",
+    "state/check_artifacts/momentum_cost_sensitivity_results.json (new: reproducible artifact)",
+    "state/campaign/runs/45913998476/agents/agent_02.json (new: this record)",
+    "state/worker_progress.md (milestone update at a genuine semantic milestone)",
+    "logs/ACTIVATION-2026-11-27.md (new: timestamped activation record)",
+    "research/checks/_diag_cost_tmp.py (throwaway diagnostic used to confirm the cost cfg reaches the candidate path; rm is denied at this layer so it is left in place; NOT part of the evidence base)"
+  ],
+  "verified": [
+    "python3 research/checks/momentum_cost_sensitivity.py: manifest 10/10 OK; PREFLIGHT PASSED; leakage PASS (AMZN/JPM); equity-fill audit PASS under zero AND realistic costs; determinism r1==r2 True; artifact written; OVERALL (canonical lookback 5) = COST_ROBUST; lookbacks COST_ROBUST = 3/3 (lb3 |E0|=8 |Er|=8 |E2|=7; lb5 |E0|=9 |Er|=9 |E2|=8; lb10 |E0|=8 |Er|=8 |E2|=8).",
+    "python3 research/checks/verify_momentum_cost_sensitivity.py: Gate 1 MATCH (AMZN/JPM x lookback 3/5/10 x zero/realistic/stress2x, per-segment candidate medians and matched-null medians recomputed fresh); Gate 2 classification MATCH (COST_ROBUST reproduced from artifact gaps); Gate 3 all 10 tickers zero-cost lookback-5 MATCH vs momentum_results.json (medians, null medians, verdicts, segments); Gate 4 determinism True.",
+    "python3 -m unittest discover -s tests -v: 168 tests, all OK (the new checks are standalone and not imported by the suite; no regression)."
+  ],
+  "unverified": [
+    "Finish timestamp not captured: the date and stat shell forms are denied at this layer; only the observed activation start (2026-11-27T00:00:59Z, controller message time) is recorded and no timestamp was invented.",
+    "'Cost-robust' is conditional on the engine's constant-dollar (fixed-notional) sizing: traded notional per bar is small relative to the 1e6 base and cumulative P&L, so the absolute per-fold cost drag is ~1e-4 and the candidate's absolute net-of-cost medians are essentially unchanged. A compounding / equity-scaled sizing or materially higher slippage could produce larger costs; that was NOT tested (bounded grid, out of scope).",
+    "Only one realistic cost point plus a 2x stress were evaluated; the broader cost surface is not mapped (bounded by design).",
+    "The candidate-minus-null gap WIDENS under costs partly because the matched coin-flip null churns more (random daily weights) and pays more costs than the persistent momentum signal; the widening is therefore partly a null-turnover effect, not purely a candidate property.",
+    "JNJ and XOM are in the zero-cost edge set E0 but are noise-level (CONSISTENT_WITH_NOISE) with small positive gaps; the E0 composition is reported so COST_ROBUST is not over-read.",
+    "Verdict labels flip for MSFT (REGIME_STABLE->REGIME_DEPENDENT) and JPM (REGIME_DEPENDENT->REGIME_STABLE) between zero and realistic cost; these are null-dispersion artifacts (candidate medians flat), consistent with the documented 'verdict labels are not self-interpreting' caveat, and the gap-based classification is the robust read."
+  ],
+  "observed_effect": "The admitted short-horizon momentum candidate is cost-robust on the collected universe: the candidate-minus-null gap is preserved (and, via the null's higher turnover, widens) at the repo's realistic cost level and a 2x stress, for all three lookbacks (3/5/10 -> COST_ROBUST 3/3); the absolute net-of-cost candidate medians are essentially unchanged (per-fold drag ~1e-4) for the same assets, with NVDA the only excluded asset (a stable loser whose losses grow with costs). The a-priori prediction (COST_MARGINAL/COST_FRAGILE) was REFUTED. Independently verified on all four gates; the zero-cost lookback-5 column reproduces the prior momentum_results.json exactly on all 10 tickers.",
+  "uncertainty_targeted": "Whether the short-horizon (lookback 3/5/10) momentum edge survives conservative transaction-cost stress under the repository's realistic cost model with a matched coin-flip null, i.e. whether the only admitted positive candidate is cost-robust or a zero-cost artifact.",
+  "uncertainty_reduced": "Reduced: the cost-robustness of the candidate is now classified (COST_ROBUST at lookbacks 3/5/10, canonical 5) with a reproducible artifact and independent recomputation. Not resolved: the result is conditional on the engine's constant-dollar fixed-notional sizing (low absolute cost drag); a compounding/equity-scaled sizing or higher-slippage cost surface remains untested, and the gap-widening is partly a matched-null turnover effect.",
+  "process_decision": "RETAIN",
+  "research_result": "Cost-robustness of short-horizon momentum on the collected 10-asset universe is classified COST_ROBUST at lookbacks 3/5/10 (canonical 5) under the repo's existing realistic cost model (commission_per_trade=2.0, commission_per_share=0.003, slippage_cents=2.0, slippage_proportional=0.0005) and a 2x stress, judged by the candidate-minus-null gap and corroborated by essentially unchanged absolute net-of-cost medians (drag ~1e-4/fold). The a-priori COST_MARGINAL/COST_FRAGILE prediction was refuted. Qualification: conditional on constant-dollar fixed-notional sizing; the matched coin-flip null pays more costs than the persistent signal, so part of the gap-widening is a null-turnover effect; JNJ/XOM are noise-level members of the edge set. This is a research/simulation finding, not a traded result.",
+  "decision": "RETAIN",
+  "next": "Execute R-002: test a fixed lookback-5 momentum signal with a predeclared small holding-period set through the existing walk-forward/null methodology.",
+  "candidate_tasks": [
+    {
+      "task_id": "R-006",
+      "role": "HIGHER_ORDER_OBJECTIVE",
+      "status": "OPEN",
+      "primary_question": "Does the cost-robustness of short-horizon momentum survive a cost model applied under compounding / equity-scaled sizing rather than the engine's constant-dollar fixed-notional sizing?",
+      "bottleneck": "The verified cost-robustness result is conditional on constant-dollar fixed-notional sizing, which yields a small absolute per-fold cost drag (~1e-4); a strategy that trades a share of growing equity could face materially larger costs.",
+      "objective": "Re-run the lookback-5 momentum cost check with a predeclared equity-scaled (compounding) sizing variant under the same realistic and 2x cost grid and matched null, without leverage.",
+      "scope": "Existing 10-asset universe, existing momentum signal and cost model; one predeclared sizing variant; no leverage.",
+      "out_of_scope": "Do not optimize sizing parameters, add leverage, expand the universe, or tune costs after seeing results.",
+      "deliverable": "A reproducible cost-robustness artifact under equity-scaled sizing plus independent verification.",
+      "success_criterion": "The result classifies cost robustness under the alternative sizing and is independently reproduced, regardless of outcome.",
+      "stop_condition": "Stop after the predeclared sizing variant completes the cost grid and independent check.",
+      "verification_requirement": "Leakage gate, matched null, independent recomputation, determinism, regression suite.",
+      "evidence_basis": "R-001 verified COST_ROBUST only under constant-dollar fixed-notional sizing; the sizing-convention caveat is the main residual qualification.",
+      "expected_information_gain": "MEDIUM",
+      "downstream_leverage": "MEDIUM",
+      "falsification_power": "HIGH",
+      "verifiability": "HIGH",
+      "effort": "MEDIUM",
+      "complexity": "MEDIUM",
+      "execution_risk": "LOW",
+      "tests_preceding_process": true
+    }
+  ],
+  "complexity_added": "LOW (two standalone research check scripts + one JSON artifact; no framework, controller, dependency, or universe change)",
+  "failure_class": "NONE",
+  "task_selection_observation": "IMPROVED"
+}
