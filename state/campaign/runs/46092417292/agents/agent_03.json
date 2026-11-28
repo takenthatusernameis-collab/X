@@ -1,0 +1,66 @@
+{
+  "agent_number": 3,
+  "campaign_slot": 3,
+  "global_agent_number": 3,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-002",
+  "objective": "Audit resolved frontier cells and task history for duplicate or near-duplicate work and determine whether a minimal novelty guard is sufficient.",
+  "bottleneck": "Research efficiency depends on preserving negative evidence strongly enough to redirect search.",
+  "question": "Does the durable history adequately prevent repeating equivalent experiments when a frontier cell is already resolved?",
+  "action": "Read-only audit (no research code or experiment executed; bash is denied at this layer so all inspection used repository-native read/grep/glob). Inspected: state/LEARNING_STATE.md (frontier table, learning history, active delta, Learning rules), state/STATE.md, state/worker_progress.md, state/campaign/task_queue.json (P-001..P-007, R-001..R-007 with statuses), state/campaign/current_task.json, state/campaign/runs/46092417292/campaign_status.json (selection_history + status gating), agents/agent_01.json (P-001 prior audit), agents/agent_02.json (R-001), and the research/checks/ inventory (33 files) cross-referenced against state/check_artifacts/ (12 artifacts). Classified each momentum-family check by information objective and searched the whole repository for references to detect orphans.",
+  "changed": [
+    "state/campaign/runs/46092417292/agents/agent_03.json (this audit record; the single durable deliverable)",
+    "state/worker_progress.md (semantic milestone: P-002 duplicate-work audit complete)",
+    "logs/ACTIVATION-2026-11-28.md (activation record appended)"
+  ],
+  "verified": [
+    "Inspection (no code change): LEARNING_STATE.md frontier + history show each distinct frontier-first cell from activation 37263008074 onward closed exactly once with a decisive verdict, independent-verification MATCH, and determinism, with no equivalent re-test recorded: mean-reversion FALSIFIED (37263008074), cross-sectional relative strength FALSIFIED (37304873966), volatility targeting FALSIFIED (37314710995), momentum lookback-5 ADMITTED (37318950814), momentum lookback-sweep 3/5/10 TESTED (37361000967), momentum longer-horizon 20/60 TESTED (37394344201), cross-sectional momentum 63d FALSIFIED, 20-day breakout FALSIFIED (37414038601).",
+    "Inspection (no code change): the novelty guard is already codified in two durable places -- LEARNING_STATE.md 'Learning rules' #2 ('A repeated experiment requires a new hypothesis, diagnostic purpose, materially new data, independent verification need, or different information objective') and LEARNING_EFFICIENCY.md section 2 ('Add a novelty guard').",
+    "Inspection (no code change): the OPEN queue momentum variants each carry a DISTINCT information objective that satisfies the guard's exception criteria and are therefore not duplicates: R-002 holding-period sensitivity, R-003 past-only volatility gate, R-005 volatility-normalized sizing, R-006 strict temporal holdout, R-007 bps-only cost model.",
+    "Inspection (no code change): queue status gating prevents re-selecting resolved cells -- campaign_status.json shows R-001 and R-004 are RESOLVED and select_task only draws OPEN tasks for the role; selection_history records P-001, R-001, P-002 with no repeated task_id.",
+    "Inspection (no code change): ONE concrete code-level near-duplicate identified -- research/checks/momentum_sweep.py is an orphan near-duplicate of the executed research/checks/momentum_lookback_sweep.py (and overlaps momentum_longer_horizon.py): same 10-asset collected universe, same walk-forward (train=252/test=84/warmup=60/overlap=60), same 4 past-only volatility blocks, same coin-flip null, same per-asset regime-stability metric over lookbacks {3,5,10} (momentum_sweep adds lookback 20 and fold-level t-statistics). It has NO artifact (state/check_artifacts/momentum_sweep_results.json is absent), NO verifier, and NO markdown reference anywhere (repo-wide grep for 'momentum_sweep' returns only its own ARTIFACT_PATH line, the agent before-snapshot hashes, and this session's log); it is NOT marked superseded.",
+    "Inspection (no code change): the near-duplicate did NOT produce a duplicate experiment -- the executed lookback robustness was recorded once (37361000967, momentum_lookback_sweep_results.json); the orphan momentum_sweep.py was never run, so the durable history prevented an equivalent experiment from being executed twice even though the redundant code file remains.",
+    "Inspection (no code change): the other checks without a JSON artifact are NOT near-duplicates -- cross_sectional_regime_diagnostic.py (cross-sectional dispersion regime classifier for the MA class), regime_dependent_deep_dive.py (MA REGIME_DEPENDENT deep-dive), regime_adaptive_ma.py (MA regime-adaptive, falsified 37260572520), and momentum_hold_period_sensitivity.py (R-002, OPEN/pending) each have a distinct information objective."
+  ],
+  "unverified": [
+    "No live wall-clock was available (bash and the `date` form are denied at this layer); the activation start is taken from the observed environment message time 2026-11-28T01:30:01Z and the before-snapshot captured_utc 2026-11-28T01:29:56Z. No finish timestamp was captured and none was invented.",
+    "The audit is observational: there is no controlled counterfactual proving the novelty guard (vs. the frontier simply containing distinct available cells) is the operative cause of duplicate avoidance; attribution is confounded exactly as recorded by the P-001 audit.",
+    "The proposed minimal change (mark momentum_sweep.py superseded) was NOT executed, so its independent controller validation (verification_requirement) is unmet here; it is recorded as one candidate task for a future agent that can run the controller.",
+    "Duplicate detection was by docstring/objective comparison and reference search, not by executing or diffing the two checks' numeric outputs; a byte-level equivalence of momentum_sweep.py's unique fold-t-statistic lens vs. the executed checks was not computed."
+  ],
+  "observed_effect": "The durable history DOES adequately prevent repeating equivalent EXPERIMENTS at the level that determines research efficiency: every distinct frontier-first cell was closed once with a decisive, independently verified verdict and no equivalent re-test, the novelty guard is already codified, queue status gating skips resolved cells, and every OPEN momentum variant has a distinct information objective. The one near-duplicate code pair (momentum_sweep.py / momentum_lookback_sweep.py) resulted in a single executed+recorded lookback sweep, so the duplicate experiment was avoided. The only residual gap is a single unmarked orphan code artifact (momentum_sweep.py) that a future agent could re-run; this is code hygiene, not a research-process failure.",
+  "uncertainty_targeted": "Whether the durable history (frontier table + codified novelty guard + queue status gating) adequately prevents repeating equivalent experiments when a frontier cell is already resolved, or whether near-duplicate work can slip through and be re-executed.",
+  "uncertainty_reduced": "Reduced uncertainty that the durable history prevents equivalent EXPERIMENTS: established with concrete evidence that (a) each frontier-first cell was closed once with no equivalent re-test, (b) the codified novelty guard plus queue status gating are operative, and (c) the one code-level near-duplicate (momentum_sweep.py) was never executed, so no duplicate experiment entered the record. Did NOT execute the minimal orphan-marking change (recorded as candidate task P-008) and did not obtain a controlled counterfactual, so the residual code-hygiene gap and causal attribution remain as recorded.",
+  "process_decision": "RETAIN",
+  "research_result": "Process audit only (no market research). The minimal novelty guard already codified in LEARNING_STATE (Learning rules #2) and LEARNING_EFFICIENCY (section 2) is SUFFICIENT to prevent equivalent experiments: across the frontier-first period each distinct cell (mean-reversion, cross-sectional relative strength, volatility targeting, momentum lookback-5, momentum lookback-sweep, momentum longer-horizon, cross-sectional momentum 63d, 20-day breakout) was closed once with a decisive, independently verified verdict and no equivalent re-test; the queue's OPEN momentum variants each carry a distinct information objective; and queue status gating skips RESOLVED cells. Concrete duplicate-avoidance evidence: the one near-duplicate code pair (research/checks/momentum_sweep.py vs the executed momentum_lookback_sweep.py) produced only ONE executed+recorded lookback sweep (37361000967) -- the duplicate experiment was avoided. Residual (non-blocking) gap: momentum_sweep.py is an unmarked orphan near-duplicate with no artifact/reference; marking it superseded is recorded as the single minimal candidate task P-008. No process change is warranted, so the process is RETAINED.",
+  "decision": "RETAIN",
+  "next": "Execute candidate task P-008: add a one-line 'superseded by momentum_lookback_sweep.py + momentum_longer_horizon.py' note to the research/checks/momentum_sweep.py docstring (comment-only, no code/behavior change) and obtain independent controller validation that only a docstring changed.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-008",
+      "role": "LEARNING_PROCESS",
+      "bottleneck": "An orphan near-duplicate check (research/checks/momentum_sweep.py) is not marked superseded, so a future agent scanning research/checks/ could re-run an experiment equivalent to the already-resolved lookback-sweep cell.",
+      "objective": "Mark research/checks/momentum_sweep.py as superseded by momentum_lookback_sweep.py + momentum_longer_horizon.py via a one-line docstring note, closing the only observed code-level duplicate-avoidance gap without altering behavior.",
+      "primary_question": "Does marking the orphan near-duplicate check as superseded close the only observed code-level duplicate-avoidance gap without altering any behavior?",
+      "scope": "research/checks/momentum_sweep.py docstring only; no code or behavior change.",
+      "out_of_scope": "Do not rerun any experiment, do not delete the file, do not add a metadata system.",
+      "deliverable": "A one-line superseded-note edit verified comment-only by inspection and independently controller-validated.",
+      "success_criterion": "The orphan is marked superseded and the edit is verified to change only a docstring (no code lines).",
+      "stop_condition": "Stop after the single docstring note is added and verified comment-only.",
+      "verification_requirement": "Independent controller validation that the hash diff is limited to a docstring comment and the regression suite is unaffected.",
+      "evidence_basis": "P-002 audit found research/checks/momentum_sweep.py is a near-duplicate of the executed momentum_lookback_sweep.py with no artifact, no verifier, no markdown reference, and no superseded marker.",
+      "status": "OPEN",
+      "complexity": "LOW",
+      "effort": "LOW",
+      "execution_risk": "LOW",
+      "expected_information_gain": "MEDIUM",
+      "downstream_leverage": "MEDIUM",
+      "falsification_power": "LOW",
+      "verifiability": "HIGH",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "None. Read-only audit: no research code, process artifact, controller, or workflow change; only this record, the worker_progress milestone, and the activation log were written. One minimal code-hygiene change is proposed (not executed) as candidate task P-008.",
+  "failure_class": "NONE",
+  "task_selection_observation": "IMPROVED"
+}

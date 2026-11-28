@@ -1,0 +1,62 @@
+{
+  "agent_number": 1,
+  "campaign_slot": 1,
+  "global_agent_number": 1,
+  "role": "LEARNING_PROCESS",
+  "task_id": "P-001",
+  "objective": "Audit recent activation history and frontier decisions to determine whether explicit highest-value focused-task selection produces better information flow.",
+  "bottleneck": "Prior activations had durable conclusions but task choice was opportunistic from a queue.",
+  "question": "Does the current focused-task selector improve learning efficiency relative to the repository's prior opportunistic task choice?",
+  "action": "Audited durable evidence only (no code/experiment change): state/LEARNING_STATE.md (frontier table + learning history + active delta), state/STATE.md (activation sections through 37414038601), logs/ACTIVATION-2026-10-05.md and logs/ACTIVATION-2026-10-06.md, state/activation_status.json, state/campaign/task_queue.json and task_queue_initial.json, state/campaign/runs/46092417292/campaign_status.json, and the controller selection logic in .github/scripts/campaign_controller.py (select_task, task_rank, candidate_tasks_for_role). Compared the pre-frontier opportunistic period against the frontier-first period on equivalent-re-test avoidance and decisive-verdict throughput.",
+  "changed": [
+    "state/campaign/runs/46092417292/agents/agent_01.json (this audit record; the single durable deliverable)",
+    "state/worker_progress.md (semantic milestone: P-001 process audit complete)"
+  ],
+  "verified": [
+    "Inspection (no code change): LEARNING_STATE.md frontier table + learning history show one distinct frontier cell per activation across 37263008074 (mean-reversion FALSIFIED), 37304873966 (cross-sectional relative strength FALSIFIED), 37314710995 (volatility targeting FALSIFIED), 37318950814 (momentum SUPPORTED), 37361000967 (momentum lookback sweep, qualified), 37394344201 (momentum longer-horizon, qualified), 37414038601 (breakout FALSIFIED) -- each with a decisive verdict, independent-verification MATCH, determinism, and no equivalent re-test.",
+    "Inspection (no code change): the prior opportunistic period (STATE.md sections 2026-10-02..2026-10-05) repeatedly re-refined a single MA-crossover cell (per-asset t-stat, regime deep-dive, regime-adaptive, richer regime features, per-asset null) rather than advancing across distinct cells.",
+    "Inspection (no code change): campaign_controller.py task_rank (lines 206-218) is an ordinal qualitative sort (maximize expected_information_gain/downstream_leverage/falsification_power/verifiability, minimize effort/complexity/execution_risk, tie-break task_id); candidate_tasks_for_role (221-225) selects the first OPEN task for the role; select_task (269-383) records selection_basis. This is a real selector, but it ranks queue metadata, not the LEARNING_STATE frontier directly.",
+    "Inspection (no code change): task_queue.json P-001..P-004 all carry HIGH expected_information_gain/downstream_leverage/falsification_power/verifiability, so the top tier is coarse and the effective discriminator falls to effort/complexity/execution_risk then task_id (P-001 selected over P-003 by task_id tie-break)."
+  ],
+  "unverified": [
+    "No controlled counterfactual exists for the opportunistic selector; the before/after comparison is observational and confounded by the frontier simply containing distinct available cells.",
+    "Attribution to the controller's ordinal task_rank selector specifically is not isolated: the prior frontier-first gains were produced by agent-level selection reading LEARNING_STATE, and several frontier activations (37260572520, 37318950814) were logged UNVERIFIED (process delta) because the objective came from a queued receipt item rather than a frontier cell.",
+    "The current campaign 46092417292 has completed_agents=[] (campaign_status.json), so the ordinal selector has produced no completed sequence yet; its end-to-end effect on information flow is unverified.",
+    "The coarse top-tier discrimination of task_rank (many HIGH-benefit ties broken by task_id) means the selector's 'highest-value' claim is weak within the top priority tier; this is recorded as an observation, not a demonstrated bottleneck, and is out of scope to change here."
+  ],
+  "observed_effect": "The frontier-first selection PRACTICE is associated with a concrete information-flow difference: 7 distinct frontier cells were each closed once with a decisive verdict, independent-verification MATCH, and determinism, with no equivalent re-tests, whereas the prior opportunistic period repeatedly re-refined one MA-crossover cell across many activations. This is consistent with the frontier-first practice reducing equivalent search and increasing distinct hypotheses resolved per activation. The specific causal contribution of the controller's ordinal selector is NOT isolated (see unverified).",
+  "uncertainty_targeted": "Whether explicit highest-value focused-task selection (vs opportunistic queue choice) improves information flow, and whether the controller's ordinal task_rank selector is the operative cause of any improvement.",
+  "uncertainty_reduced": "Reduced uncertainty that the frontier-first focused-task selection PRACTICE improves information flow (concrete before/after contrast in equivalent-re-test avoidance and distinct-cell throughput). Did NOT resolve whether the controller's ordinal task_rank selector is the specific cause; that residual uncertainty is now explicitly recorded together with its confounds and the coarse top-tier observation.",
+  "process_decision": "RETAIN",
+  "research_result": "Process audit only (no market research). Durable finding: the frontier-first focused-task selection practice is associated with improved information flow (distinct cells closed decisively, no equivalent re-tests). The controller's ordinal selector specifically is UNVERIFIED as the cause, and its top-tier discrimination is coarse (task_id tie-break). No observed bottleneck in the current selector warrants a process change, so the process is retained unchanged.",
+  "decision": "RETAIN",
+  "next": "When campaign 46092417292 has at least three completed agents, perform one bounded check comparing each selected task_id against the LEARNING_STATE highest-value OPEN frontier cell to test whether the ordinal selector's picks match the frontier; record MATCH/MISMATCH without redesigning the selector.",
+  "candidate_tasks": [
+    {
+      "task_id": "P-007",
+      "role": "LEARNING_PROCESS",
+      "bottleneck": "The controller's ordinal task_rank selector ranks queue metadata, not the LEARNING_STATE frontier, so its picks may diverge from the highest-value unresolved cell.",
+      "objective": "Once at least three agents in campaign 46092417292 have completed, compare each selected task_id against the LEARNING_STATE highest-value OPEN frontier cell and classify selector-frontier agreement.",
+      "primary_question": "Do the ordinal selector's picks match the frontier's highest-value unresolved cells often enough to justify the selector's 'highest-value' claim?",
+      "scope": "Use campaign_status.json selection_history, the per-agent records, and LEARNING_STATE frontier only; no controller redesign.",
+      "out_of_scope": "Do not modify the controller, add a reward score, or rerun experiments.",
+      "deliverable": "A bounded MATCH/MISMATCH classification with the compared task_ids and frontier cells.",
+      "success_criterion": "A clear agreement classification or one specific, verifiable divergence is recorded.",
+      "stop_condition": "Stop after the available completed selections are compared once.",
+      "verification_requirement": "Controller-side inspection of selection_history and frontier state; no reliance on agent confidence.",
+      "evidence_basis": "campaign_status.json selection_history and LEARNING_STATE frontier table.",
+      "status": "OPEN",
+      "complexity": "LOW",
+      "effort": "LOW",
+      "execution_risk": "LOW",
+      "expected_information_gain": "MEDIUM",
+      "downstream_leverage": "HIGH",
+      "falsification_power": "MEDIUM",
+      "verifiability": "HIGH",
+      "tests_preceding_process": false
+    }
+  ],
+  "complexity_added": "None. Audit only: no research code, process artifact, controller, or workflow change; only this record and the worker_progress milestone were written.",
+  "failure_class": "NONE",
+  "task_selection_observation": "IMPROVED"
+}
